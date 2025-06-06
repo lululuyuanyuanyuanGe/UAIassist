@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from langchain_tavily import TavilySearch
-from langchain_core.tools import tool
+from langchain_core.tools import tool, InjectedToolCallId
 from langchain_core.messages import BaseMessage, ToolMessage
 from langchain.chat_models import init_chat_model
 
@@ -24,17 +24,70 @@ memory = MemorySaver()
 # Define the format of the conversation messages between LLM
 class State(TypedDict):
     messages: Annotated[list, add_messages]
+    name: str
+    birthday: str
 
 graph_builder = StateGraph(State)
 
 @tool
-def human_assistance(query: str) -> str:
+# Note that because we are generating a ToolMessage for a state update, we
+# generally require the ID of the corresponding tool call. We can use
+# LangChain's InjectedToolCallId to signal that this argument should not
+# be revealed to the model in the tool's schema.
+def human_assistance(
+        query: str,
+        name: str,
+        birthday: str,
+        tool_call_id: Annotated[str, InjectedToolCallId]
+    ) -> str:
     """Request assistance from a human"""
-    human_response = interrupt({"query": query})
-    return human_response["data"]
+    human_response = interrupt(
+        {
+            "query": query,
+            "name": name,
+            "birthday": birthday
+        }
+    )
+
+    # Let the LLM structure the reply using the parse_human_feedback tool
+    parsed_response = llm_with_tools.invoke([
+        {"role": "user", "content": f"The human replied: {human_response['data']}"},
+        {"role": "tool", "tool_call": {
+            "name": "parse_human_feedback",
+            "args": {
+                "text": human_response["data"]
+            }
+        }}
+    ])
+
+    structured = parsed_response.tool_calls[0].args  # e.g. {"correct": "yes"}
+
+    # Handle corrections
+    new_name = structured.get("name", name)
+    new_birthday = structured.get("birthday", birthday)
+    correct = structured.get("correct", "").lower().startswith("y")
+
+    return Command(update={
+        "name": new_name,
+        "birthday": new_birthday,
+        "messages": [
+            ToolMessage(
+                tool_call_id=tool_call_id,
+                name="human_assistance",
+                content="Confirmed" if correct else "Corrected info received"
+            )
+        ]
+    })
+
+@tool
+def parse_human_feedback(text: str) -> dict:
+    """Parse human correction into a structured dictionary with keys like 'correct', 'name', and 'birthday'."""
+    # This is only a schema description for the LLM.
+    # LangGraph will auto-fill this with LLM's reasoning.
+    pass  # Not executed at runtime — LLM fills this tool response.
 
 search_tool = TavilySearch(max_results = 2)
-tools = [search_tool, human_assistance]
+tools = [search_tool, human_assistance, parse_human_feedback]
 llm = init_chat_model(
         "gpt-4o"        
         #temperature
@@ -130,7 +183,7 @@ def stream_graph_updates(user_input: str):
 
                     # Once done resuming, break out of the outer loop
                     break
-                
+
 while True:
     try:
         user_input = input("User: ")
