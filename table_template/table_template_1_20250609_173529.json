@@ -1,0 +1,44 @@
+{
+  "session_id": "1",
+  "timestamp": "2025-06-09T17:35:29.406261",
+  "table_info": {
+    "purpose": "未提供具体用途",
+    "description": "未提供详细描述",
+    "data_sources": [
+      "未提供数据来源"
+    ],
+    "target_users": [
+      "未提供目标用户"
+    ],
+    "frequency": "未提供使用频率"
+  },
+  "table_structure": {
+    "has_multi_level": false,
+    "multi_level_headers": []
+  },
+  "additional_requirements": {
+    "formatting": [
+      "未提供格式要求"
+    ],
+    "validation_rules": [
+      "未提供数据验证规则"
+    ],
+    "special_features": [
+      "未提供特殊功能需求"
+    ]
+  },
+  "conversation_messages": [
+    {
+      "type": "HumanMessage",
+      "content": "???????????????"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "你好！为了帮助你设计一个合适的Excel表格，我需要了解一些信息。首先，请告诉我这个表格的主要用途是什么？例如，它是用于财务管理、项目跟踪还是其他用途？"
+    }
+  ]
+}

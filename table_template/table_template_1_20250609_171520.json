@@ -1,0 +1,184 @@
+{
+  "session_id": "1",
+  "timestamp": "2025-06-09T17:15:20.025014",
+  "table_info": {
+    "purpose": "收集中讯村居民的人口普查信息",
+    "description": "该表格用于记录中讯村居民的基本信息、经济状况和其他相关人口数据，以便进行统计分析和政策制定。",
+    "data_sources": [
+      "居民提供的个人信息",
+      "政府人口数据库"
+    ],
+    "target_users": [
+      "政府统计部门",
+      "社会研究机构"
+    ],
+    "frequency": "每年"
+  },
+  "table_structure": {
+    "has_multi_level": true,
+    "headers": [],
+    "multi_level_headers": {
+      "level_1": [
+        {
+          "name": "基础信息",
+          "description": "居民的基本个人信息",
+          "children": [
+            {
+              "name": "姓名",
+              "description": "居民的全名",
+              "data_type": "text",
+              "required": true,
+              "example": "张三"
+            },
+            {
+              "name": "年龄",
+              "description": "居民的年龄",
+              "data_type": "number",
+              "required": true,
+              "example": "35"
+            },
+            {
+              "name": "性别",
+              "description": "居民的性别",
+              "data_type": "text",
+              "required": true,
+              "example": "男"
+            },
+            {
+              "name": "身份证信息",
+              "description": "居民的身份证号码",
+              "data_type": "text",
+              "required": true,
+              "example": "123456789012345678"
+            },
+            {
+              "name": "婚姻状况",
+              "description": "居民的婚姻状况",
+              "data_type": "text",
+              "required": false,
+              "example": "已婚"
+            },
+            {
+              "name": "子女人数",
+              "description": "居民的子女数量",
+              "data_type": "number",
+              "required": false,
+              "example": "2"
+            },
+            {
+              "name": "健康状况",
+              "description": "居民的健康状况",
+              "data_type": "text",
+              "required": false,
+              "example": "良好"
+            },
+            {
+              "name": "联系电话",
+              "description": "居民的联系电话",
+              "data_type": "text",
+              "required": true,
+              "example": "13800138000"
+            }
+          ]
+        },
+        {
+          "name": "经济状况",
+          "description": "居民的经济相关信息",
+          "children": [
+            {
+              "name": "职业",
+              "description": "居民的职业",
+              "data_type": "text",
+              "required": true,
+              "example": "教师"
+            },
+            {
+              "name": "收入",
+              "description": "居民的月收入",
+              "data_type": "number",
+              "required": true,
+              "example": "5000"
+            },
+            {
+              "name": "是否有房产",
+              "description": "居民是否拥有房产",
+              "data_type": "boolean",
+              "required": true,
+              "example": "true"
+            },
+            {
+              "name": "是否有车",
+              "description": "居民是否拥有车辆",
+              "data_type": "boolean",
+              "required": false,
+              "example": "false"
+            },
+            {
+              "name": "教育程度",
+              "description": "居民的最高教育程度",
+              "data_type": "text",
+              "required": false,
+              "example": "本科"
+            },
+            {
+              "name": "社会保险",
+              "description": "居民是否参加社会保险",
+              "data_type": "boolean",
+              "required": false,
+              "example": "true"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "additional_requirements": {
+    "formatting": [
+      "所有文本字段首字母大写",
+      "身份证信息需加密显示"
+    ],
+    "validation_rules": [
+      "年龄必须为正整数",
+      "收入必须为非负数",
+      "联系电话必须为有效的电话号码格式"
+    ],
+    "special_features": [
+      "自动计算家庭总收入",
+      "根据身份证信息自动识别性别"
+    ]
+  },
+  "conversation_messages": [
+    {
+      "type": "HumanMessage",
+      "content": "生成一个中讯村人口普查表格"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，我们可以从几个方面来设计这个人口普查表格。首先，我想了解一下，这个表格的主要用途是什么？是为了统计人口数量，还是为了收集更详细的人口信息，比如年龄、职业等？"
+    },
+    {
+      "type": "AIMessage",
+      "content": "了解了，这个表格需要收集详细的人口信息。接下来，我们可以考虑一下具体需要哪些表头。除了您提到的职业、收入、是否有房产和身份证信息外，您还希望收集哪些其他信息，比如教育程度、婚姻状况等？"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，了解了。我们目前有以下信息需要收集：\n\n1. 姓名\n2. 年龄\n3. 性别\n4. 职业\n5. 收入\n6. 是否有房产\n7. 身份证信息\n8. 教育程度\n9. 婚姻状况\n10. 子女人数\n11. 是否有车\n\n接下来，我想确认一下，这些信息是否需要分组或分类，比如按家庭、年龄段等进行分类？或者是否需要多级表头来更好地组织这些信息？"
+    },
+    {
+      "type": "AIMessage",
+      "content": "当然可以。除了已经列出的信息外，以下是一些可能对人口普查有用的额外信息，您可以考虑是否需要：\n\n1. **居住地址**：具体到街道和门牌号，以便更精确地定位。\n2. **联系电话**：方便后续联系。\n3. **健康状况**：是否有重大疾病或残疾。\n4. **民族**：了解人口的民族构成。\n5. **户籍类型**：是否为本地户籍或外来人口。\n6. **居住年限**：在当前地址居住了多久。\n7. **就业状态**：全职、兼职、失业、退休等。\n8. **语言能力**：是否会说其他语言。\n9. **宗教信仰**：了解人口的宗教构成。\n10. **社会保险**：是否参加社会保险。\n\n请您考虑这些建议，并告诉我哪些信息是您希望添加到表格中的。"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，我们现在有以下信息需要收集：\n\n1. 姓名\n2. 年龄\n3. 性别\n4. 职业\n5. 收入\n6. 是否有房产\n7. 身份证信息\n8. 教育程度\n9. 婚姻状况\n10. 子女人数\n11. 是否有车\n12. 健康状况\n13. 联系电话\n14. 社会保险\n\n接下来，我们可以考虑表格的结构。您是否希望这些信息按某种特定的顺序排列？或者是否需要对某些信息进行分组，比如将个人信息（姓名、年龄、性别等）和经济信息（收入、是否有房产等）分开？"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，我们可以将表格设计为三层结构，具体如下：\n\n**第一级表头：**\n- 中讯村人口普查\n\n**第二级表头：**\n- 基础信息\n- 经济状况\n\n**第三级表头：**\n\n**基础信息：**\n1. 姓名\n2. 年龄\n3. 性别\n4. 身份证信息\n5. 婚姻状况\n6. 子女人数\n7. 健康状况\n8. 联系电话\n\n**经济状况：**\n1. 职业\n2. 收入\n3. 是否有房产\n4. 是否有车\n5. 教育程度\n6. 社会保险\n\n请确认这个分类是否符合您的需求，或者您是否有其他的调整建议？如果没有其他问题，我们就可以开始设计这个表格了。[COMPLETE]"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "session_id": "1",
+  "timestamp": "2025-06-09T17:04:49.073848",
+  "table_info": {
+    "purpose": "记录村民的基本信息以进行人口普查",
+    "description": "该表格用于收集和记录中讯村村民的基本人口信息，包括姓名、年龄、性别和家庭成员数量。",
+    "data_sources": [
+      "村民提供的个人信息"
+    ],
+    "target_users": [
+      "村委会工作人员",
+      "人口普查员"
+    ],
+    "frequency": "每年"
+  },
+  "table_structure": {
+    "has_multi_level": true,
+    "headers": [],
+    "multi_level_headers": {
+      "level_1": [
+        {
+          "name": "中讯村人口普查",
+          "description": "村民基本信息",
+          "children": [
+            {
+              "name": "姓名",
+              "description": "村民的全名",
+              "data_type": "text",
+              "required": true,
+              "example": "张三"
+            },
+            {
+              "name": "年龄",
+              "description": "村民的年龄",
+              "data_type": "number",
+              "required": true,
+              "example": "35"
+            },
+            {
+              "name": "性别",
+              "description": "村民的性别",
+              "data_type": "text",
+              "required": true,
+              "example": "男"
+            },
+            {
+              "name": "家庭成员数量",
+              "description": "村民家庭中的成员总数",
+              "data_type": "number",
+              "required": true,
+              "example": "4"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "additional_requirements": {
+    "formatting": [
+      "表格应清晰易读，适合打印"
+    ],
+    "validation_rules": [
+      "年龄必须为正整数",
+      "性别只能为'男'或'女'"
+    ],
+    "special_features": []
+  },
+  "conversation_messages": [
+    {
+      "type": "HumanMessage",
+      "content": "生成一个村民统计信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，我可以帮助你设计一个村民统计信息的表格。首先，我需要了解这个表格的主要用途是什么？例如，它是用于人口普查、福利分配，还是其他用途？"
+    },
+    {
+      "type": "AIMessage",
+      "content": "明白了，表格用于人口普查。那么接下来，我们需要确定需要收集哪些具体信息。通常，人口普查可能需要包括个人基本信息、家庭信息等。你希望在这个表格中收集哪些具体信息呢？例如，姓名、年龄、性别、家庭成员数量等。"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，我们可以从这些基本信息开始设计表格。接下来，我们需要确定表头的设计。你希望这些信息在表格中如何排列？例如：\n\n1. 姓名\n2. 年龄\n3. 性别\n4. 家庭成员数量\n\n另外，你是否需要多级表头，比如将个人信息和家庭信息分开？"
+    },
+    {
+      "type": "AIMessage",
+      "content": "明白了，我们可以设计一个多级表头的表格。一级表头为“中讯村人口普查”，下面的子表头包括“姓名”、“年龄”、“性别”和“家庭成员数量”。这样可以更清晰地组织信息。\n\n接下来，我们需要考虑是否有其他信息需要添加到表格中，例如联系方式、职业、教育程度等。你认为这些信息是否需要包含在表格中？"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，那我们就保持表格的简单性，只包含姓名、年龄、性别和家庭成员数量这几个信息。\n\n最后，你是否需要在表格中添加任何计算功能或数据分析功能，例如统计总人数、平均年龄等？这些功能可以帮助更好地分析和利用数据。"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，那我们就保持表格的简单性，不添加额外的计算功能。\n\n总结一下，我们的表格将包含以下内容：\n\n- 一级表头：中讯村人口普查\n- 二级表头：姓名、年龄、性别、家庭成员数量\n\n这个表格将用于记录村民的基本信息，方便进行人口普查。\n\n如果没有其他问题或需求，这个表格设计就完成了。[COMPLETE]"
+    }
+  ]
+}

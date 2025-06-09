@@ -3,6 +3,7 @@ from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 import uuid
 import json
+import os
 
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
@@ -23,7 +24,6 @@ class FrontdeskState(TypedDict):
     additonal_requirements: dict
     gather_complete: bool
     has_template: bool
-    user_input: str
 
 class FrontDeskAgent:
     """
@@ -141,30 +141,38 @@ class FrontDeskAgent:
                 "gather_complete": True
             }
 
-        system_prompt_text = """你作为一个资深的excel表格设计专家，现在需要通过和用户对话的方式了解用户需求，并通过发散四维
-         一步一步帮用户设计出excel表格，你需要弄清楚以下问题
+        system_prompt_text = """你是一个资深的excel表格设计专家，你的任务是主动引导用户完成表格设计。
 
-         -这个表格是用来干什么的
-         -需要收集哪些信息
-         -表格都涉及到哪些表头，是否存在多级表头
-         -需要用到哪些数据
+        **你需要按顺序收集以下信息：**
+        1. 表格的用途和目标（用来做什么？解决什么问题？）
+        2. 需要收集的具体信息类型（哪些数据字段？），可以发散思维适当追问用户补充额外数据
+        3. 表格结构设计（是否需要多级表头？如何分组？）
+        4. 特殊要求（格式、验证规则、特殊功能等）
 
-         请一次只问1-2个问题，让对话自然进行
+        **对话策略：**
+        - 主动询问，不要被动等待
+        - 一次问1或2个具体问题
+        - 根据用户回答给出建议和选项
+        - 如果用户回答模糊，追问具体细节
+        - 当收集到足够信息设计完整表格时，主动总结并标记 [COMPLETE]
 
-        你也可以给出用户一些建议并询问用户是否采纳。
-        当你认为信息收集完整时，请在回复最后加上 [COMPLETE] 标记，并总结表格信息。
+        **判断完成标准：**
+        当你明确了表格用途、主要字段、结构组织方式后，应该主动总结信息并在回复末尾加上 [COMPLETE] 标记。
+
+        **示例完成总结格式：**
+        "好的，根据我们的讨论，我已经收集到足够的信息来设计这个表格：
+        - 用途：[总结用途]
+        - 主要字段：[列出字段]
+        - 结构：[描述表头组织]
+        现在我可以为您生成详细的表格结构了。[COMPLETE]"
         """
 
-        messages = state["messages"]
+        messages = state["messages"].copy()
 
-        # 判断是否已提供系统提示词
+        # 确保系统提示词在最前面
         if not messages or not isinstance(messages[0], SystemMessage):
-            messages = [SystemMessage(content = system_prompt_text)] + messages
-
-        # Add the current user input if available
-        if state.get("user_input"):
-            messages.append(HumanMessage(content = state["user_input"]))
-
+            messages = [SystemMessage(content=system_prompt_text)] + messages
+            
         response = self.llm.invoke(messages)
 
         gather_complete = "[COMPLETE]" in response.content
@@ -182,15 +190,14 @@ class FrontDeskAgent:
         """用户和agent对话确认信息，或提供额外信息用于智能体收集表格信息"""
 
         try:
-            user_input = input("用户：")
+            user_input = input("👤用户：")
             return {
-                "user_input": user_input
+                "messages": [HumanMessage(content=user_input)]
             }
         except EOFError:
             # Handle non-interactive environments
             print("⚠️  非交互式环境，无法获取用户输入")
             return {
-                "user_input": "",
                 "gather_complete": True  # Force completion to avoid infinite loop
             }
     
@@ -224,7 +231,7 @@ class FrontDeskAgent:
                 },
                 "table_structure": {
                     "has_multi_level": False,
-                    "headers": [
+                    "multi_level_headers": [
                         {
                             "name": "待定字段1",
                             "description": "需要进一步确定的表头",
@@ -232,10 +239,7 @@ class FrontDeskAgent:
                             "required": True,
                             "example": "示例数据"
                         }
-                    ],
-                    "multi_level_headers": {
-                        "level_1": []
-                    }
+                    ]
                 },
                 "additional_requirements": {
                     "formatting": ["待确定"],
@@ -264,6 +268,12 @@ class FrontDeskAgent:
         2. 输出必须是有效的JSON格式
         3. 严格按照以下数据结构输出
 
+        **表格结构说明：**
+        - 对于多级表头，使用嵌套的数组和字典结构
+        - 标题表头（有子级的）只包含 name 和 children 字段
+        - 数据表头（叶子节点）包含 name, description, data_type, required, example 字段
+        - 支持任意层级的嵌套结构
+
         **输出格式：**
         请直接输出JSON内容，不要使用markdown代码块包装，不要添加任何解释文字：
         {
@@ -275,33 +285,33 @@ class FrontDeskAgent:
             "frequency": "使用频率（如：每日/每周/每月）"
         },
         "table_structure": {
-            "has_multi_level": false,
-            "headers": [
+            "has_multi_level": true,
+            "multi_level_headers": [
             {
-                "name": "表头名称",
-                "description": "表头说明",
-                "data_type": "数据类型（text/number/date/boolean）",
-                "required": true,
-                "example": "示例数据"
-            }
-            ],
-            "multi_level_headers": {
-            "level_1": [
-                {
-                "name": "一级表头名称",
-                "description": "一级表头说明",
+                "name": "第一级标题表头名称",
                 "children": [
+                {
+                    "name": "第二级标题表头名称",
+                    "children": [
                     {
-                    "name": "二级表头名称",
-                    "description": "二级表头说明",
-                    "data_type": "数据类型",
-                    "required": true,
-                    "example": "示例数据"
+                        "name": "数据字段名称",
+                        "description": "数据字段说明",
+                        "data_type": "数据类型（text/number/date/boolean）",
+                        "required": true,
+                        "example": "示例数据"
                     }
-                ]
+                    ]
+                },
+                {
+                    "name": "直接数据字段名称",
+                    "description": "数据字段说明",
+                    "data_type": "数据类型（text/number/date/boolean）",
+                    "required": false,
+                    "example": "示例数据"
                 }
-            ]
+                ]
             }
+            ]
         },
         "additional_requirements": {
             "formatting": ["格式要求"],
@@ -309,6 +319,12 @@ class FrontDeskAgent:
             "special_features": ["特殊功能需求"]
         }
         }
+
+        **结构示例说明：**
+        - 如果表头是标题性质（有子表头），只需要 "name" 和 "children"
+        - 如果表头是数据字段（叶子节点），需要完整的字段信息
+        - children 是一个数组，可以包含更多的标题表头或数据字段
+        - 支持2级、3级或更多级的嵌套结构
         """
         print("正在生成表格模板......")
         system_message = SystemMessage(content=system_prompt)
@@ -323,7 +339,7 @@ class FrontDeskAgent:
             # Clean the response content to handle markdown-wrapped JSON
             response_content = response.content.strip()
             
-            # Remove markdown code block markers if present
+            # 移除markdown输出
             if response_content.startswith('```json'):
                 response_content = response_content[7:]  # Remove ```json
             if response_content.startswith('```'):
@@ -340,8 +356,39 @@ class FrontDeskAgent:
             table_info = structured_output["table_info"]
             table_structure = structured_output["table_structure"]
             additional_requirements = structured_output["additional_requirements"]
-            
+
+            # 创建完整的数据
+            complete_data = {
+                "session_id": state.get("session_id", "unknown"),
+                "timestamp": datetime.now().isoformat(),
+                "table_info": table_info,
+                "table_structure": table_structure,
+                "additional_requirements": additional_requirements,
+                "conversation_messages": [
+                    {
+                        "type": msg.__class__.__name__,
+                        "content": msg.content
+                    } for msg in state["messages"] if hasattr(msg, 'content')
+                ]
+            }
+
             print("✅ JSON解析成功，表格模板生成完成")
+
+            # 创建文件夹用于存储生成的表格模板
+            output_dir = "table_template"
+            os.makedirs(output_dir, exist_ok=True)
+
+            # 生成文件名称
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_id = state.get("session_id", "default")
+            filename = f"table_template_{session_id}_{timestamp}.json"
+
+            # 将表格模板储存到这个JSON文件
+            file_path = os.path.join(output_dir, filename)
+            with open(file_path, 'w', encoding = 'utf-8') as f:
+                json.dump(complete_data, f, ensure_ascii=False, indent=2)
+            print(f"✅ 表格模板已保存到: {filename}")
+        
             # Return updated state
             return {
                 **state,
@@ -368,7 +415,7 @@ class FrontDeskAgent:
                 },
                 "table_structure": {
                     "has_multi_level": False,
-                    "headers": [
+                    "multi_level_headers": [
                         {
                             "name": "基础字段",
                             "description": "根据对话推断的字段",
@@ -376,10 +423,7 @@ class FrontDeskAgent:
                             "required": True,
                             "example": "示例"
                         }
-                    ],
-                    "multi_level_headers": {
-                        "level_1": []
-                    }
+                    ]
                 },
                 "additional_requirements": {
                     "formatting": ["标准格式"],
@@ -434,7 +478,7 @@ class FrontDeskAgent:
                         if "messages" in node_output and node_output["messages"]:
                             latest_message = node_output["messages"][-1]
                             if hasattr(latest_message, 'content'):
-                                print(f"💬 Response: {latest_message.content}")
+                                print(f"💬 智能体回复: {latest_message.content}")
                         
                         for key, value in node_output.items():
                             if key != "messages" and value:
@@ -452,15 +496,3 @@ if __name__ == "__main__":
 
     user_input = input("请输入你想生成的表格：")
     frontdeskagent.run_front_desk_agent(user_input)
-
-
-
-
-        
-
-
-
-
-
-
-        
