@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
+from utilities.visualize_graph import save_graph_visualization
 import uuid
 import json
 
@@ -78,11 +79,40 @@ class FrontDeskAgent:
         """检查用户是否提供了表格生成模板"""
 
         system_prompt = """
-        你作为一个表格生成智能体，第一步你需要判断用户是否提供了表格的模板，
-        判断规则如下：
-        1.用户清晰的描述出了表格的结构，每一级表头标题
-        2.用户提供了表格各式的文件，可能是excel文件，pdf等里面清晰的定义了表格结构
-        如果用户提供了表格模板则回答[YES]，反之回答[NO]，如果你有任何不清楚的地方也需要回答[NO]
+        你是一个专业的表格模板识别专家，负责准确判断用户是否已经提供了完整的表格生成模板。
+
+        **判断标准：**
+        用户提供了表格模板当且仅当满足以下任一条件：
+
+        1. **结构化描述**：用户清晰、详细地描述了表格的完整结构，包括：
+           - 明确的表头名称和层级关系
+           - 每个字段的具体含义和数据类型
+           - 表格的整体布局和组织方式
+           
+        2. **文件模板**：用户提供了包含表格结构的文件，如：
+           - Excel文件(.xlsx, .xls)
+           - CSV模板文件
+           - PDF文档中的表格样式
+           - 图片中的表格截图
+           
+        3. **具体示例**：用户给出了表格的具体示例，包含：
+           - 完整的表头结构
+           - 示例数据行
+           - 格式要求和规范
+
+        **不符合条件的情况：**
+        - 仅描述表格用途或目的
+        - 只提到需要哪些信息类别，但未具体化表头
+        - 模糊的需求描述
+        - 询问如何制作表格
+
+        **输出要求：**
+        - 如果用户提供了符合上述标准的完整表格模板，请回答 [YES]
+        - 如果用户未提供完整模板或描述不够具体，请回答 [NO]
+        - 如果有任何不确定的地方，倾向于回答 [NO]
+
+        **分析过程：**
+        请仔细分析用户输入，考虑是否包含足够的结构化信息来直接生成表格。
         """
         system_message = SystemMessage(content=system_prompt)
 
@@ -94,7 +124,7 @@ class FrontDeskAgent:
 
         return {
             "has_template": has_template,
-            "messages": [AIMessage(content = f"是否提供模板：{"是" if has_template else "否"}")]
+            "messages": [AIMessage(content = f"模板识别结果：{"已提供完整模板" if has_template else "未提供完整模板，需要进一步收集信息"}")]
         }
 
     def _route_after_template_check(self, state: FrontdeskState) -> str:
@@ -177,8 +207,57 @@ class FrontDeskAgent:
     def _store_information_node(self, state: FrontdeskState) -> FrontdeskState:
         """将收集到的信息结构化储存"""
 
+        # Check if we have enough conversation context
+        conversation_length = len([msg for msg in state["messages"] if isinstance(msg, (HumanMessage, AIMessage))])
+        
+        if conversation_length < 2:
+            # 没有收集到足够信息，根据用户初始输入创立基础表格
+            initial_input = state["user_input"] if state.get("user_input") else "未知需求"
+            
+            basic_template = {
+                "table_info": {
+                    "purpose": f"基于用户输入创建的表格：{initial_input}",
+                    "description": "用户提供的基本需求，需要进一步完善",
+                    "data_sources": ["用户输入"],
+                    "target_users": ["用户"],
+                    "frequency": "待确定"
+                },
+                "table_structure": {
+                    "has_multi_level": False,
+                    "headers": [
+                        {
+                            "name": "待定字段1",
+                            "description": "需要进一步确定的表头",
+                            "data_type": "text",
+                            "required": True,
+                            "example": "示例数据"
+                        }
+                    ],
+                    "multi_level_headers": {
+                        "level_1": []
+                    }
+                },
+                "additional_requirements": {
+                    "formatting": ["待确定"],
+                    "validation_rules": ["待确定"],
+                    "special_features": ["待确定"]
+                }
+            }
+            
+            print("⚠️ 对话信息不足，生成基础模板")
+            return {
+                **state,
+                "table_info": basic_template["table_info"],
+                "table_structure": basic_template["table_structure"],
+                "additional_requirements": basic_template["additional_requirements"],
+                "gather_complete": True
+            }
+
         system_prompt ="""你是一个专业的表格结构分析专家。请根据对话历史记录，或用户提供的表格模板，
         提取并结构化表格相关信息。
+
+        **重要提醒：**
+        如果对话信息不足，请基于现有信息生成一个合理的基础结构，不要拒绝生成。
 
         **任务要求：**
         1. 仔细分析对话内容，提取表格的用途、内容、数据需求和结构信息
@@ -186,7 +265,7 @@ class FrontDeskAgent:
         3. 严格按照以下数据结构输出
 
         **输出格式：**
-        ```json
+        请直接输出JSON内容，不要使用markdown代码块包装，不要添加任何解释文字：
         {
         "table_info": {
             "purpose": "表格的具体用途和目标",
@@ -231,20 +310,38 @@ class FrontDeskAgent:
         }
         }
         """
-
+        print("正在生成表格模板......")
         system_message = SystemMessage(content=system_prompt)
-        messages = [system_message] + state["messages"]
+        filtered_messages = [
+            msg for msg in state["messages"]
+            if not isinstance(msg, SystemMessage)
+        ]
+        messages = [system_message] + filtered_messages
         response = self.llm.invoke(messages)
 
         try:
+            # Clean the response content to handle markdown-wrapped JSON
+            response_content = response.content.strip()
+            
+            # Remove markdown code block markers if present
+            if response_content.startswith('```json'):
+                response_content = response_content[7:]  # Remove ```json
+            if response_content.startswith('```'):
+                response_content = response_content[3:]   # Remove ```
+            if response_content.endswith('```'):
+                response_content = response_content[:-3]  # Remove trailing ```
+            
+            response_content = response_content.strip()
+            
             # Parse the JSON response
-            structured_output = json.loads(response.content)
+            structured_output = json.loads(response_content)
             
             # Extract components
             table_info = structured_output["table_info"]
             table_structure = structured_output["table_structure"]
             additional_requirements = structured_output["additional_requirements"]
             
+            print("✅ JSON解析成功，表格模板生成完成")
             # Return updated state
             return {
                 **state,
@@ -255,17 +352,52 @@ class FrontDeskAgent:
             }
         
         except json.JSONDecodeError as e:
-            print(f"Failed to parse JSON response: {e}")
-            print(f"Raw response: {response.content}")
+            print(f"❌ JSON解析失败: {e}")
+            print(f"原始响应: {response.content}")
+            print(f"清理后响应: {response_content if 'response_content' in locals() else 'N/A'}")
             
-            # Return state with error indication
+            # Fallback: create a basic template from the conversation
+            print("🔄 使用对话内容生成基础模板")
+            fallback_template = {
+                "table_info": {
+                    "purpose": "根据对话内容生成的表格",
+                    "description": "基于用户需求的基础表格结构",
+                    "data_sources": ["用户对话"],
+                    "target_users": ["用户"],
+                    "frequency": "待确定"
+                },
+                "table_structure": {
+                    "has_multi_level": False,
+                    "headers": [
+                        {
+                            "name": "基础字段",
+                            "description": "根据对话推断的字段",
+                            "data_type": "text",
+                            "required": True,
+                            "example": "示例"
+                        }
+                    ],
+                    "multi_level_headers": {
+                        "level_1": []
+                    }
+                },
+                "additional_requirements": {
+                    "formatting": ["标准格式"],
+                    "validation_rules": ["基本验证"],
+                    "special_features": ["无特殊要求"]
+                }
+            }
+            
             return {
                 **state,
-                "gather_complete": False
+                "table_info": fallback_template["table_info"],
+                "table_structure": fallback_template["table_structure"],
+                "additional_requirements": fallback_template["additional_requirements"],
+                "gather_complete": True
             }
         except KeyError as e:
-            print(f"Missing key in JSON response: {e}")
-            print(f"Available keys: {list(structured_output.keys()) if 'structured_output' in locals() else 'N/A'}")
+            print(f"❌ JSON结构错误: {e}")
+            print(f"可用键: {list(structured_output.keys()) if 'structured_output' in locals() else 'N/A'}")
             
             return {
                 **state,
@@ -315,6 +447,8 @@ if __name__ == "__main__":
 
     #创建智能体
     frontdeskagent = FrontDeskAgent()
+
+    # save_graph_visualization(frontdeskagent.graph)
 
     user_input = input("请输入你想生成的表格：")
     frontdeskagent.run_front_desk_agent(user_input)
