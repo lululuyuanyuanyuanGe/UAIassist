@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
+from utilities.message_process import build_BaseMessage_type, build_complex_message
 import uuid
 import json
 import os
@@ -57,6 +58,7 @@ class FrontDeskAgent:
 
         # 添加节点
         workflow.add_node("check_template", self._check_template_node)
+        workflow.add_node("confirm_template", self._confirm_template_node) # 和用户确认模板，排除疑点
         workflow.add_node("gather_requirements", self._gather_requirements_node)
         workflow.add_node("store_information", self._store_information_node)
 
@@ -68,10 +70,12 @@ class FrontDeskAgent:
             "check_template",
             self._route_after_template_check,
             {
-                "has_template": "store_information",
+                "has_template": "confirm_template",
                 "no_template": "gather_requirements"
             }
         )
+
+        workflow
 
         workflow.add_conditional_edges(
             "gather_requirements",
@@ -140,66 +144,16 @@ class FrontDeskAgent:
         # 表格文件并未提交给大模型进行分析
 
         # 用户输入的文本
-        latest_message = state["messages"][-1] if state["messages"] else ""
+        user_input = state["messages"][-1] if state["messages"] else ""
         analyze_message = system_message + latest_message
         file_paths = state["uploaded_files"]
 
         # 检查是否上传了文件
         if file_paths:
-            # 用OpenAI内置函数将文件上传至其服务器
-            file_ids =[]
-            for file_path in file_paths:
-                file_response = client.files.create(
-                    file = open(file_path, 'rb'),
-                    purpose = "user_data"
-                )
-                file_ids.append(file_response.id)
-            
-            # 创建文件，文本混合输入
-            messages = [
-                {
-                    "role": "system", "content": system_prompt
-                },
-                {
-                    "role": "user", "content": [
-                        {
-                            "type": "text",
-                            "text": latest_message
-                        },
-                        *[
-                            {
-                                "type": "inptu_file",
-                                "file_id": file_id
-                            } for file_id in file_ids
-                        ]
-                    ]
-                }
-            ]
+            messages = build_complex_message(system_prompt, file_paths, client, user_input)
             # 把对话转换成BaseMessage
-
-            langchain_messages = []
-            for msg in messages:
-                if msg["role"] == "system":
-                    langchain_messages.append(SystemMessage(content = msg["content"]))
-                elif msg["role"] == "user":
-                    # 判断是否为复杂输入(包含文件)
-                    if isinstance(msg["content"], list):
-                        # 将用户文本输入存储在 contenxt_text
-                        contexnt_text = next((item["text"] for item in msg["content"] if item["type"] == "text"), "")
-                        file_refs = [item["file_id"] for item in msg["content"] if item["type"] == "input_file"]
-                        user_input = F"{contexnt_text} + input files list: {' '.join(file_refs)}"
-                        human_msg = HumanMessage(
-                            content= user_input,
-                            additional_kargs = {
-                                "filer_ids": file_refs,
-                                "multimodal_content": msg["content"]
-                            }
-                        )
-                        langchain_messages.append(human_msg)
-                else:
-                    langchain_messages.append(HumanMessage(content=msg["content"]))
+            langchain_messages = build_BaseMessage_type(messages)
             
-            # 更新state的消息队列
             state["messages"].extend(langchain_messages)
             
             response = client.chat.completions.create(
