@@ -6,6 +6,15 @@ import json
 import os
 # Create an interactive chatbox using gradio
 import gradio as gr
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# 用于处理用户上传文件
+from openai import OpenAI
+client = OpenAI(
+    api_key = os.environ.get("OPENAI_API_KEY")
+)
 
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
@@ -123,36 +132,87 @@ class FrontDeskAgent:
         **分析过程：**
         请仔细分析用户输入和上传的文件，考虑是否包含足够的结构化信息来直接生成表格。
         如果用户上传了文件，请特别关注文件类型和可能包含的表格信息。
+
+        **注意事项**
+        如果你认为用户当前的信息不够完整，或者你需要一些补充也要回答 [NO]
         """
         system_message = SystemMessage(content=system_prompt)
+        # 表格文件并未提交给大模型进行分析
 
-        # Get the latest user message and check for file information
-        latest_message = state["messages"][-1] if state["messages"] else None
-        messages_to_analyze = [system_message]
-        
-        if latest_message:
-            messages_to_analyze.append(latest_message)
+        # 用户输入的文本
+        latest_message = state["messages"][-1] if state["messages"] else ""
+        analyze_message = system_message + latest_message
+        file_paths = state["uploaded_files"]
+
+        # 检查是否上传了文件
+        if file_paths:
+            # 用OpenAI内置函数将文件上传至其服务器
+            file_ids =[]
+            for file_path in file_paths:
+                file_response = client.files.create(
+                    file = open(file_path, 'rb'),
+                    purpose = "user_data"
+                )
+                file_ids.append(file_response.id)
             
-            # Check if the message mentions files (indicating multimodal input)
-            if latest_message.content and any(keyword in latest_message.content.lower() 
-                                           for keyword in ['[图片文件', '[文件:', '上传了以下文件']):
-                # This indicates multimodal input with files
-                enhanced_message = HumanMessage(content=f"""
-                {latest_message.content}
-                
-                注意：用户已上传文件，请根据文件类型和内容判断是否提供了表格模板。
-                """)
-                messages_to_analyze[-1] = enhanced_message
+            # 创建文件，文本混合输入
+            messages = [
+                {
+                    "role": "system", "content": system_prompt
+                },
+                {
+                    "role": "user", "content": [
+                        {
+                            "type": "text",
+                            "text": latest_message
+                        },
+                        *[
+                            {
+                                "type": "inptu_file",
+                                "file_id": file_id
+                            } for file_id in file_ids
+                        ]
+                    ]
+                }
+            ]
+            # 把对话转换成BaseMessage
 
-        response = self.llm.invoke(messages_to_analyze)
+            langchain_messages = []
+            for msg in messages:
+                if msg["role"] == "system":
+                    langchain_messages.append(SystemMessage(content = msg["content"]))
+                elif msg["role"] == "user":
+                    # 判断是否为复杂输入(包含文件)
+                    if isinstance(msg["content"], list):
+                        # 将用户文本输入存储在 contenxt_text
+                        contexnt_text = next((item["text"] for item in msg["content"] if item["type"] == "text"), "")
+                        file_refs = [item["file_id"] for item in msg["content"] if item["type"] == "input_file"]
+                        user_input = F"{contexnt_text} + input files list: {' '.join(file_refs)}"
+                        human_msg = HumanMessage(
+                            content= user_input,
+                            additional_kargs = {
+                                "filer_ids": file_refs,
+                                "multimodal_content": msg["content"]
+                            }
+                        )
+                        langchain_messages.append(human_msg)
+                else:
+                    langchain_messages.append(HumanMessage(content=msg["content"]))
+            
+            # 更新state的消息队列
+            state["messages"].extend(langchain_messages)
+            
+            response = client.chat.completions.create(
+                model = "gpt-4o",
+                messages = messages,
+                temperature = 0.1
+            )
+
+        else:
+            response = self.llm.invoke(analyze_message)
 
         has_template = "[YES]" in response.content.upper()
 
-        # Enhanced response based on file analysis
-        if any(keyword in latest_message.content.lower() for keyword in ['[图片文件', '[文件:', 'excel', '.xlsx', '.csv']) if latest_message else False:
-            template_analysis = f"模板识别结果：{'已识别到文件上传并' if not has_template else ''}{'检测到完整模板' if has_template else '需要进一步分析文件内容和收集信息'}"
-        else:
-            template_analysis = f"模板识别结果：{'已提供完整模板' if has_template else '未提供完整模板，需要进一步收集信息'}"
 
         return {
             "has_template": has_template,
@@ -162,6 +222,9 @@ class FrontDeskAgent:
     def _route_after_template_check(self, state: FrontdeskState) -> str:
         """根据模板检查结果路由到下一个节点"""
         return "has_template" if state["has_template"] else "no_template"
+
+    # def _analyze_uploaded_template(self, state: FrontdeskState) -> FrontdeskState:
+
 
     def _gather_requirements_node(self, state: FrontdeskState) -> FrontdeskState:
         """和用户对话确定生成表格的内容，要求等 - 支持多模态输入分析"""
@@ -578,7 +641,7 @@ if __name__ == "__main__":
     #创建智能体
     frontdeskagent = FrontDeskAgent()
 
-    # save_graph_visualization(frontdeskagent.graph)
+    save_graph_visualization(frontdeskagent.graph)
 
-    user_input = input("告诉我逆向生成什么样的表格：")
-    frontdeskagent.run_front_desk_agent(user_input)
+    # user_input = input("告诉我逆向生成什么样的表格：")
+    # frontdeskagent.run_front_desk_agent(user_input)
