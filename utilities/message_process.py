@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, List
 from openai import OpenAI
 
 from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage
@@ -60,3 +60,7 @@ def build_complex_message(system_prompt: str, file_paths: list[str], client: Ope
             ]
         }
     ]
+
+def filter_out_system_messages(messages: List[BaseMessage]) -> List[BaseMessage]:
+    """辅助函数过滤消息队列中的系统提示词消息"""
+    return [message for message in messages if not isinstance(message, SystemMessage)]

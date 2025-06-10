@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
-from utilities.message_process import build_BaseMessage_type, build_complex_message
+from utilities.message_process import build_BaseMessage_type, build_complex_message, filter_out_system_messages
 import uuid
 import json
 import os
@@ -36,6 +36,7 @@ class FrontdeskState(TypedDict):
     additonal_requirements: dict
     gather_complete: bool
     has_template: bool
+    complete_confirm: bool
     uploaded_files: list  # Add support for tracking uploaded files
 
 class FrontDeskAgent:
@@ -145,15 +146,15 @@ class FrontDeskAgent:
 
         # 用户输入的文本
         user_input = state["messages"][-1] if state["messages"] else ""
-        analyze_message = system_message + latest_message
+        analyze_message = system_message + user_input
         file_paths = state["uploaded_files"]
 
         # 检查是否上传了文件
         if file_paths:
             messages = build_complex_message(system_prompt, file_paths, client, user_input)
-            # 把对话转换成BaseMessage
+            # 将用户输入转换成 BaseMessage 类
             langchain_messages = build_BaseMessage_type(messages)
-            
+            # 将用户输入加入到state的消息队列中
             state["messages"].extend(langchain_messages)
             
             response = client.chat.completions.create(
@@ -166,18 +167,43 @@ class FrontDeskAgent:
             response = self.llm.invoke(analyze_message)
 
         has_template = "[YES]" in response.content.upper()
-
-
+        # 删除当前节点的系统提示词
+        state["messages"] = filter_out_system_messages(state["messages"])
         return {
             "has_template": has_template,
-            "messages": [AIMessage(content=template_analysis)]
+            "messages": [AIMessage(content=response.content)]
         }
 
     def _route_after_template_check(self, state: FrontdeskState) -> str:
         """根据模板检查结果路由到下一个节点"""
         return "has_template" if state["has_template"] else "no_template"
 
-    # def _analyze_uploaded_template(self, state: FrontdeskState) -> FrontdeskState:
+    def _confirm_template_node(self, state: FrontdeskState) -> FrontdeskState:
+        """和用户确认模板细节"""
+
+        system_prompt = """
+        当模板确认后请在回复结尾加入[COMPLETE]
+        """
+
+        state["messages"].append(SystemMessage(content=system_prompt))
+        response = self.llm.invoke(state["messages"])
+
+        complete_confirm = "[COMPLETE]" in response.content.upper()
+
+        return{
+            "complete_confirm": complete_confirm,
+            "messages": [AIMessage(content=response.content)]
+        }
+    
+    # confirm template node's conditional check
+    def _route_after_template_confirm(self, state: FrontdeskState) -> str:
+        """根据是否完成格式校验路由到相应节点"""
+        return "complte_confirm" if state["complete_confirm"] else "incomplete_confirm"
+    
+    def _gather_user_template_supplement(self, state: FrontdeskState) -> FrontdeskState:
+        """收集用户补充信息，来确认模板"""
+
+
 
 
     def _gather_requirements_node(self, state: FrontdeskState) -> FrontdeskState:
@@ -252,57 +278,57 @@ class FrontDeskAgent:
             "gather_complete": False  # Keep conversation going
         }
 
-    def process_user_message(self, message: str, session_id: str = "default") -> dict:
-        """
-        处理单个用户消息并返回智能体响应（用于GUI集成）
-        """
-        # Create or update conversation state
-        if not hasattr(self, '_conversation_states'):
-            self._conversation_states = {}
+    # def process_user_message(self, message: str, session_id: str = "default") -> dict:
+    #     """
+    #     处理单个用户消息并返回智能体响应（用于GUI集成）
+    #     """
+    #     # Create or update conversation state
+    #     if not hasattr(self, '_conversation_states'):
+    #         self._conversation_states = {}
         
-        if session_id not in self._conversation_states:
-            self._conversation_states[session_id] = self._create_initial_state(message, session_id)
-        else:
-            # Add user message to existing conversation
-            from langchain_core.messages import HumanMessage
-            self._conversation_states[session_id]["messages"].append(HumanMessage(content=message))
+    #     if session_id not in self._conversation_states:
+    #         self._conversation_states[session_id] = self._create_initial_state(message, session_id)
+    #     else:
+    #         # Add user message to existing conversation
+    #         from langchain_core.messages import HumanMessage
+    #         self._conversation_states[session_id]["messages"].append(HumanMessage(content=message))
         
-        config = {"configurable": {"thread_id": session_id}}
+    #     config = {"configurable": {"thread_id": session_id}}
         
-        # Process through the graph
-        responses = []
-        for chunk in self.graph.stream(self._conversation_states[session_id], config=config, stream_mode="updates"):
-            for node_name, node_output in chunk.items():
-                if isinstance(node_output, dict):
-                    # Update conversation state
-                    self._conversation_states[session_id].update(node_output)
+    #     # Process through the graph
+    #     responses = []
+    #     for chunk in self.graph.stream(self._conversation_states[session_id], config=config, stream_mode="updates"):
+    #         for node_name, node_output in chunk.items():
+    #             if isinstance(node_output, dict):
+    #                 # Update conversation state
+    #                 self._conversation_states[session_id].update(node_output)
                     
-                    # Collect responses
-                    if "messages" in node_output and node_output["messages"]:
-                        latest_message = node_output["messages"][-1]
-                        if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
-                            responses.append({
-                                "node": node_name,
-                                "content": latest_message.content,
-                                "type": latest_message.__class__.__name__
-                            })
+    #                 # Collect responses
+    #                 if "messages" in node_output and node_output["messages"]:
+    #                     latest_message = node_output["messages"][-1]
+    #                     if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
+    #                         responses.append({
+    #                             "node": node_name,
+    #                             "content": latest_message.content,
+    #                             "type": latest_message.__class__.__name__
+    #                         })
                     
-                    # Check completion status
-                    if node_output.get("gather_complete"):
-                        responses.append({
-                            "node": "completion",
-                            "content": "信息收集完成",
-                            "type": "completion",
-                            "table_info": node_output.get("table_info"),
-                            "table_structure": node_output.get("table_structure"),
-                            "additional_requirements": node_output.get("additional_requirements")
-                        })
+    #                 # Check completion status
+    #                 if node_output.get("gather_complete"):
+    #                     responses.append({
+    #                         "node": "completion",
+    #                         "content": "信息收集完成",
+    #                         "type": "completion",
+    #                         "table_info": node_output.get("table_info"),
+    #                         "table_structure": node_output.get("table_structure"),
+    #                         "additional_requirements": node_output.get("additional_requirements")
+    #                     })
         
-        return {
-            "responses": responses,
-            "state": self._conversation_states[session_id],
-            "session_id": session_id
-        }
+    #     return {
+    #         "responses": responses,
+    #         "state": self._conversation_states[session_id],
+    #         "session_id": session_id
+    #     }
     
     def _route_after_gather(self, state: FrontdeskState) -> str:
         """根据"gather_complete"的值返回下一个节点"""
@@ -431,10 +457,7 @@ class FrontDeskAgent:
         """
         print("正在生成表格模板......")
         system_message = SystemMessage(content=system_prompt)
-        filtered_messages = [
-            msg for msg in state["messages"]
-            if not isinstance(msg, SystemMessage)
-        ]
+        filtered_messages = filter_out_system_messages(state["messages"])
         messages = [system_message] + filtered_messages
         response = self.llm.invoke(messages)
 
