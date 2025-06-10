@@ -1,0 +1,122 @@
+{
+  "session_id": "0d74a52f-4b4d-41d0-ac72-7146ea9702bb",
+  "timestamp": "2025-06-10T14:23:18.242842",
+  "table_info": {
+    "purpose": "记录七田村2025年度党员的详细信息",
+    "description": "该表格用于存储和管理七田村党员的基本信息，包括个人信息、党籍状态和联系方式等。",
+    "data_sources": [
+      "村委会党员登记系统",
+      "手动录入"
+    ],
+    "target_users": [
+      "村委会工作人员",
+      "党支部书记"
+    ],
+    "frequency": "每年更新"
+  },
+  "table_structure": {
+    "has_multi_level": true,
+    "multi_level_headers": [
+      {
+        "name": "个人信息",
+        "children": [
+          {
+            "name": "姓名",
+            "description": "党员的全名",
+            "data_type": "text",
+            "required": true,
+            "example": "张三"
+          },
+          {
+            "name": "性别",
+            "description": "党员的性别",
+            "data_type": "text",
+            "required": true,
+            "example": "男"
+          },
+          {
+            "name": "出生日期",
+            "description": "党员的出生日期",
+            "data_type": "date",
+            "required": true,
+            "example": "1980-01-01"
+          }
+        ]
+      },
+      {
+        "name": "党籍信息",
+        "children": [
+          {
+            "name": "入党日期",
+            "description": "党员的入党日期",
+            "data_type": "date",
+            "required": true,
+            "example": "2000-05-15"
+          },
+          {
+            "name": "党籍状态",
+            "description": "党员的当前党籍状态",
+            "data_type": "text",
+            "required": true,
+            "example": "正式党员"
+          },
+          {
+            "name": "老党员标记",
+            "description": "是否为老党员的标记",
+            "data_type": "boolean",
+            "required": false,
+            "example": "true"
+          }
+        ]
+      },
+      {
+        "name": "联系方式",
+        "children": [
+          {
+            "name": "联系电话",
+            "description": "党员的联系电话",
+            "data_type": "text",
+            "required": true,
+            "example": "13800138000"
+          },
+          {
+            "name": "电子邮件",
+            "description": "党员的电子邮件地址",
+            "data_type": "text",
+            "required": false,
+            "example": "example@example.com"
+          }
+        ]
+      }
+    ]
+  },
+  "additional_requirements": {
+    "formatting": [
+      "日期格式为YYYY-MM-DD",
+      "电话号码格式为11位数字"
+    ],
+    "validation_rules": [
+      "姓名不能为空",
+      "性别必须为'男'或'女'",
+      "党籍状态必须为'正式党员'或'预备党员'"
+    ],
+    "special_features": [
+      "自动计算党员年龄",
+      "根据入党日期自动标记老党员"
+    ]
+  },
+  "conversation_messages": [
+    {
+      "type": "HumanMessage",
+      "content": "根据这个格式生成excel表格"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "根据这个格式生成excel表格\n\n用户上传了以下文件: [文件: 七田村2025年度党员名册_原格式_老党员标记.xlsx]\n请根据文件内容和用户需求进行分析和响应。"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：检测到完整模板"
+    }
+  ]
+}

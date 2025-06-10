@@ -1,0 +1,126 @@
+{
+  "session_id": "09314275-2777-4cf4-b60c-82da4bfa270b",
+  "timestamp": "2025-06-10T14:19:53.008256",
+  "table_info": {
+    "purpose": "记录和分析羊村的人口信息，以便进行人口普查和统计分析。",
+    "description": "该表格用于收集羊村居民的基本人口信息，包括个人身份、家庭结构和职业等。",
+    "data_sources": [
+      "村民登记表",
+      "户籍管理系统"
+    ],
+    "target_users": [
+      "村委会工作人员",
+      "人口普查员"
+    ],
+    "frequency": "每年更新一次"
+  },
+  "table_structure": {
+    "has_multi_level": true,
+    "multi_level_headers": [
+      {
+        "name": "个人信息",
+        "children": [
+          {
+            "name": "姓名",
+            "description": "村民的全名",
+            "data_type": "text",
+            "required": true,
+            "example": "张三"
+          },
+          {
+            "name": "性别",
+            "description": "村民的性别",
+            "data_type": "text",
+            "required": true,
+            "example": "男"
+          },
+          {
+            "name": "年龄",
+            "description": "村民的年龄",
+            "data_type": "number",
+            "required": true,
+            "example": 30
+          }
+        ]
+      },
+      {
+        "name": "家庭信息",
+        "children": [
+          {
+            "name": "家庭住址",
+            "description": "村民的家庭住址",
+            "data_type": "text",
+            "required": true,
+            "example": "羊村东街10号"
+          },
+          {
+            "name": "家庭成员数",
+            "description": "家庭中的总人数",
+            "data_type": "number",
+            "required": true,
+            "example": 4
+          }
+        ]
+      },
+      {
+        "name": "职业信息",
+        "children": [
+          {
+            "name": "职业",
+            "description": "村民的职业",
+            "data_type": "text",
+            "required": false,
+            "example": "农民"
+          },
+          {
+            "name": "工作单位",
+            "description": "村民的工作单位名称",
+            "data_type": "text",
+            "required": false,
+            "example": "羊村合作社"
+          }
+        ]
+      }
+    ]
+  },
+  "additional_requirements": {
+    "formatting": [
+      "所有文本字段首字母大写",
+      "年龄字段居中对齐"
+    ],
+    "validation_rules": [
+      "年龄必须为正整数",
+      "性别字段只能为'男'或'女'"
+    ],
+    "special_features": [
+      "自动计算家庭成员的平均年龄",
+      "根据职业分类生成统计图表"
+    ]
+  },
+  "conversation_messages": [
+    {
+      "type": "HumanMessage",
+      "content": "生成羊村人口普查统计"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "生成羊村人口普查统计"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "为了帮助您设计羊村人口普查统计的表格，我需要了解一些详细信息：\n\n1. **表格的用途和目标**：您希望通过这个人口普查统计表格解决什么问题？是为了记录人口信息、分析人口结构，还是其他目的？\n\n2. **需要收集的具体信息类型**：您希望在表格中包含哪些数据字段？例如，姓名、年龄、性别、职业、住址等。请尽可能详细列出。\n\n请您提供这些信息，以便我能更好地为您设计合适的表格结构。"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "参考这个模板，你可以添加额外的生成信息\n\n用户上传了以下文件: [文件: 七田村2025年度党员名册_原格式_老党员标记.xlsx]\n请根据文件内容和用户需求进行分析和响应。"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：检测到完整模板"
+    }
+  ]
+}

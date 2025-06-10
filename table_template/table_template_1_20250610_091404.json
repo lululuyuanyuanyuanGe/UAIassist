@@ -1,0 +1,172 @@
+{
+  "session_id": "1",
+  "timestamp": "2025-06-10T09:14:04.357955",
+  "table_info": {
+    "purpose": "分析羊村的人口结构",
+    "description": "收集羊村居民的基本信息和经济状况，以便进行人口结构分析。",
+    "data_sources": [
+      "羊村居民提供的信息"
+    ],
+    "target_users": [
+      "人口普查员",
+      "数据分析师"
+    ],
+    "frequency": "每年"
+  },
+  "table_structure": {
+    "has_multi_level": true,
+    "multi_level_headers": [
+      {
+        "name": "羊村人口普查表",
+        "children": [
+          {
+            "name": "基本信息",
+            "children": [
+              {
+                "name": "姓名",
+                "description": "居民的全名",
+                "data_type": "text",
+                "required": true,
+                "example": "张三"
+              },
+              {
+                "name": "性别",
+                "description": "居民的性别",
+                "data_type": "text",
+                "required": true,
+                "example": "男"
+              },
+              {
+                "name": "年龄",
+                "description": "居民的年龄",
+                "data_type": "number",
+                "required": true,
+                "example": 30
+              },
+              {
+                "name": "身份证号",
+                "description": "居民的身份证号码",
+                "data_type": "text",
+                "required": true,
+                "example": "123456789012345678"
+              }
+            ]
+          },
+          {
+            "name": "经济状况",
+            "children": [
+              {
+                "name": "收入",
+                "description": "居民的年收入",
+                "data_type": "number",
+                "required": true,
+                "example": 50000
+              },
+              {
+                "name": "学历",
+                "description": "居民的最高学历",
+                "data_type": "text",
+                "required": true,
+                "example": "本科"
+              },
+              {
+                "name": "职业",
+                "description": "居民的职业",
+                "data_type": "text",
+                "required": true,
+                "example": "教师"
+              },
+              {
+                "name": "家庭状况",
+                "description": "居民的家庭状况",
+                "data_type": "text",
+                "required": false,
+                "example": "已婚，有两个孩子"
+              },
+              {
+                "name": "住房",
+                "description": "居民的住房情况",
+                "data_type": "text",
+                "required": false,
+                "example": "自有住房"
+              },
+              {
+                "name": "存款",
+                "description": "居民的银行存款",
+                "data_type": "number",
+                "required": false,
+                "example": 20000
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "additional_requirements": {
+    "formatting": [
+      "身份证号需为18位数字"
+    ],
+    "validation_rules": [
+      "年龄需为正整数",
+      "收入和存款需为非负数"
+    ],
+    "special_features": [
+      "自动计算总收入"
+    ]
+  },
+  "conversation_messages": [
+    {
+      "type": "HumanMessage",
+      "content": "帮我生成一个羊村人口普查表"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "为了帮助您设计一个合适的羊村人口普查表，我需要了解一些详细信息。首先，请告诉我这个表格的具体用途和目标是什么？例如，它是用于统计人口数量、分析人口结构，还是其他目的？"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "分析人口结构，涉及到收入，学历，职业，家庭状况，住房等信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，了解了表格的用途是分析羊村的人口结构。接下来，我们需要确定具体需要收集哪些信息。您已经提到了一些字段，比如收入、学历、职业、家庭状况和住房。除此之外，您是否还需要其他信息，比如年龄、性别、婚姻状况等？或者您有其他想要补充的字段吗？"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "还有基本信息例如性别，年龄，名字，身份证号等"
+    },
+    {
+      "type": "AIMessage",
+      "content": "明白了，我们将包括基本信息和您提到的其他字段。以下是我目前收集到的字段：\n\n1. 基本信息：\n   - 姓名\n   - 性别\n   - 年龄\n   - 身份证号\n\n2. 人口结构信息：\n   - 收入\n   - 学历\n   - 职业\n   - 家庭状况\n   - 住房\n\n接下来，我们需要考虑表格的结构设计。您是否希望这些信息分组显示，比如将基本信息和人口结构信息分成不同的部分？或者您有其他的分组方式吗？另外，是否需要多级表头来更好地组织这些信息？"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "在帮我补充存款一列"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，我们将增加一个“存款”字段到人口结构信息中。现在的字段列表如下：\n\n1. 基本信息：\n   - 姓名\n   - 性别\n   - 年龄\n   - 身份证号\n\n2. 人口结构信息：\n   - 收入\n   - 学历\n   - 职业\n   - 家庭状况\n   - 住房\n   - 存款\n\n关于表格结构，您希望这些信息如何组织？是否需要将基本信息和人口结构信息分成不同的部分，或者使用多级表头来更好地展示这些信息？另外，您是否有任何特殊要求，比如格式、数据验证规则或特殊功能（如自动计算）？"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "表格分为三级一级为标题叫做羊村人口普查表，二级基本信息，和经济状况，经济状况包含了所有能反映出经济水平的信息，最后一级为子表头就是具体的信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，了解了您的表格结构需求。以下是表格的设计结构：\n\n- 一级表头：羊村人口普查表\n\n- 二级表头：\n  - 基本信息\n  - 经济状况\n\n- 三级表头：\n  - 基本信息下：\n    - 姓名\n    - 性别\n    - 年龄\n    - 身份证号\n  - 经济状况下：\n    - 收入\n    - 学历\n    - 职业\n    - 家庭状况\n    - 住房\n    - 存款\n\n请确认是否有任何特殊要求，例如格式（如日期格式、数字格式）、数据验证规则（如身份证号格式验证）或特殊功能（如自动计算总收入）？如果没有其他要求，我将总结并标记为完成。"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "完全正确"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，根据我们的讨论，我已经收集到足够的信息来设计这个表格：\n\n- 用途：分析羊村的人口结构\n- 主要字段：\n  - 基本信息：姓名、性别、年龄、身份证号\n  - 经济状况：收入、学历、职业、家庭状况、住房、存款\n- 结构：三级表头\n  - 一级表头：羊村人口普查表\n  - 二级表头：基本信息、经济状况\n  - 三级表头：具体信息字段\n\n现在我可以为您生成详细的表格结构了。[COMPLETE]"
+    }
+  ]
+}

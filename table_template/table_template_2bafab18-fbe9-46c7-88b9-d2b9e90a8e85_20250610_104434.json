@@ -1,0 +1,185 @@
+{
+  "session_id": "2bafab18-fbe9-46c7-88b9-d2b9e90a8e85",
+  "timestamp": "2025-06-10T10:44:34.657358",
+  "table_info": {
+    "purpose": "管理公司员工的基本信息和工作情况",
+    "description": "记录员工的基本信息、工作信息以及其他相关信息，以便于公司的人力资源管理。",
+    "data_sources": [
+      "员工入职表单",
+      "人力资源管理系统"
+    ],
+    "target_users": [
+      "人力资源部门",
+      "公司管理层"
+    ],
+    "frequency": "每月更新"
+  },
+  "table_structure": {
+    "has_multi_level": true,
+    "multi_level_headers": [
+      {
+        "name": "基本信息",
+        "children": [
+          {
+            "name": "姓名",
+            "description": "员工的全名",
+            "data_type": "text",
+            "required": true,
+            "example": "张三"
+          },
+          {
+            "name": "工号",
+            "description": "员工的唯一识别编号",
+            "data_type": "text",
+            "required": true,
+            "example": "A12345"
+          },
+          {
+            "name": "联系电话",
+            "description": "员工的联系电话",
+            "data_type": "text",
+            "required": true,
+            "example": "13800138000"
+          }
+        ]
+      },
+      {
+        "name": "工作信息",
+        "children": [
+          {
+            "name": "部门",
+            "description": "员工所属的部门",
+            "data_type": "text",
+            "required": true,
+            "example": "人力资源部"
+          },
+          {
+            "name": "职位",
+            "description": "员工的职位名称",
+            "data_type": "text",
+            "required": true,
+            "example": "人事专员"
+          },
+          {
+            "name": "入职日期",
+            "description": "员工的入职日期",
+            "data_type": "date",
+            "required": true,
+            "example": "2023-01-15"
+          }
+        ]
+      },
+      {
+        "name": "其他信息",
+        "children": [
+          {
+            "name": "薪资",
+            "description": "员工的月薪",
+            "data_type": "number",
+            "required": true,
+            "example": "5000"
+          },
+          {
+            "name": "绩效评级",
+            "description": "员工的绩效评级",
+            "data_type": "text",
+            "required": false,
+            "example": "优秀"
+          }
+        ]
+      }
+    ]
+  },
+  "additional_requirements": {
+    "formatting": [
+      "日期格式为YYYY-MM-DD",
+      "电话号码格式为11位数字"
+    ],
+    "validation_rules": [
+      "工号必须唯一",
+      "薪资必须为正数"
+    ],
+    "special_features": [
+      "自动计算员工工龄",
+      "根据绩效评级生成报告"
+    ]
+  },
+  "conversation_messages": [
+    {
+      "type": "HumanMessage",
+      "content": "我想创建一个员工信息管理表格"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "我想创建一个员工信息管理表格"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "首先，请告诉我这个员工信息管理表格的具体用途和目标。您是希望用它来记录员工的基本信息，还是用于其他特定的管理目的，比如考勤、绩效评估等？"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "用来管理公司员工的基本信息和工作情况"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，为了更好地设计这个表格，我们需要确定需要收集的具体信息类型。除了员工的基本信息（如姓名、性别、出生日期、联系方式等），您还希望记录哪些工作相关的信息？例如，职位、部门、入职日期、工资情况等。请详细列出您需要的字段。"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "需要包括姓名、工号、部门、职位、入职日期、联系电话等基本信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "除了这些基本信息，您是否还需要记录员工的其他信息，比如紧急联系人、学历背景、工作状态（如在职、离职）、或者绩效考核结果等？这些信息可以帮助更全面地管理员工情况。"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "还需要薪资、绩效评级等字段"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "了解了。接下来，我们来设计表格的结构。您是否希望使用多级表头来更好地组织这些信息？例如，可以将基本信息和工作信息分成不同的组，或者根据需要进行其他分组。您对此有何想法？"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "是的，需要多级表头分组"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，我们可以将表格设计为以下多级表头结构：\n\n1. **基本信息**\n   - 姓名\n   - 工号\n   - 联系电话\n\n2. **工作信息**\n   - 部门\n   - 职位\n   - 入职日期\n\n3. **其他信息**\n   - 薪资\n   - 绩效评级\n\n请确认这个结构是否符合您的需求，或者您有其他的分组建议？另外，您是否有任何特殊要求，比如格式、数据验证规则或其他特殊功能？"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "这样就够了"
+    },
+    {
+      "type": "AIMessage",
+      "content": "模板识别结果：未提供完整模板，需要进一步收集信息"
+    },
+    {
+      "type": "AIMessage",
+      "content": "好的，根据我们的讨论，我已经收集到足够的信息来设计这个表格：\n\n- 用途：管理公司员工的基本信息和工作情况\n- 主要字段：姓名、工号、部门、职位、入职日期、联系电话、薪资、绩效评级\n- 结构：多级表头分组，包括基本信息、工作信息和其他信息\n\n现在我可以为您生成详细的表格结构了。[COMPLETE]"
+    }
+  ]
+}

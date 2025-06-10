@@ -4,6 +4,8 @@ from utilities.visualize_graph import save_graph_visualization
 import uuid
 import json
 import os
+# Create an interactive chatbox using gradio
+import gradio as gr
 
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
@@ -24,10 +26,12 @@ class FrontdeskState(TypedDict):
     additonal_requirements: dict
     gather_complete: bool
     has_template: bool
+    uploaded_files: list  # Add support for tracking uploaded files
 
 class FrontDeskAgent:
     """
     基于LangGraph的AI代理系统，用于判断用户是否给出了表格生成模板，并帮助用户汇总表格生成模板
+    支持多模态输入（文档、图片等）
     """
 
     def __init__(self, model_name: str = "gpt-4o", checkpoint_path: str = "checkpoints.db"):
@@ -45,7 +49,6 @@ class FrontDeskAgent:
         # 添加节点
         workflow.add_node("check_template", self._check_template_node)
         workflow.add_node("gather_requirements", self._gather_requirements_node)
-        workflow.add_node("collect_input", self._gather_user_input)
         workflow.add_node("store_information", self._store_information_node)
 
         # 入口节点
@@ -66,20 +69,20 @@ class FrontDeskAgent:
             self._route_after_requirements,
             {
                 "complete": "store_information",
-                "continue": "collect_input"
+                "continue": END  # End conversation to wait for user input
             }
         )
 
-        workflow.add_edge("collect_input", "gather_requirements")
         workflow.add_edge("store_information", END)
         
         return workflow.compile(checkpointer = self.memory)
         
     def _check_template_node(self, state: FrontdeskState) -> FrontdeskState:
-        """检查用户是否提供了表格生成模板"""
+        """检查用户是否提供了表格生成模板 - 支持多模态输入"""
 
         system_prompt = """
         你是一个专业的表格模板识别专家，负责准确判断用户是否已经提供了完整的表格生成模板。
+        你需要分析用户的文本描述以及他们上传的任何文件（包括图片、文档等）。
 
         **判断标准：**
         用户提供了表格模板当且仅当满足以下任一条件：
@@ -90,21 +93,27 @@ class FrontDeskAgent:
            - 表格的整体布局和组织方式
            
         2. **文件模板**：用户提供了包含表格结构的文件，如：
-           - Excel文件(.xlsx, .xls)
-           - CSV模板文件
-           - PDF文档中的表格样式
-           - 图片中的表格截图
+           - Excel文件(.xlsx, .xls) - 包含具体的表头和数据结构
+           - CSV模板文件 - 有明确的列名和格式
+           - PDF文档中的表格样式 - 显示完整的表格布局
+           - 图片中的表格截图 - 能清晰看到表头和结构
            
         3. **具体示例**：用户给出了表格的具体示例，包含：
            - 完整的表头结构
            - 示例数据行
            - 格式要求和规范
 
+        **特别注意文件类型：**
+        - 如果用户上传了图片文件，分析图片中是否包含表格结构
+        - 如果用户上传了文档文件，考虑其可能包含的表格模板信息
+        - 如果用户上传了Excel或CSV文件，这通常意味着提供了明确的模板
+
         **不符合条件的情况：**
         - 仅描述表格用途或目的
         - 只提到需要哪些信息类别，但未具体化表头
         - 模糊的需求描述
         - 询问如何制作表格
+        - 上传的文件与表格设计无关
 
         **输出要求：**
         - 如果用户提供了符合上述标准的完整表格模板，请回答 [YES]
@@ -112,19 +121,42 @@ class FrontDeskAgent:
         - 如果有任何不确定的地方，倾向于回答 [NO]
 
         **分析过程：**
-        请仔细分析用户输入，考虑是否包含足够的结构化信息来直接生成表格。
+        请仔细分析用户输入和上传的文件，考虑是否包含足够的结构化信息来直接生成表格。
+        如果用户上传了文件，请特别关注文件类型和可能包含的表格信息。
         """
         system_message = SystemMessage(content=system_prompt)
 
-        latest_message = [system_message] + [state["messages"][-1]] if state["messages"] else [system_message]
+        # Get the latest user message and check for file information
+        latest_message = state["messages"][-1] if state["messages"] else None
+        messages_to_analyze = [system_message]
+        
+        if latest_message:
+            messages_to_analyze.append(latest_message)
+            
+            # Check if the message mentions files (indicating multimodal input)
+            if latest_message.content and any(keyword in latest_message.content.lower() 
+                                           for keyword in ['[图片文件', '[文件:', '上传了以下文件']):
+                # This indicates multimodal input with files
+                enhanced_message = HumanMessage(content=f"""
+                {latest_message.content}
+                
+                注意：用户已上传文件，请根据文件类型和内容判断是否提供了表格模板。
+                """)
+                messages_to_analyze[-1] = enhanced_message
 
-        response = self.llm.invoke(latest_message)
+        response = self.llm.invoke(messages_to_analyze)
 
         has_template = "[YES]" in response.content.upper()
 
+        # Enhanced response based on file analysis
+        if any(keyword in latest_message.content.lower() for keyword in ['[图片文件', '[文件:', 'excel', '.xlsx', '.csv']) if latest_message else False:
+            template_analysis = f"模板识别结果：{'已识别到文件上传并' if not has_template else ''}{'检测到完整模板' if has_template else '需要进一步分析文件内容和收集信息'}"
+        else:
+            template_analysis = f"模板识别结果：{'已提供完整模板' if has_template else '未提供完整模板，需要进一步收集信息'}"
+
         return {
             "has_template": has_template,
-            "messages": [AIMessage(content = f"模板识别结果：{"已提供完整模板" if has_template else "未提供完整模板，需要进一步收集信息"}")]
+            "messages": [AIMessage(content=template_analysis)]
         }
 
     def _route_after_template_check(self, state: FrontdeskState) -> str:
@@ -132,7 +164,7 @@ class FrontDeskAgent:
         return "has_template" if state["has_template"] else "no_template"
 
     def _gather_requirements_node(self, state: FrontdeskState) -> FrontdeskState:
-        """和用户对话确定生成表格的内容，要求等"""
+        """和用户对话确定生成表格的内容，要求等 - 支持多模态输入分析"""
 
         # If gather_complete is already True, don't override it
         if state.get("gather_complete", False):
@@ -142,6 +174,7 @@ class FrontDeskAgent:
             }
 
         system_prompt_text = """你是一个资深的excel表格设计专家，你的任务是主动引导用户完成表格设计。
+        你可以分析用户上传的文件（包括图片、文档、Excel文件等）来更好地理解他们的需求。
 
         **你需要按顺序收集以下信息：**
         1. 表格的用途和目标（用来做什么？解决什么问题？）
@@ -149,18 +182,24 @@ class FrontDeskAgent:
         3. 表格结构设计（是否需要多级表头？如何分组？）
         4. 特殊要求（格式、验证规则、特殊功能等）
 
+        **多模态分析能力：**
+        - 如果用户上传了图片，尝试分析图片中的表格结构或相关信息
+        - 如果用户上传了文档，考虑文档中可能包含的表格需求或模板
+        - 如果用户上传了Excel/CSV文件，分析其结构作为参考
+
         **对话策略：**
         - 主动询问，不要被动等待
         - 一次问1或2个具体问题
-        - 根据用户回答给出建议和选项
+        - 根据用户回答和上传的文件给出建议和选项
         - 如果用户回答模糊，追问具体细节
+        - 如果用户上传了相关文件，主动提及并询问是否基于文件内容设计
         - 当收集到足够信息设计完整表格时，主动总结并标记 [COMPLETE]
 
         **判断完成标准：**
         当你明确了表格用途、主要字段、结构组织方式后，应该主动总结信息并在回复末尾加上 [COMPLETE] 标记。
 
         **示例完成总结格式：**
-        "好的，根据我们的讨论，我已经收集到足够的信息来设计这个表格：
+        "好的，根据我们的讨论和您提供的文件，我已经收集到足够的信息来设计这个表格：
         - 用途：[总结用途]
         - 主要字段：[列出字段]
         - 结构：[描述表头组织]
@@ -172,7 +211,7 @@ class FrontDeskAgent:
         # 确保系统提示词在最前面
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=system_prompt_text)] + messages
-            
+
         response = self.llm.invoke(messages)
 
         gather_complete = "[COMPLETE]" in response.content
@@ -189,17 +228,64 @@ class FrontDeskAgent:
     def _gather_user_input(self, state: FrontdeskState) -> FrontdeskState:
         """用户和agent对话确认信息，或提供额外信息用于智能体收集表格信息"""
 
-        try:
-            user_input = input("👤用户：")
-            return {
-                "messages": [HumanMessage(content=user_input)]
-            }
-        except EOFError:
-            # Handle non-interactive environments
-            print("⚠️  非交互式环境，无法获取用户输入")
-            return {
-                "gather_complete": True  # Force completion to avoid infinite loop
-            }
+        # For GUI integration, we don't need to actually collect input here
+        # The input will be provided through the state updates from the GUI
+        # Just return the current state to continue the flow
+        return {
+            "gather_complete": False  # Keep conversation going
+        }
+
+    def process_user_message(self, message: str, session_id: str = "default") -> dict:
+        """
+        处理单个用户消息并返回智能体响应（用于GUI集成）
+        """
+        # Create or update conversation state
+        if not hasattr(self, '_conversation_states'):
+            self._conversation_states = {}
+        
+        if session_id not in self._conversation_states:
+            self._conversation_states[session_id] = self._create_initial_state(message, session_id)
+        else:
+            # Add user message to existing conversation
+            from langchain_core.messages import HumanMessage
+            self._conversation_states[session_id]["messages"].append(HumanMessage(content=message))
+        
+        config = {"configurable": {"thread_id": session_id}}
+        
+        # Process through the graph
+        responses = []
+        for chunk in self.graph.stream(self._conversation_states[session_id], config=config, stream_mode="updates"):
+            for node_name, node_output in chunk.items():
+                if isinstance(node_output, dict):
+                    # Update conversation state
+                    self._conversation_states[session_id].update(node_output)
+                    
+                    # Collect responses
+                    if "messages" in node_output and node_output["messages"]:
+                        latest_message = node_output["messages"][-1]
+                        if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
+                            responses.append({
+                                "node": node_name,
+                                "content": latest_message.content,
+                                "type": latest_message.__class__.__name__
+                            })
+                    
+                    # Check completion status
+                    if node_output.get("gather_complete"):
+                        responses.append({
+                            "node": "completion",
+                            "content": "信息收集完成",
+                            "type": "completion",
+                            "table_info": node_output.get("table_info"),
+                            "table_structure": node_output.get("table_structure"),
+                            "additional_requirements": node_output.get("additional_requirements")
+                        })
+        
+        return {
+            "responses": responses,
+            "state": self._conversation_states[session_id],
+            "session_id": session_id
+        }
     
     def _route_after_gather(self, state: FrontdeskState) -> str:
         """根据"gather_complete"的值返回下一个节点"""
@@ -219,7 +305,7 @@ class FrontDeskAgent:
         
         if conversation_length < 2:
             # 没有收集到足够信息，根据用户初始输入创立基础表格
-            initial_input = state["user_input"] if state.get("user_input") else "未知需求"
+            initial_input = state["messages"][0].content if state["messages"] else "未知需求"
             
             basic_template = {
                 "table_info": {
@@ -449,7 +535,7 @@ class FrontDeskAgent:
             }
 
     def _create_initial_state(self, user_input: str, session_id: str = "default") -> FrontdeskState:
-        """创建Langgraph最初状态"""
+        """创建Langgraph最初状态 - 支持多模态输入"""
         return {
             "messages": [HumanMessage(content=user_input)],
             "session_id": session_id,
@@ -457,8 +543,8 @@ class FrontDeskAgent:
             "table_info": {},
             "gather_complete": False,
             "has_template": False,
-            "user_input": user_input,
-            "additonal_requirements": {}
+            "additonal_requirements": {},
+            "uploaded_files": []  # Track uploaded files
         }
     
     def run_front_desk_agent(self, user_input: str, session_id = "1") -> None: # session_id默认为1
@@ -477,7 +563,7 @@ class FrontDeskAgent:
                     if isinstance(node_output, dict):
                         if "messages" in node_output and node_output["messages"]:
                             latest_message = node_output["messages"][-1]
-                            if hasattr(latest_message, 'content'):
+                            if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
                                 print(f"💬 智能体回复: {latest_message.content}")
                         
                         for key, value in node_output.items():
@@ -494,5 +580,5 @@ if __name__ == "__main__":
 
     # save_graph_visualization(frontdeskagent.graph)
 
-    user_input = input("请输入你想生成的表格：")
+    user_input = input("告诉我逆向生成什么样的表格：")
     frontdeskagent.run_front_desk_agent(user_input)
