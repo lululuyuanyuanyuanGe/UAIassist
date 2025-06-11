@@ -22,6 +22,7 @@ from langgraph.graph.message import add_messages
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command, Interrupt
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
@@ -202,9 +203,14 @@ class FrontDeskAgent:
     
     def _gather_user_template_supplement(self, state: FrontdeskState) -> FrontdeskState:
         """收集用户补充信息，来确认模板"""
+        response = Interrupt({
+            "agent_response": state["messages"][-1],
+            "question": "Please enter your response: "
+        })
 
-
-
+        return {
+            "messages": [HumanMessage(content=response)]
+        }
 
     def _gather_requirements_node(self, state: FrontdeskState) -> FrontdeskState:
         """和用户对话确定生成表格的内容，要求等 - 支持多模态输入分析"""
@@ -270,65 +276,13 @@ class FrontDeskAgent:
 
     def _gather_user_input(self, state: FrontdeskState) -> FrontdeskState:
         """用户和agent对话确认信息，或提供额外信息用于智能体收集表格信息"""
-
-        # For GUI integration, we don't need to actually collect input here
-        # The input will be provided through the state updates from the GUI
-        # Just return the current state to continue the flow
+        response = Interrupt({
+            "agnet_response": state["messages"][-1],
+            "question": "Please enter your response: "
+        })
         return {
-            "gather_complete": False  # Keep conversation going
+            "messages": [HumanMessage(content=response)]
         }
-
-    # def process_user_message(self, message: str, session_id: str = "default") -> dict:
-    #     """
-    #     处理单个用户消息并返回智能体响应（用于GUI集成）
-    #     """
-    #     # Create or update conversation state
-    #     if not hasattr(self, '_conversation_states'):
-    #         self._conversation_states = {}
-        
-    #     if session_id not in self._conversation_states:
-    #         self._conversation_states[session_id] = self._create_initial_state(message, session_id)
-    #     else:
-    #         # Add user message to existing conversation
-    #         from langchain_core.messages import HumanMessage
-    #         self._conversation_states[session_id]["messages"].append(HumanMessage(content=message))
-        
-    #     config = {"configurable": {"thread_id": session_id}}
-        
-    #     # Process through the graph
-    #     responses = []
-    #     for chunk in self.graph.stream(self._conversation_states[session_id], config=config, stream_mode="updates"):
-    #         for node_name, node_output in chunk.items():
-    #             if isinstance(node_output, dict):
-    #                 # Update conversation state
-    #                 self._conversation_states[session_id].update(node_output)
-                    
-    #                 # Collect responses
-    #                 if "messages" in node_output and node_output["messages"]:
-    #                     latest_message = node_output["messages"][-1]
-    #                     if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
-    #                         responses.append({
-    #                             "node": node_name,
-    #                             "content": latest_message.content,
-    #                             "type": latest_message.__class__.__name__
-    #                         })
-                    
-    #                 # Check completion status
-    #                 if node_output.get("gather_complete"):
-    #                     responses.append({
-    #                         "node": "completion",
-    #                         "content": "信息收集完成",
-    #                         "type": "completion",
-    #                         "table_info": node_output.get("table_info"),
-    #                         "table_structure": node_output.get("table_structure"),
-    #                         "additional_requirements": node_output.get("additional_requirements")
-    #                     })
-        
-    #     return {
-    #         "responses": responses,
-    #         "state": self._conversation_states[session_id],
-    #         "session_id": session_id
-    #     }
     
     def _route_after_gather(self, state: FrontdeskState) -> str:
         """根据"gather_complete"的值返回下一个节点"""
@@ -581,9 +535,9 @@ class FrontDeskAgent:
             "session_id": session_id,
             "table_structure": {},
             "table_info": {},
+            "additional_requirements": {},
             "gather_complete": False,
             "has_template": False,
-            "additonal_requirements": {},
             "uploaded_files": []  # Track uploaded files
         }
     
@@ -592,10 +546,27 @@ class FrontDeskAgent:
         initial_state = self._create_initial_state(user_input, session_id)
         config = {"configurable": {"thread_id": session_id}}
 
-        print(f"🤖 Processing user input: {user_input}")
+        print(f"🤖 正在处理用户输入: {user_input}")
         print("=" * 50)
 
-        for chunk in self.graph.stream(initial_state, config=config, stream_mode="updates"):
+        while True:
+            # stream智能体回复
+            chunks = []
+            interrupt_found = False
+
+            for chunk in self.graph.stream(initial_state, config = config, stream_mode = "updates"):
+                chunks.append(chunk)
+                # 检查是否遇到了interrupt
+                if '__interrupt__' in chunk:
+                    interrupt_found = True
+                    interrupt_data = chunk['__interrupt__'][0]
+
+                    # 处理interrupt
+                    # 先简单用terminal进行交互，后期可以在此用web ui进行交互
+                    user_response = input(interrupt_data.question)
+                    Command(resume=user_response)
+                    break
+        
                 for node_name, node_output in chunk.items():
                     print(f"\n📍 Node: {node_name}")
                     print("-" * 30)
@@ -609,9 +580,11 @@ class FrontDeskAgent:
                         for key, value in node_output.items():
                             if key != "messages" and value:
                                 print(f"📊 {key}: {value}")
-                    
                     print("-" * 30)
-
+            
+            if not interrupt_found:
+                print("Graph finish executed")
+                break
                 
 if __name__ == "__main__":
 
@@ -620,5 +593,5 @@ if __name__ == "__main__":
 
     save_graph_visualization(frontdeskagent.graph)
 
-    # user_input = input("告诉我逆向生成什么样的表格：")
+    # user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格：")
     # frontdeskagent.run_front_desk_agent(user_input)
