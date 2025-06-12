@@ -1,0 +1,2 @@
+1. openai ChatCompletion api and Asisstants api are not compatible, we can only submit file through Asisstant api which has
+limit control on chat history which is not ideal for our AI Agent system.
