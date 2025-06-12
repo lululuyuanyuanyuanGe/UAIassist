@@ -30,7 +30,7 @@ from langchain_openai import ChatOpenAI
 
 @tool
 def upload_file_to_LLM():
-    """这个函数用于将用户输入的文件上传给大模型"""
+    """用于将用户输入的文件上传给大模型"""
     pass
 
 # 定义前台接待员状态
@@ -44,6 +44,7 @@ class FrontdeskState(TypedDict):
     has_template: bool
     complete_confirm: bool
     uploaded_files: list  # Add support for tracking uploaded files
+    previous_node: str  # Track the previous node before file upload
 
 class FrontDeskAgent:
     """
@@ -54,9 +55,9 @@ class FrontDeskAgent:
     def __init__(self, model_name: str = "gpt-4o", checkpoint_path: str = "checkpoints.db"):
         self.model_name = model_name
         self.llm = ChatOpenAI(model=model_name, temperature=0.1)
+        self.tools = [upload_file_to_LLM]
         self.llm_with_tool = self.llm.bind_tools(self.tools)
         self.memory = MemorySaver()
-        self.tools = [upload_file_to_LLM]
         self.graph = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
@@ -73,19 +74,21 @@ class FrontDeskAgent:
         workflow.add_node("gather_requirements", self._gather_requirements_node)
         workflow.add_node("store_information", self._store_information_node)
         workflow.add_node("collect_input", self._gather_user_input)
-        workflow.add_node("gather_template_supplement", self._gather_user_template_supplement)
+        workflow.add_node("collect_template_supplement", self._gather_user_template_supplement)
         workflow.add_node("file_upload_tool", file_upload_node)
+
 
         # 入口节点
         workflow.set_entry_point("check_template")
 
         # 连接节点
-        # 连接模板检测节点
+        # 检测节点判断用户提供了文件需要上传
         workflow.add_conditional_edges(
             "check_template",
             self._route_after_template_check,
             {
                 "has_template": "confirm_template",
+                "has_file_upload": "file_upload_tool",
                 "no_template": "gather_requirements"
             }
         )
@@ -96,25 +99,52 @@ class FrontDeskAgent:
             self._route_after_template_confirm,
             {
                 "complete_confirm": "store_information",
-                "incomplete_confirm": "gather_template_supplement"
+                "incomplete_confirm": "collect_template_supplement"
             }
         )
 
+        # collect_template_supplement时用户可能上传文件
+        workflow.add_conditional_edges(
+            "collect_template_supplement",
+            self._route_after_collect_template_supplement,
+            {
+                "continue_confirm": "confirm_template",
+                "upload_file": "file_upload_tool"
+            }
+        )
+
+        # collect_input时用户可能上传文件
+        workflow.add_conditional_edges(
+            "collect_input",
+            self._route_after_collect_input,
+            {
+                "continue_gather": "gather_requirements",
+                "upload_file": "file_upload_tool"
+            }
+        )
+        
         # 当模板未提供时
         workflow.add_conditional_edges(
             "gather_requirements",
-            self._route_after_requirements,
+            self._route_after_gather_requirements,
             {
                 "complete": "store_information",
                 "continue": "collect_input"
             }
         )
 
-        # collect_input should return to gather_requirements for continuous interaction
-        workflow.add_edge("collect_input", "gather_requirements")
-        
-        # gather_template_supplement should return to confirm_template for continuous interaction  
-        workflow.add_edge("gather_template_supplement", "confirm_template")
+        # 文件上传工具处理完后的路由
+        workflow.add_conditional_edges(
+            "file_upload_tool",
+            self._route_after_file_upload,
+            {
+                "check_template": "check_template",
+                "confirm_template": "confirm_template", 
+                "gather_requirements": "gather_requirements",
+                "collect_template_supplement": "collect_template_supplement",
+                "collect_input": "collect_input"
+            }
+        )
 
         workflow.add_edge("store_information", END)
         
@@ -215,8 +245,48 @@ class FrontDeskAgent:
         }
 
     def _route_after_template_check(self, state: FrontdeskState) -> str:
-        """根据模板检查结果路由到下一个节点"""
+        """用户提供外部文件时返回工具节点路由，没有外部文件则正常判断"""
+        if state.get("uploaded_files"):
+            # Set previous node before going to file upload
+            state["previous_node"] = "check_template"
+            return "has_file_upload"
         return "has_template" if state["has_template"] else "no_template"
+    
+    def _route_after_collect_template_supplement(self, state: FrontdeskState) -> str:
+        """模板补充收集后的路由决策 - 检测用户是否提供了新文件"""
+        # 检测最新用户消息中是否包含文件路径
+        if state.get("messages"):
+            latest_message = state["messages"][-1]
+            if isinstance(latest_message, HumanMessage):
+                # 检测并处理用户输入中的文件路径
+                detected_files = detect_and_process_file_paths(latest_message.content)
+                if detected_files:
+                    # 更新状态中的上传文件列表
+                    current_files = state.get("uploaded_files", [])
+                    state["uploaded_files"] = current_files + detected_files
+                    # Set previous node before going to file upload
+                    state["previous_node"] = "collect_template_supplement"
+                    return "upload_file"
+        
+        return "continue_confirm"
+
+    def _route_after_collect_input(self, state: FrontdeskState) -> str:
+        """用户输入收集后的路由决策 - 检测用户是否提供了新文件"""
+        # 检测最新用户消息中是否包含文件路径
+        if state.get("messages"):
+            latest_message = state["messages"][-1]
+            if isinstance(latest_message, HumanMessage):
+                # 检测并处理用户输入中的文件路径
+                detected_files = detect_and_process_file_paths(latest_message.content)
+                if detected_files:
+                    # 更新状态中的上传文件列表
+                    current_files = state.get("uploaded_files", [])
+                    state["uploaded_files"] = current_files + detected_files
+                    # Set previous node before going to file upload
+                    state["previous_node"] = "collect_input"
+                    return "upload_file"
+        
+        return "continue_gather"
 
     def _confirm_template_node(self, state: FrontdeskState) -> FrontdeskState:
         """和用户确认模板细节"""
@@ -355,7 +425,7 @@ class FrontDeskAgent:
             "gather_complete": gather_complete    
         }
 
-    def _route_after_requirements(self, state: FrontdeskState) -> str:
+    def _route_after_gather_requirements(self, state: FrontdeskState) -> str:
         """根据需求收集完成状态路由到下一个节点"""
         return "complete" if state["gather_complete"] else "continue"
 
@@ -615,7 +685,9 @@ class FrontDeskAgent:
             "additional_requirements": {},
             "gather_complete": False,
             "has_template": False,
-            "uploaded_files": detected_files  # 使用检测到的文件路径
+            "complete_confirm": False,
+            "uploaded_files": detected_files,  # 使用检测到的文件路径
+            "previous_node": "check_template"  # 初始状态下，如果有文件上传，应该回到check_template
         }
     
     def run_front_desk_agent(self, user_input: str, session_id = "1") -> None: # session_id默认为1
@@ -668,12 +740,30 @@ class FrontDeskAgent:
         
         print("\n✅ 表格模板生成完成！")
 
+    def _route_after_file_upload(self, state: FrontdeskState) -> str:
+        """文件上传工具处理完成后的路由决策 - 返回到之前的节点"""
+        # 返回到文件上传前的节点
+        previous_node = state.get("previous_node", "check_template")
+        
+        print(f"📁 文件上传完成，返回到节点: {previous_node}")
+        
+        # 根据之前的节点返回相应的路由值
+        node_routing_map = {
+            "check_template": "check_template",
+            "collect_template_supplement": "collect_template_supplement", 
+            "collect_input": "collect_input",
+            "confirm_template": "confirm_template",
+            "gather_requirements": "gather_requirements"
+        }
+        
+        return node_routing_map.get(previous_node, "check_template")
+
 if __name__ == "__main__":
 
     #创建智能体
     frontdeskagent = FrontDeskAgent()
 
-    # save_graph_visualization(frontdeskagent.graph)
+    save_graph_visualization(frontdeskagent.graph)
 
-    user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格: \n")
-    frontdeskagent.run_front_desk_agent(user_input)
+    # user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格: \n")
+    # frontdeskagent.run_front_desk_agent(user_input)
