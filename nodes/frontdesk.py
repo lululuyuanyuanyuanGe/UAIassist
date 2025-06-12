@@ -30,19 +30,18 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
 @tool
-def upload_file_to_LLM_tool(file_paths: list, state: dict, provider: str = "openai", purpose: str = "assistants", vector_store_id: str = None):
+def upload_file_to_LLM_tool(file_paths: list, provider: str = "openai", purpose: str = "assistants", vector_store_id: str = None):
     """
-    通用文件上传工具，将用户提供的文件上传给大模型，并直接更新状态中的uploaded_files_id
+    通用文件上传工具，将用户提供的文件上传给大模型
     
     Args:
         file_paths: 文件路径列表
-        state: 当前状态字典，将直接更新uploaded_files_id
         provider: 模型提供商 ("openai", "azure", "anthropic", "local")
         purpose: 文件用途 ("assistants", "fine-tune", "user_data")
         vector_store_id: 可选的向量存储ID，用于OpenAI助手
     
     Returns:
-        dict: 包含上传结果的字典
+        dict: 包含上传结果的字典，包括file_ids
     """
     # 执行文件上传
     result = upload_file_to_LLM(file_paths, provider, purpose, vector_store_id)
@@ -50,14 +49,10 @@ def upload_file_to_LLM_tool(file_paths: list, state: dict, provider: str = "open
     # 提取成功上传的文件ID
     uploaded_file_ids = [file["file_id"] for file in result.get("uploaded_files", [])]
     
-    # 直接更新状态中的uploaded_files_id
-    current_file_ids = state.get("uploaded_files_id", [])
-    updated_file_ids = list(set(current_file_ids + uploaded_file_ids))  # 去重
-    state["uploaded_files_id"] = updated_file_ids
-    
     print(f"📁 上传成功的文件ID: {uploaded_file_ids}")
-    print(f"📁 状态中总文件ID: {updated_file_ids}")
     
+    # 返回结果，包含file_ids用于后续状态更新
+    result["file_ids"] = uploaded_file_ids
     return result
 
 # 定义前台接待员状态
@@ -73,6 +68,52 @@ class FrontdeskState(TypedDict):
     uploaded_files: list  # 用户提供的文件路径
     uploaded_files_id: list
     previous_node: str  # Track the previous node before file upload
+    failed_uploads: list  # Track files that failed to upload
+
+class CustomFileUploadNode:
+    """自定义文件上传节点，处理工具调用和状态更新"""
+    
+    def __init__(self, tools):
+        self.tools = tools
+        self.tool_node = ToolNode(tools)
+    
+    def __call__(self, state: FrontdeskState):
+        # 执行工具调用 - 使用正确的invoke方法
+        result = self.tool_node.invoke(state)
+        
+        # 检查工具执行结果，更新uploaded_files_id和failed_uploads
+        if "messages" in result:
+            for message in result["messages"]:
+                if hasattr(message, 'content') and isinstance(message.content, str):
+                    try:
+                        # 尝试解析工具返回的结果
+                        import json
+                        if message.content.startswith('{') and ('"file_ids"' in message.content or '"failed_files"' in message.content):
+                            tool_result = json.loads(message.content)
+                            
+                            # 更新成功上传的文件ID
+                            if "file_ids" in tool_result:
+                                current_file_ids = state.get("uploaded_files_id", [])
+                                new_file_ids = tool_result["file_ids"]
+                                updated_file_ids = list(set(current_file_ids + new_file_ids))  # 去重
+                                result["uploaded_files_id"] = updated_file_ids
+                                print(f"📁 状态更新 - 新增文件ID: {new_file_ids}")
+                                print(f"📁 状态更新 - 总文件ID: {updated_file_ids}")
+                            
+                            # 更新失败上传的文件
+                            if "failed_files" in tool_result and tool_result["failed_files"]:
+                                current_failed = state.get("failed_uploads", [])
+                                failed_paths = [f.get("file", "") for f in tool_result["failed_files"]]
+                                updated_failed = list(set(current_failed + failed_paths))  # 去重
+                                result["failed_uploads"] = updated_failed
+                                print(f"📁 状态更新 - 失败文件: {failed_paths}")
+                                print(f"📁 状态更新 - 总失败文件: {updated_failed}")
+                            
+                            break
+                    except (json.JSONDecodeError, AttributeError):
+                        continue
+        
+        return result
 
 class FrontDeskAgent:
     """
@@ -88,13 +129,59 @@ class FrontDeskAgent:
         self.memory = MemorySaver()
         self.graph = self._build_graph()
 
+    def _filter_messages_for_llm(self, messages):
+        """过滤消息，确保正确的对话序列，避免OpenAI API错误"""
+        from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
+        
+        filtered = []
+        i = 0
+        while i < len(messages):
+            msg = messages[i]
+            
+            # 检查消息类型
+            if isinstance(msg, (HumanMessage, SystemMessage)):
+                filtered.append(msg)
+                i += 1
+            elif isinstance(msg, AIMessage):
+                # 如果AI消息有tool_calls，检查后续是否有对应的tool消息
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    # 查找对应的tool消息
+                    tool_call_ids = [tc.get('id') for tc in msg.tool_calls if tc.get('id')]
+                    j = i + 1
+                    found_tool_responses = []
+                    
+                    # 收集所有对应的tool消息
+                    while j < len(messages) and isinstance(messages[j], ToolMessage):
+                        if messages[j].tool_call_id in tool_call_ids:
+                            found_tool_responses.append(messages[j])
+                        j += 1
+                    
+                    # 如果找到了完整的tool响应，跳过这个AI消息和tool消息序列
+                    # 因为我们不想在LLM调用中包含tool相关的消息
+                    if len(found_tool_responses) == len(tool_call_ids):
+                        i = j  # 跳过整个tool调用序列
+                        continue
+                    else:
+                        # 如果tool响应不完整，也跳过这个AI消息，避免API错误
+                        i += 1
+                        continue
+                else:
+                    # 普通AI消息，直接添加
+                    filtered.append(msg)
+                    i += 1
+            else:
+                # 其他类型消息（如ToolMessage）跳过
+                i += 1
+        
+        return filtered
+
     def _build_graph(self) -> StateGraph:
         """构建生成表格的LangGraph状态图"""
 
         workflow = StateGraph(FrontdeskState)
 
-        # 创建工具节点
-        file_upload_node = ToolNode(self.tools)
+        # 创建自定义工具节点
+        file_upload_node = CustomFileUploadNode(self.tools)
 
         # 添加节点
         workflow.add_node("check_template", self._check_template_node)
@@ -115,7 +202,7 @@ class FrontDeskAgent:
             self._route_after_template_check,
             {
                 "has_template": "confirm_template",
-                "has_file_upload": "file_upload_tool",
+                "file_upload": "file_upload_tool",
                 "no_template": "gather_requirements"
             }
         )
@@ -164,109 +251,81 @@ class FrontDeskAgent:
         return workflow.compile(checkpointer = self.memory)
 
     def _check_template_node(self, state: FrontdeskState) -> FrontdeskState:
-        """检查用户是否提供了表格生成模板 - 支持多模态输入"""
+        """检查用户是否提供了表格生成模板 - 支持多模态输入和智能工具调用"""
 
-        system_prompt = """
+        # 获取已上传文件信息和失败文件信息
+        uploaded_files_info = ""
+        if state.get("uploaded_files_id"):
+            uploaded_files_info = f"\n**已上传的文件：**\n已成功上传 {len(state['uploaded_files_id'])} 个文件到系统中，文件ID: {state['uploaded_files_id']}\n"
+        
+        failed_files_info = ""
+        if state.get("failed_uploads"):
+            failed_files_info = f"\n**上传失败的文件：**\n以下文件上传失败，请不要重复尝试: {state['failed_uploads']}\n"
+
+        system_prompt = f"""
         你是一个专业的表格模板识别专家，负责准确判断用户是否已经提供了完整的表格生成模板。
         你需要分析用户的文本描述以及他们上传的任何文件（包括图片、文档等）。
+        {uploaded_files_info}{failed_files_info}
+        **工具使用指南：**
+        如果用户输入中包含NEW文件路径（尚未上传且未失败的文件），请使用 upload_file_to_LLM_tool 工具。
+        
+        文件路径识别规则：
+        - Windows路径：d:\\folder\\file.xlsx, C:\\Users\\file.csv
+        - Unix路径：/home/user/file.xlsx, ./data/file.csv
+        - 相对路径：../data/file.xlsx, data/file.csv
+        
+        工具参数：
+        - file_paths: 提取的文件路径列表，例如 ["d:\\data\\file.xlsx"]
+        - provider: "openai"
+        - purpose: "assistants"
+
+        **重要：** 
+        - 如果文件已经上传（如上面显示的已上传文件），请不要重复上传！
+        - 如果文件上传失败（如上面显示的失败文件），请不要重复尝试！
 
         **判断标准：**
         用户提供了表格模板当且仅当满足以下任一条件：
 
-        1. **结构化描述**：用户清晰、详细地描述了表格的完整结构，包括：
-           - 明确的表头名称和层级关系
-           - 每个字段的具体含义和数据类型
-           - 表格的整体布局和组织方式
-           
-        2. **文件模板**：用户提供了包含表格结构的文件，如：
-           - Excel文件(.xlsx, .xls) - 包含具体的表头和数据结构
-           - CSV模板文件 - 有明确的列名和格式
-           - PDF文档中的表格样式 - 显示完整的表格布局
-           - 图片中的表格截图 - 能清晰看到表头和结构
-           
-        3. **具体示例**：用户给出了表格的具体示例，包含：
-           - 完整的表头结构
-           - 示例数据行
-           - 格式要求和规范
-
-        **特别注意文件类型：**
-        - 如果用户上传了Excel文件(.xlsx, .xls)，请仔细分析其中的表头结构和数据格式
-        - 如果用户上传了图片文件，分析图片中是否包含表格结构
-        - 如果用户上传了文档文件，考虑其可能包含的表格模板信息
-
-        **不符合条件的情况：**
-        - 仅描述表格用途或目的
-        - 只提到需要哪些信息类别，但未具体化表头
-        - 模糊的需求描述
-        - 询问如何制作表格
-        - 上传的文件与表格设计无关
+        1. **结构化描述**：用户清晰、详细地描述了表格的完整结构
+        2. **文件模板**：用户提供了包含表格结构的文件（包括已上传的文件）
+        3. **具体示例**：用户给出了表格的具体示例
 
         **输出要求：**
-        - 如果用户提供了符合上述标准的完整表格模板，请回答 [YES]
-        - 如果用户未提供完整模板或描述不够具体，请回答 [NO]
-        - 如果有任何不确定的地方，倾向于回答 [NO]
-
-        **分析过程：**
-        请仔细分析用户输入和上传的文件，考虑是否包含足够的结构化信息来直接生成表格。
-        如果用户上传了Excel文件，请使用pandas等工具分析文件结构，查看表头、数据类型、行数等信息。
+        - 如果用户提供了完整表格模板，回答 [YES]
+        - 如果用户未提供完整模板，回答 [NO]
+        - 如果需要分析NEW文件，请先调用工具上传文件，然后基于分析结果判断
 
         **注意事项**
-        如果你认为用户当前的信息不够完整，或者你需要一些补充也要回答 [NO]
+        如果信息不够完整，回答 [NO]
         """
         
-        # 获取用户输入消息
-        user_message = state["messages"][-1] if state["messages"] else HumanMessage(content="")
-        file_paths = state.get("uploaded_files", [])
+        # 过滤消息，移除工具消息
+        filtered_messages = self._filter_messages_for_llm(state["messages"])
 
-        # 检查是否上传了文件
-        if file_paths:
-            print(f"🔍 正在使用Assistants API分析 {len(file_paths)} 个文件...")
-            try:
-                # 使用新的Assistants API方法
-                result = create_assistant_with_files(
-                    client=client,
-                    file_paths=file_paths,
-                    user_input=user_message.content,
-                    system_prompt=system_prompt
-                )
-                
-                response_content = result["response"]
-                print("✅ Assistants API文件分析完成")
-                
-                # 将分析结果转换为LangChain消息格式
-                analysis_message = AIMessage(content=response_content)
-                state["messages"].append(analysis_message)
-                
-            except Exception as e:
-                print(f"❌ Assistants API分析失败: {e}")
-                print("🔄 回退到文本分析模式")
-                # 回退到文本分析
-                messages = [SystemMessage(content=system_prompt), user_message]
-                response = self.llm.invoke(messages)
-                response_content = response.content
-        else:
-            # 构建正确的消息列表
-            messages = [SystemMessage(content=system_prompt), user_message]
-            response = self.llm.invoke(messages)
-            response_content = response.content
+        # 使用带工具的LLM
+        llm_with_tools = self.llm.bind_tools(self.tools)
+        messages = [SystemMessage(content=system_prompt)] + filtered_messages
+        response = llm_with_tools.invoke(messages)
 
-        has_template = "[YES]" in response_content.upper()
+        has_template = "[YES]" in response.content.upper()
         
         return {
             "has_template": has_template,
-            "messages": [AIMessage(content=response_content)]
+            "messages": [response]
         }
 
     def _route_after_template_check(self, state: FrontdeskState) -> str:
-        """用户提供外部文件时返回工具节点路由，没有外部文件则正常判断"""
-        if state.get("uploaded_files"):
-            # Set previous node before going to file upload
-            state["previous_node"] = "check_template"
-            return "has_file_upload"
+        """根据LLM是否调用工具来决定路由"""
+        if state.get("messages"):
+            latest_message = state["messages"][-1]
+            if hasattr(latest_message, 'tool_calls') and latest_message.tool_calls:
+                # Set previous node before going to file upload
+                state["previous_node"] = "check_template"
+                return "file_upload"
         return "has_template" if state["has_template"] else "no_template"
 
     def _confirm_template_node(self, state: FrontdeskState) -> FrontdeskState:
-        """和用户确认模板细节"""
+        """和用户确认模板细节 - 支持智能工具调用"""
 
         # If complete_confirm is already True, don't override it
         if state.get("complete_confirm", False):
@@ -275,21 +334,27 @@ class FrontDeskAgent:
                 "complete_confirm": True
             }
 
-        system_prompt = """你是一个专业的表格模板审核专家，你的任务是主动与用户确认和完善表格模板的详细信息。
+        # 获取已上传文件信息
+        uploaded_files_info = ""
+        if state.get("uploaded_files_id"):
+            uploaded_files_info = f"\n**已上传的文件：**\n已成功上传 {len(state['uploaded_files_id'])} 个文件到系统中，文件ID: {state['uploaded_files_id']}\n"
+
+        system_prompt = f"""你是一个专业的表格模板审核专家，你的任务是主动与用户确认和完善表格模板的详细信息。
+        {uploaded_files_info}
+        **工具使用指南：**
+        如果用户在对话中提到了NEW文件路径、文件名，或者说要上传新文件来补充模板信息，请使用 upload_file_to_LLM_tool 工具。
+        工具参数说明：
+        - file_paths: 从用户输入中提取的文件路径列表
+        - provider: 使用 "openai"
+        - purpose: 使用 "assistants"
+        
+        **重要：** 如果文件已经上传（如上面显示的已上传文件），请不要重复上传！
 
         **你需要按顺序确认以下信息：**
         1. **表格的用途和目标**：确认表格的具体用途，用来做什么？解决什么问题？
         2. **需要收集的具体信息类型**：确认所有数据字段，是否有遗漏的重要字段？
         3. **表格结构设计**：确认是否需要多级表头？如何分组？层级关系是否合理？
         4. **特殊要求**：确认格式、验证规则、特殊功能等
-
-        **检查重点：**
-        - **表头完整性**：检查表头是否清晰明确，是否有歧义或模糊的表述
-        - **数据类型明确性**：确认每个字段的数据类型是否明确（文本、数字、日期等）
-        - **必填字段标识**：确认哪些字段是必填的，哪些是可选的
-        - **数据格式规范**：检查是否需要特定的数据格式要求
-        - **表格结构逻辑**：验证表格的层级结构是否合理
-        - **业务逻辑一致性**：确保表格设计符合实际业务需求
 
         **对话策略：**
         - 主动询问，不要被动等待
@@ -298,34 +363,26 @@ class FrontDeskAgent:
         - 根据用户回答给出建议和选项
         - 如果用户回答模糊，追问具体细节
         - 当确认所有信息都清晰完整时，主动总结并标记 [COMPLETE]
+        - 如果用户提供新文件来补充信息，请先调用工具上传分析
 
         **判断完成标准：**
         当你确认了表格用途、所有字段详情、结构组织方式、特殊要求后，应该主动总结信息并在回复末尾加上 [COMPLETE] 标记。
 
-        **示例确认格式：**
-        "好的，我已经仔细审核了您的表格模板，现在让我总结确认的信息：
-        - 表格用途：[用途说明]
-        - 主要字段：[字段列表]
-        - 结构设计：[描述表头组织]
-        - 特殊要求：[要求说明]
-        所有信息都已确认清楚，现在可以开始生成表格了。[COMPLETE]"
-
-        **示例补充询问格式：**
-        "我注意到您的模板中有几个地方需要进一步确认：
-        1. [具体问题1]
-        2. [具体问题2]
-        请您提供更多细节，以便我为您生成更准确的表格。"
-
         当模板确认完成后请在回复结尾加入[COMPLETE]
         """
 
-        messages = state["messages"].copy()
+        # 过滤消息，移除工具消息
+        filtered_messages = self._filter_messages_for_llm(state["messages"])
 
         # 确保系统提示词在最前面
-        if not messages or not isinstance(messages[0], SystemMessage):
-            messages = [SystemMessage(content=system_prompt)] + messages
+        if not filtered_messages or not isinstance(filtered_messages[0], SystemMessage):
+            messages = [SystemMessage(content=system_prompt)] + filtered_messages
+        else:
+            messages = [SystemMessage(content=system_prompt)] + filtered_messages[1:]
 
-        response = self.llm.invoke(messages)
+        # 使用带工具的LLM
+        llm_with_tools = self.llm.bind_tools(self.tools)
+        response = llm_with_tools.invoke(messages)
         complete_confirm = "[COMPLETE]" in response.content.upper()
 
         return{
@@ -333,22 +390,14 @@ class FrontDeskAgent:
             "messages": [response]
         }
     
-    # confirm template node's conditional check
     def _route_after_template_confirm(self, state: FrontdeskState) -> str:
-        """根据是否完成格式校验路由到相应节点 - 检测文件上传需求"""
-        # 检测最新用户消息中是否包含文件路径
+        """根据LLM是否调用工具来决定路由"""
         if state.get("messages"):
             latest_message = state["messages"][-1]
-            if isinstance(latest_message, HumanMessage):
-                # 检测并处理用户输入中的文件路径
-                detected_files = detect_and_process_file_paths(latest_message.content)
-                if detected_files:
-                    # 更新状态中的上传文件列表
-                    current_files = state.get("uploaded_files", [])
-                    state["uploaded_files"] = current_files + detected_files
-                    # Set previous node before going to file upload
-                    state["previous_node"] = "confirm_template"
-                    return "upload_file"
+            if hasattr(latest_message, 'tool_calls') and latest_message.tool_calls:
+                # Set previous node before going to file upload
+                state["previous_node"] = "confirm_template"
+                return "upload_file"
         
         return "complete_confirm" if state["complete_confirm"] else "incomplete_confirm"
     
@@ -360,7 +409,7 @@ class FrontDeskAgent:
         }
 
     def _gather_requirements_node(self, state: FrontdeskState) -> FrontdeskState:
-        """和用户对话确定生成表格的内容，要求等 - 支持多模态输入分析"""
+        """和用户对话确定生成表格的内容，要求等 - 支持多模态输入分析和智能工具调用"""
 
         # If gather_complete is already True, don't override it
         if state.get("gather_complete", False):
@@ -369,8 +418,22 @@ class FrontDeskAgent:
                 "gather_complete": True
             }
 
-        system_prompt_text = """你是一个资深的excel表格设计专家，你的任务是主动引导用户完成表格设计。
+        # 获取已上传文件信息
+        uploaded_files_info = ""
+        if state.get("uploaded_files_id"):
+            uploaded_files_info = f"\n**已上传的文件：**\n已成功上传 {len(state['uploaded_files_id'])} 个文件到系统中，文件ID: {state['uploaded_files_id']}\n"
+
+        system_prompt_text = f"""你是一个资深的excel表格设计专家，你的任务是主动引导用户完成表格设计。
         你可以分析用户上传的文件（包括图片、文档、Excel文件等）来更好地理解他们的需求。
+        {uploaded_files_info}
+        **工具使用指南：**
+        如果用户在对话中提到了NEW文件路径、文件名，或者说要上传新文件来帮助设计表格，请使用 upload_file_to_LLM_tool 工具。
+        工具参数说明：
+        - file_paths: 从用户输入中提取的文件路径列表
+        - provider: 使用 "openai"
+        - purpose: 使用 "assistants"
+        
+        **重要：** 如果文件已经上传（如上面显示的已上传文件），请不要重复上传！
 
         **你需要按顺序收集以下信息：**
         1. 表格的用途和目标（用来做什么？解决什么问题？）
@@ -390,6 +453,7 @@ class FrontDeskAgent:
         - 如果用户回答模糊，追问具体细节
         - 如果用户上传了相关文件，主动提及并询问是否基于文件内容设计
         - 当收集到足够信息设计完整表格时，主动总结并标记 [COMPLETE]
+        - 如果用户提供文件，请先调用工具上传分析，然后基于分析结果继续对话
 
         **判断完成标准：**
         当你明确了表格用途、主要字段、结构组织方式后，应该主动总结信息并在回复末尾加上 [COMPLETE] 标记。
@@ -402,13 +466,18 @@ class FrontDeskAgent:
         现在我可以为您生成详细的表格结构了。[COMPLETE]"
         """
 
-        messages = state["messages"].copy()
+        # 过滤消息，移除工具消息
+        filtered_messages = self._filter_messages_for_llm(state["messages"])
 
         # 确保系统提示词在最前面
-        if not messages or not isinstance(messages[0], SystemMessage):
-            messages = [SystemMessage(content=system_prompt_text)] + messages
+        if not filtered_messages or not isinstance(filtered_messages[0], SystemMessage):
+            messages = [SystemMessage(content=system_prompt_text)] + filtered_messages
+        else:
+            messages = [SystemMessage(content=system_prompt_text)] + filtered_messages[1:]
 
-        response = self.llm.invoke(messages)
+        # 使用带工具的LLM
+        llm_with_tools = self.llm.bind_tools(self.tools)
+        response = llm_with_tools.invoke(messages)
         gather_complete = "[COMPLETE]" in response.content
 
         return {
@@ -417,20 +486,13 @@ class FrontDeskAgent:
         }
 
     def _route_after_gather_requirements(self, state: FrontdeskState) -> str:
-        """根据需求收集完成状态路由到下一个节点 - 检测文件上传需求"""
-        # 检测最新用户消息中是否包含文件路径
+        """根据LLM是否调用工具来决定路由"""
         if state.get("messages"):
             latest_message = state["messages"][-1]
-            if isinstance(latest_message, HumanMessage):
-                # 检测并处理用户输入中的文件路径
-                detected_files = detect_and_process_file_paths(latest_message.content)
-                if detected_files:
-                    # 更新状态中的上传文件列表
-                    current_files = state.get("uploaded_files", [])
-                    state["uploaded_files"] = current_files + detected_files
-                    # Set previous node before going to file upload
-                    state["previous_node"] = "gather_requirements"
-                    return "upload_file"
+            if hasattr(latest_message, 'tool_calls') and latest_message.tool_calls:
+                # Set previous node before going to file upload
+                state["previous_node"] = "gather_requirements"
+                return "upload_file"
         
         return "complete" if state["gather_complete"] else "continue"
 
@@ -559,7 +621,7 @@ class FrontDeskAgent:
         """
         print("正在生成表格模板......")
         system_message = SystemMessage(content=system_prompt)
-        filtered_messages = filter_out_system_messages(state["messages"])
+        filtered_messages = self._filter_messages_for_llm(state["messages"])
         messages = [system_message] + filtered_messages
         response = self.llm.invoke(messages)
 
@@ -693,6 +755,7 @@ class FrontDeskAgent:
             "complete_confirm": False,
             "uploaded_files": detected_files,  # 使用检测到的文件路径
             "uploaded_files_id": [],  # 初始化为空列表
+            "failed_uploads": [],  # 初始化失败上传列表
             "previous_node": "check_template"  # 初始状态下，如果有文件上传，应该回到check_template
         }
     
@@ -769,7 +832,7 @@ if __name__ == "__main__":
     #创建智能体
     frontdeskagent = FrontDeskAgent()
 
-    save_graph_visualization(frontdeskagent.graph)
+    # save_graph_visualization(frontdeskagent.graph)
 
-    # user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格: \n")
-    # frontdeskagent.run_front_desk_agent(user_input)
+    user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格: \n")
+    frontdeskagent.run_front_desk_agent(user_input)
