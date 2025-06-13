@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 # Import the FrontDeskAgent
-from nodes.frontdesk import FrontDeskAgent
+from angents.frontdesk import FrontDeskAgent
 
 class ChatbotInterface:
     def __init__(self):
