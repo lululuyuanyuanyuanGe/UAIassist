@@ -5,3 +5,8 @@
 4.检查file_upload到底是怎么做的，thread用的是什么
 5.解决为什么会出现循环
 6.搞清楚invoke的时候到底能不能读取到之前上传的file content
+
+
+7.擦用VBA的方式
+8.测C#
+

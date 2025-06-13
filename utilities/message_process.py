@@ -405,3 +405,7 @@ def _upload_to_openai(file_paths: list, purpose: str, vector_store_id: str, resu
 #         results["error"] = f"本地存储错误: {str(e)}"
     
 #     return results
+
+def convert_excel_2_html(file_path: str) -> Path:
+    """This is a tool that convers user input's excel to a html file"""
+    pass
