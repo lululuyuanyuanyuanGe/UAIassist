@@ -1,7 +1,12 @@
+from __future__ import annotations
+from bs4 import BeautifulSoup, Tag
+from pathlib import Path
+
 from typing import TypedDict, Annotated, List
 import re
 import os
 from pathlib import Path
+import subprocess
 
 from openai import OpenAI
 from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage
@@ -406,6 +411,69 @@ def _upload_to_openai(file_paths: list, purpose: str, vector_store_id: str, resu
     
 #     return results
 
-def convert_excel_2_html(file_path: str) -> Path:
+def convert_excel_2_html(input_path: str, output_dir: str) -> None:
     """This is a tool that convers user input's excel to a html file"""
-    pass
+    soffice_path = r"D:\LibreOffice\program\soffice.exe"
+    cmd = [soffice_path, '--headless', '--convert-to', 'html', input_path, '--outdir', output_dir]
+    subprocess.run(cmd, check=True)
+
+
+def clean_html_file(input_path: str | Path, output_dir: str | Path) -> Path:
+    """
+    Remove spreadsheet-export cruft (doctype, <style> rules, meta etc.) while
+    preserving only the markup that describes the table itself.
+
+    * keeps:  <table>, <thead>, <tbody>, <tfoot>, <tr>, <td>, <th>,
+              <col>, <colgroup>  (and their children)
+    * keeps attributes:  rowspan | colspan   universally,
+                         span               only on <colgroup>
+    * everything else is discarded.
+
+    Parameters
+    ----------
+    input_path  : str | Path   source HTML file (UTF-8 expected)
+    output_dir  : str | Path   directory to write the cleaned file to
+
+    Returns
+    -------
+    Path  – absolute path of the cleaned file that was written
+    """
+    # ------------------------------------------------------------------ config
+    structural_tags = {
+        "table", "thead", "tbody", "tfoot",
+        "tr", "td", "th",
+        "col", "colgroup"
+    }
+    always_keep_attrs = {"rowspan", "colspan"}
+    per_tag_extra_attrs = {"colgroup": {"span"}}
+    # ------------------------------------------------------------------ I/O
+    in_path  = Path(input_path).expanduser().resolve()
+    out_dir  = Path(output_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    raw_html = in_path.read_text(encoding="utf-8")
+
+    # strip <!DOCTYPE …> if present
+    raw_html = re.sub(r'<!DOCTYPE[^>]*?>', '', raw_html, flags=re.I | re.S)
+
+    soup = BeautifulSoup(raw_html, "html.parser")
+
+    # remove <style> blocks entirely so their CSS text doesn’t leak out
+    for style_tag in soup.find_all("style"):
+        style_tag.decompose()
+
+    # prune unwanted elements & attributes
+    for tag in soup.find_all(True):
+        if tag.name not in structural_tags:
+            tag.unwrap()              # drop tag but keep its children
+            continue
+
+        allowed = always_keep_attrs | per_tag_extra_attrs.get(tag.name, set())
+        tag.attrs = {k: v for k, v in tag.attrs.items() if k in allowed}
+
+    # write prettified HTML
+    out_path = out_dir / f"cleaned_{in_path.stem}{in_path.suffix}"
+    out_path.write_text(soup.prettify(), encoding="utf-8")
+    return out_path
+
+clean_html_file(r"D:\asianInfo\ExcelAssist\htmls\（7.12）2024年自然灾害对巩固拓展脱贫攻坚成果工作的影响情况表.html", r"D:\asianInfo\ExcelAssist\clean_htmls")
