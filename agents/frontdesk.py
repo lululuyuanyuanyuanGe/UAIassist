@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Add root project directory to sys.path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+
+
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
@@ -503,6 +511,15 @@ class FrontDeskAgent:
             "messages": [HumanMessage(content=user_response)]
         }
 
+
+    def _process_html(file_path: Path, state: FrontdeskState) -> FrontdeskState:
+        """This is the node that let LLM process the cleaned Html and add short description in each cell"""
+        system_promtp = """"""
+
+        
+
+    
+
     
     def _store_information_node(self, state: FrontdeskState) -> FrontdeskState:
         """将收集到的信息结构化储存"""
@@ -832,7 +849,7 @@ if __name__ == "__main__":
     #创建智能体
     frontdeskagent = FrontDeskAgent()
 
-    # save_graph_visualization(frontdeskagent.graph)
+    save_graph_visualization(frontdeskagent.graph)
 
-    user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格: \n")
-    frontdeskagent.run_front_desk_agent(user_input)
+    # user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格: \n")
+    # frontdeskagent.run_front_desk_agent(user_input)
