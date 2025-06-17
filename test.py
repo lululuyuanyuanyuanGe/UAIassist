@@ -1,3 +1,3 @@
-from utilities.message_process import convert_excel_2_html
+from utilities.file_process import detect_and_process_file_paths, retrieve_file_content
 
-convert_excel_2_html(r"D:\asianInfo\ExcelAssist\燕云村case\老党员补贴.xlsx", r"D:\asianInfo\ExcelAssist\htmls")
+result = retrieve_file_content([r"D:\asianInfo\ExcelAssist\燕云村case\老党员补贴.xlsx"], "test")
