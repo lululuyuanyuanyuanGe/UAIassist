@@ -7,6 +7,7 @@ import re
 import os
 from pathlib import Path
 import subprocess
+import chardet
 
 from openai import OpenAI
 from langchain_core.messages import HumanMessage, BaseMessage, SystemMessage
@@ -411,69 +412,99 @@ def _upload_to_openai(file_paths: list, purpose: str, vector_store_id: str, resu
     
 #     return results
 
-def convert_excel_2_html(input_path: str, output_dir: str) -> None:
-    """This is a tool that convers user input's excel to a html file"""
-    soffice_path = r"D:\LibreOffice\program\soffice.exe"
-    cmd = [soffice_path, '--headless', '--convert-to', 'html', input_path, '--outdir', output_dir]
-    subprocess.run(cmd, check=True)
-
-
-def clean_html_file(input_path: str | Path, output_dir: str | Path) -> Path:
+def convert_excel_2_html(input_path: str | Path, output_dir: str | Path) -> Path:
     """
-    Remove spreadsheet-export cruft (doctype, <style> rules, meta etc.) while
-    preserving only the markup that describes the table itself.
+    Convert an Excel workbook to a minimal HTML file that contains only the
+    table structure.  Returns the *cleaned* HTML path.
 
-    * keeps:  <table>, <thead>, <tbody>, <tfoot>, <tr>, <td>, <th>,
-              <col>, <colgroup>  (and their children)
-    * keeps attributes:  rowspan | colspan   universally,
-                         span               only on <colgroup>
-    * everything else is discarded.
-
-    Parameters
-    ----------
-    input_path  : str | Path   source HTML file (UTF-8 expected)
-    output_dir  : str | Path   directory to write the cleaned file to
-
-    Returns
-    -------
-    Path  – absolute path of the cleaned file that was written
+    Notes
+    -----
+    • LibreOffice writes `<workbook-stem>.html` into *output_dir*.  
+    • Because *output_dir* is reserved exclusively for these exports, we can
+      compute that file name directly instead of searching for it.
     """
-    # ------------------------------------------------------------------ config
-    structural_tags = {
-        "table", "thead", "tbody", "tfoot",
-        "tr", "td", "th",
-        "col", "colgroup"
-    }
-    always_keep_attrs = {"rowspan", "colspan"}
-    per_tag_extra_attrs = {"colgroup": {"span"}}
-    # ------------------------------------------------------------------ I/O
-    in_path  = Path(input_path).expanduser().resolve()
-    out_dir  = Path(output_dir).expanduser().resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
+    input_path  = Path(input_path).expanduser().resolve()
+    output_dir  = Path(output_dir).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_html = in_path.read_text(encoding="utf-8")
+    # 1️⃣  LibreOffice export --------------------------------------------------
+    soffice = r"D:\LibreOffice\program\soffice.exe"      # adjust if necessary
+    subprocess.run(
+        [soffice, "--headless", "--convert-to", "html", str(input_path),
+         "--outdir", str(output_dir)],
+        check=True
+    )
 
-    # strip <!DOCTYPE …> if present
-    raw_html = re.sub(r'<!DOCTYPE[^>]*?>', '', raw_html, flags=re.I | re.S)
+    # 2️⃣  The raw export path we expect LibreOffice to create
+    raw_html_path = output_dir / f"{input_path.stem}.html"
+    if not raw_html_path.exists():
+        raise FileNotFoundError(f"LibreOffice did not create {raw_html_path}")
 
-    soup = BeautifulSoup(raw_html, "html.parser")
+    # 3️⃣  Clean & return the tidy file
+    return _clean_html(raw_html_path, output_dir)
 
-    # remove <style> blocks entirely so their CSS text doesn’t leak out
-    for style_tag in soup.find_all("style"):
-        style_tag.decompose()
 
-    # prune unwanted elements & attributes
-    for tag in soup.find_all(True):
-        if tag.name not in structural_tags:
-            tag.unwrap()              # drop tag but keep its children
+# ──────────────────────── private helpers ─────────────────────── #
+def _read_text_auto(path: Path) -> str:
+    """Best-effort text loader with encoding detection."""
+    data = path.read_bytes()
+    for enc in ("utf-8", "utf-8-sig", "gb18030", "gbk", "big5"):
+        try:
+            return data.decode(enc)
+        except UnicodeDecodeError:
             continue
+    if chardet:
+        enc = chardet.detect(data).get("encoding")
+        if enc:
+            try:
+                return data.decode(enc)
+            except UnicodeDecodeError:
+                pass
+    return data.decode("utf-8", errors="replace")
 
-        allowed = always_keep_attrs | per_tag_extra_attrs.get(tag.name, set())
-        tag.attrs = {k: v for k, v in tag.attrs.items() if k in allowed}
 
-    # write prettified HTML
-    out_path = out_dir / f"cleaned_{in_path.stem}{in_path.suffix}"
-    out_path.write_text(soup.prettify(), encoding="utf-8")
-    return out_path
+def _clean_html(raw_html_path: Path, out_dir: Path) -> Path:
+    """
+    Strip Excel/Sheets boiler-plate—*including the massive inline CSS*—and keep
+    only genuine table markup.
 
-clean_html_file(r"D:\asianInfo\ExcelAssist\htmls\（7.12）2024年自然灾害对巩固拓展脱贫攻坚成果工作的影响情况表.html", r"D:\asianInfo\ExcelAssist\clean_htmls")
+    • Preserves:  <table>, <thead>, <tbody>, <tfoot>, <tr>, <td>, <th>,
+                 <col>, <colgroup>
+    • Keeps attributes:  rowspan/colspan everywhere, plus span on <colgroup>.
+    """
+    KEEP          = {"table", "thead", "tbody", "tfoot", "tr", "td",
+                     "th", "col", "colgroup"}
+    ATTR_ALWAYS   = {"rowspan", "colspan"}
+    ATTR_EXTRA    = {"colgroup": {"span"}}
+
+    html = _read_text_auto(raw_html_path)
+
+    # drop DOCTYPE / XML prologs
+    html = re.sub(r'<!DOCTYPE[^>]*?>',           '', html, flags=re.I | re.S)
+    html = re.sub(r'<\?xml[^>]*?\?>',            '', html, flags=re.I)
+    html = re.sub(r'<\?mso-application[^>]*?\?>','', html, flags=re.I)
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # remove <style>, <meta>, <link>
+    for t in soup.find_all(["style", "meta", "link"]):
+        t.decompose()
+
+    # prune unwanted tags / attributes
+    for t in soup.find_all(True):
+        if t.name not in KEEP:
+            t.unwrap()
+            continue
+        allowed = ATTR_ALWAYS | ATTR_EXTRA.get(t.name, set())
+        t.attrs = {k: v for k, v in t.attrs.items() if k in allowed}
+
+    # build minimal shell
+    shell = BeautifulSoup("<html><body></body></html>", "html.parser")
+    for tbl in soup.find_all("table"):
+        shell.body.append(tbl)
+
+    out_file = out_dir / f"{raw_html_path.stem}_clean.html"
+    out_file.write_text(shell.prettify(), encoding="utf-8")
+    return out_file
+
+

@@ -131,7 +131,7 @@ class FrontDeskAgent:
 
     def __init__(self, model_name: str = "gpt-4o", checkpoint_path: str = "checkpoints.db"):
         self.model_name = model_name
-        self.llm = ChatOpenAI(model=model_name, temperature=0.1)
+        self.llm = ChatOpenAI(model=model_name, temperature=2)
         self.tools = [upload_file_to_LLM_tool]
         self.llm_with_tool = self.llm.bind_tools(self.tools)
         self.memory = MemorySaver()
