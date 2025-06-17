@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 from utilities.message_process import build_BaseMessage_type, create_assistant_with_files, filter_out_system_messages, detect_and_process_file_paths, upload_file_to_LLM
+from utilities.modelRelated import model_creation
 import uuid
 import json
 import os
@@ -131,7 +132,7 @@ class FrontDeskAgent:
 
     def __init__(self, model_name: str = "gpt-4o", checkpoint_path: str = "checkpoints.db"):
         self.model_name = model_name
-        self.llm = ChatOpenAI(model=model_name, temperature=2)
+        self.llm = model_creation(model_name, temperature=2)
         self.tools = [upload_file_to_LLM_tool]
         self.llm_with_tool = self.llm.bind_tools(self.tools)
         self.memory = MemorySaver()

@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 from utilities.message_process import build_BaseMessage_type, create_assistant_with_files, filter_out_system_messages, detect_and_process_file_paths, upload_file_to_LLM
+from utilities.modelRelated import model_creation
 import uuid
 import json
 import os
@@ -39,7 +40,7 @@ from langchain_openai import ChatOpenAI
 
 
 # Define the state for dataCollector
-class dataCollectorState(TypedDict):
+class DataCollectorState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     validation_pass: bool
     related_files = list[Path]
@@ -49,14 +50,14 @@ class DataCollectorAgent:
 
     def __init__(self, model_name: str = "gpt-4o"):
         self.model_name = model_name
-        self.llm = ChatOpenAI(model=model_name, temperature=0.1)
+        self.llm = model_creation(model_name, temperature=0.1)
         self.tools = []
         self.llm_with_tool = self.llm.bind_tools(self.tools)
         self.memory = MemorySaver()
         self.graph = self._build_graph()
         
     def _build_graph(self) -> StateGraph:
-        workflow = StateGraph(dataCollectorState)
+        workflow = StateGraph(DataCollectorState)
 
         workflow.add_node("select_file", self._select_related_file_from_DB)
         workflow.add_node("validate_file_selection", self._validate_selected_file)
@@ -71,7 +72,7 @@ class DataCollectorAgent:
         )
         
 
-    def _select_related_file_from_DB(self, state: dataCollectorState) -> dataCollectorState:
+    def _select_related_file_from_DB(self, state: DataCollectorState) -> DataCollectorState:
         # For now the DB will just simply be a JSON file that contains the all the file name and
         # tags for description, later we will vectorize them as we get the entire data
         """
@@ -88,7 +89,7 @@ class DataCollectorAgent:
             "messages": [system_message, response]
         }
     
-    def _validate_selected_file(self, state: dataCollectorState) -> dataCollectorState:
+    def _validate_selected_file(self, state: DataCollectorState) -> DataCollectorState:
         """This function will check the selected files to make sure the selection is correct"""
         with open('data.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -100,7 +101,7 @@ class DataCollectorAgent:
         validation_pass = "[YES]" in response.content.upper()
         return validation_pass
     
-    def _retrieve_files_content(self, state: dataCollectorState) -> dataCollectorState:
+    def _retrieve_files_content(self, state: DataCollectorState) -> DataCollectorState:
         """This node will retrieve the content of the related files"""
 
 
