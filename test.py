@@ -1,3 +1,3 @@
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content
-
-result = retrieve_file_content([r"D:\asianInfo\ExcelAssist\燕云村case\老党员补贴.xlsx"], "test")
+template_names = ["A", 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+for i, name in enumerate(template_names):
+    print(f"{i+1}. {name}")
