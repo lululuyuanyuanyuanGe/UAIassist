@@ -22,7 +22,8 @@ import gradio as gr
 from dotenv import load_dotenv
 import re
 
-from langgraph.graph import StateGraph, END, START, Send
+from langgraph.graph import StateGraph, END, START
+from langgraph.constants import Send
 from langgraph.graph.message import add_messages
 # from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import ToolNode
@@ -44,6 +45,8 @@ class ProcessUserInputState(TypedDict):
     uploaded_template_files_path: list[str]
     supplement_files_path: dict[str, list[str]]
     irrelevant_files_path: list[str]
+    all_files_irrelevant: bool  # Flag to indicate all files are irrelevant
+    text_input_validation: str  # Store validation result [Valid] or [Invalid]
     session_id: str
     
 class ProcessUserInputAgent:
@@ -70,6 +73,7 @@ class ProcessUserInputAgent:
         self.llm_c_with_tools = self.llm_c.bind_tools(self.tools)
         self.llm_s = model_creation(model_name="gpt-3.5-turbo", temperature=2) # simple logic use 3-5turbo
         self.llm_s_with_tools = self.llm_s.bind_tools(self.tools)
+        self.graph = self._build_graph().compile()
 
 
     def _build_graph(self) -> StateGraph:
@@ -77,35 +81,83 @@ class ProcessUserInputAgent:
         graph = StateGraph(ProcessUserInputState)
         graph.add_node("collect_user_input", self._collect_user_input)
         graph.add_node("file_upload", self._file_upload)
-        graph.add_node("analyze_file", self._analyze_file)
         graph.add_node("analyze_uploaded_files", self._analyze_uploaded_files)
+        graph.add_node("process_template", self._process_template)
         graph.add_node("process_supplement", self._process_supplement)
-
+        graph.add_node("process_irrelevant", self._process_irrelevant)
+        graph.add_node("analyze_text_input", self._analyze_text_input)
+        graph.add_node("clarification_tool_node", ToolNode(self.tools))
+        graph.add_node("summary_user_input", self._summary_user_input)
+        
         graph.add_edge(START, "collect_user_input")
+
         graph.add_conditional_edges(
-            "collect_user_input", 
+            "collect_user_input",
             self._route_after_collect_user_input,
             {
                 "file_upload": "file_upload",
-                "valid_input": "",
-                "invalid_input": "collect_user_input"
+                "analyze_text_input": "analyze_text_input",
             }
-            )
+        )
 
+        graph.add_edge("file_upload", "analyze_uploaded_files")
+
+        graph.add_conditional_edges(
+            "analyze_uploaded_files",
+            self._route_after_analyze_uploaded_files # Since we are using the send objects, we don't need to specify the edges
+        )
+
+        # After tool execution, re-analyze uploaded files with user input
+        graph.add_edge("clarification_tool_node", "analyze_uploaded_files")
+
+        graph.add_edge("process_template", "summary_user_input")
+        graph.add_edge("process_supplement", "summary_user_input")
+        graph.add_edge("process_irrelevant", "summary_user_input")
+
+        graph.add_conditional_edges(
+            "analyze_text_input",
+            self._route_after_analyze_text_input,
+            {
+                "valid_text_input": "summary_user_input",
+                "invalid_text_input": "collect_user_input",
+            }
+        )
+
+        graph.add_edge("summary_user_input", END)
+        return graph
+
+
+
+    def create_initial_state(self, user_input: str, session_id: str = "1") -> ProcessUserInputState:
+        """This function initializes the state of the process user input agent"""
+        return {
+            "process_user_input_messages": [HumanMessage(content=user_input)],
+            "user_input": user_input,
+            "upload_files_path": [],
+            "new_upload_files_path": [],
+            "upload_files_processed_path": [],
+            "new_upload_files_processed_path": [],
+            "uploaded_template_files_path": [],
+            "supplement_files_path": {"表格": [], "文档": []},
+            "irrelevant_files_path": [],
+            "all_files_irrelevant": False,
+            "text_input_validation": None,
+            "session_id": session_id,
+        }
     
-
-    clarification_tool_node = ToolNode(tools)
-
 
 
     def _collect_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This is the node where we get user's input"""
         user_input = interrupt("用户：")
-        return {"user_input": user_input}
+        return {
+            "process_user_input_messages": [HumanMessage(content=user_input)],
+            "user_input": user_input
+        }
 
 
 
-    def _route_after_collect_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
+    def _route_after_collect_user_input(self, state: ProcessUserInputState) -> str:
         """This node act as a safety check node, it will analyze the user's input and determine if it's a valid input,
         based on the LLM's previous response, at the same time it will route the agent to the correct node"""
         # We should let LLM decide the route
@@ -114,39 +166,33 @@ class ProcessUserInputAgent:
         # Filter out the new uploaded files
         new_upload_files = [item for item in user_upload_files if item not in state["upload_files_path"]]
         if new_upload_files:
+            # Update state with new files - this is needed for the file_upload node
             state["new_upload_files_path"] = new_upload_files
             state["upload_files_path"].extend(new_upload_files)
-            return "file_upload"
-        
-        # User didn't upload new files
-        elif not user_upload_files:
-            system_prompt = """你需要判断用户的输入是否为有效输入，判断标准为"""
-            LLM_response_and_user_input = [state["process_user_input_messages"][-2], state["process_user_input_messages"][-1]]
-            LLM_decision = self.llm_s.invoke([SystemMessage(content=system_prompt)] + LLM_response_and_user_input)
-            # If it is a valid input we conitnue the normal execution flow, otherwise we will keep leting user 
-            # input messages until it is a valid input
-            if LLM_decision.content == "[YES]":
-                return "valid_input"
-            else:
-                print(f"❌ Invalid input: {state['process_user_input_messages'][-1].content}")
-                return "invalid_input"
+            return "file_upload"  # Route to file_upload first, then it goes to analyze_uploaded_files
+        # User didn't upload any new files, we will analyze the text input
+        return "analyze_text_input"
     
 
 
-    def _uploaded_files(self, state: ProcessUserInputState) -> ProcessUserInputState:
+    def _file_upload(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will upload user's file to our system"""
         # For now we simply store the file content 
         result = retrieve_file_content(state["new_upload_files_path"], state["session_id"])
-        state["new_upload_files_processed_path"] = result
-        state["upload_files_processed_path"].extend(result)
-        print(f"✅ File uploaded: {state['upload_files_processed_path']}")
-        return "analyze_file"
+        new_upload_files_processed_path = result
+        upload_files_processed_path = state.get("upload_files_processed_path", [])
+        upload_files_processed_path.extend(result)
+        print(f"✅ File uploaded: {upload_files_processed_path}")
+        return {
+            "new_upload_files_processed_path": new_upload_files_processed_path,
+            "upload_files_processed_path": upload_files_processed_path
+        }
     
 
 
     def _analyze_uploaded_files(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will analyze the user's uploaded files, it need to classify the file into template
-        supplement, or irrelevant"""
+        supplement, or irrelevant. If all files are irrelevant, it will flag for text analysis instead."""
         
         import json
         import os
@@ -188,7 +234,8 @@ class ProcessUserInputAgent:
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
                 "irrelevant_files_path": [],
-                "process_user_input_messages": [SystemMessage(content="没有找到可处理的文件")]
+                "all_files_irrelevant": True,  # Flag for routing to text analysis
+                "process_user_input_messages": [SystemMessage(content="没有找到可处理的文件，将分析用户文本输入")]
             }
         
         # Create analysis prompt in Chinese
@@ -255,52 +302,93 @@ class ProcessUserInputAgent:
             supplement_files = classification_results.get("supplement", {"表格": [], "文档": []})
             irrelevant_files = classification_results.get("irrelevant", [])
             
-            # Create analysis summary message
-            analysis_summary = f"""📋 文件分析完成:
-            ✅ 模板文件: {len(uploaded_template_files)} 个
-            ✅ 补充表格: {len(supplement_files.get("表格", []))} 个  
-            ✅ 补充文档: {len(supplement_files.get("文档", []))} 个
-            ❌ 无关文件: {len(irrelevant_files)} 个
-
-            分类详情:
-            模板: {[Path(f).name for f in uploaded_template_files]}
-            表格: {[Path(f).name for f in supplement_files.get("表格", [])]}
-            文档: {[Path(f).name for f in supplement_files.get("文档", [])]}
-            无关: {[Path(f).name for f in irrelevant_files]}"""
+            # Check if all files are irrelevant
+            all_files_irrelevant = (
+                len(uploaded_template_files) == 0 and 
+                len(supplement_files.get("表格", [])) == 0 and 
+                len(supplement_files.get("文档", [])) == 0 and
+                len(irrelevant_files) == len(files_content)
+            )
             
-            return {
-                "uploaded_template_files_path": uploaded_template_files,
-                "supplement_files_path": supplement_files,
-                "irrelevant_files_path": irrelevant_files,
-                "process_user_input_messages": [SystemMessage(content=analysis_summary)]
-            }
+            if all_files_irrelevant:
+                # All files are irrelevant, flag for text analysis
+                analysis_summary = f"""📋 文件分析完成 - 所有文件均与表格生成无关:
+                ❌ 无关文件: {len(irrelevant_files)} 个
+                
+                文件列表: {[Path(f).name for f in irrelevant_files]}
+                
+                🔄 将转为分析用户文本输入内容"""
+                
+                return {
+                    "uploaded_template_files_path": [],
+                    "supplement_files_path": {"表格": [], "文档": []},
+                    "irrelevant_files_path": irrelevant_files,
+                    "all_files_irrelevant": True,  # Flag for routing
+                    "process_user_input_messages": [SystemMessage(content=analysis_summary)]
+                }
+            else:
+                # Some files are relevant, proceed with normal flow
+                analysis_summary = f"""📋 文件分析完成:
+                ✅ 模板文件: {len(uploaded_template_files)} 个
+                ✅ 补充表格: {len(supplement_files.get("表格", []))} 个  
+                ✅ 补充文档: {len(supplement_files.get("文档", []))} 个
+                ❌ 无关文件: {len(irrelevant_files)} 个
+
+                分类详情:
+                模板: {[Path(f).name for f in uploaded_template_files]}
+                表格: {[Path(f).name for f in supplement_files.get("表格", [])]}
+                文档: {[Path(f).name for f in supplement_files.get("文档", [])]}
+                无关: {[Path(f).name for f in irrelevant_files]}"""
+                
+                return {
+                    "uploaded_template_files_path": uploaded_template_files,
+                    "supplement_files_path": supplement_files,
+                    "irrelevant_files_path": irrelevant_files,
+                    "all_files_irrelevant": False,  # Flag for routing
+                    "process_user_input_messages": [SystemMessage(content=analysis_summary)]
+                }
             
         except Exception as e:
             print(f"❌ 分析文件时出错: {e}")
-            # Fallback: keep all files as irrelevant for safety
+            # Fallback: keep all files as irrelevant for safety and flag for text analysis
             return {
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
                 "irrelevant_files_path": [item['file_path'] for item in files_content],
-                "process_user_input_messages": [SystemMessage(content=f"文件分析出错: {e}")]
+                "all_files_irrelevant": True,  # Flag for routing to text analysis
+                "process_user_input_messages": [SystemMessage(content=f"文件分析出错: {e}，将转为分析用户文本输入")]
             }
                 
     def _route_after_analyze_uploaded_files(self, state: ProcessUserInputState):
-        if state.get("user_clarification_request"):
-            return [Send("request_user_clarification", state)]
+        """Route after analyzing uploaded files. Uses Send objects for all routing."""
         
+        # Check if LLM request a tool call
+        latest_message = state["process_user_input_messages"][-1]
+        if hasattr(latest_message, 'tool_calls') and latest_message.tool_calls:
+            return [Send("clarification_tool_node", state)]
+        
+        # Check if all files are irrelevant - route to text analysis
+        if state.get("all_files_irrelevant", False):
+            # First clean up irrelevant files, then analyze text
+            sends = []
+            if state.get("irrelevant_files_path"):
+                sends.append(Send("process_irrelevant", state))
+            sends.append(Send("analyze_text_input", state))
+            return sends
+        
+        # Some files are relevant - process them in parallel
         sends = []
-        if state.get("template_files"):
-            sends.append(Send("_process_template", state))
-        if state.get("supplement_files"):
-            sends.append(Send("_process_supplement", state))
-        if state.get("irrelevant_files"):
-            sends.append(Send("_process_irrelevant", state))
+        if state.get("uploaded_template_files_path"):
+            sends.append(Send("process_template", state))
+        if state.get("supplement_files_path", {}).get("表格") or state.get("supplement_files_path", {}).get("文档"):
+            sends.append(Send("process_supplement", state))
+        if state.get("irrelevant_files_path"):
+            sends.append(Send("process_irrelevant", state))
         
-        return sends
+        return sends if sends else [Send("analyze_text_input", state)]  # Fallback
     
     def _process_supplement(self, state: ProcessUserInputState) -> ProcessUserInputState:
-        """This node will process the supplement files, it will analyze the supplement files and summarize the content of the files"""
+        """This node will process the supplement files, it will analyze the supplement files and summarize the content of the files as well as stored the summary in data.json"""
         
         # Load existing data.json
         data_json_path = Path("agents/data.json")
@@ -369,6 +457,9 @@ class ProcessUserInputAgent:
                 }}"""
                                 
                 analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
+
+                # Update state with analysis response
+                state["process_user_input_messages"].append(analysis_response)
                 
                 # Store in data.json
                 data["文档"][source_path.name] = {
@@ -393,13 +484,11 @@ class ProcessUserInputAgent:
         
         # Create summary message
         summary_message = f"""📊 补充文件处理完成:
-✅ 表格文件: {len(table_files)} 个已分析并存储
-✅ 文档文件: {len(document_files)} 个已分析并存储
-📝 数据库已更新，总计表格 {len(data['表格'])} 个，文档 {len(data['文档'])} 个"""
+        ✅ 表格文件: {len(table_files)} 个已分析并存储
+        ✅ 文档文件: {len(document_files)} 个已分析并存储
+        📝 数据库已更新，总计表格 {len(data['表格'])} 个，文档 {len(data['文档'])} 个"""
         
-        return {
-            "process_user_input_messages": [SystemMessage(content=summary_message)]
-        }
+        return {state}
         
         
     def _process_irrelevant(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -421,15 +510,7 @@ class ProcessUserInputAgent:
             except Exception as e:
                 failed_deletes.append(Path(file_path).name)
                 print(f"❌ 删除文件时出错 {file_path}: {e}")
-        
-        # Clean up state lists - remove deleted files from all relevant lists ！！！！！！！ Might not be needed
-        for file_path in state["irrelevant_files_path"]:
-            # Remove from processed files lists
-            if file_path in state.get("upload_files_processed_path", []):
-                state["upload_files_processed_path"].remove(file_path)
-            if file_path in state.get("new_upload_files_processed_path", []):
-                state["new_upload_files_processed_path"].remove(file_path)
-        
+
         # Create summary message
         summary_message = f"""🗑️ 无关文件处理完成:
         ✅ 成功删除: {len(deleted_files)} 个文件
@@ -438,10 +519,10 @@ class ProcessUserInputAgent:
         删除的文件: {', '.join(deleted_files) if deleted_files else '无'}
         失败的文件: {', '.join(failed_deletes) if failed_deletes else '无'}"""
         
-        return {
-            "process_user_input_messages": [SystemMessage(content=summary_message)]
-        }
+        return {state}
     
+
+
     def _process_template(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will process the template files, it will analyze the template files and determine if it's a valid template"""
         
@@ -544,3 +625,140 @@ class ProcessUserInputAgent:
                 "uploaded_template_files_path": template_files,
                 "process_user_input_messages": [SystemMessage(content=f"模板分析出错: {e}\n默认为[Simple]")]
             }
+
+
+
+    def _route_after_process_template(self, state: ProcessUserInputState) -> str:
+        """It has two different routes, if it is [Complex] template we will go to complex template handle node, which for now is a placeholder.
+        if it is [Simple] template we simply go to the template_provided node to keep the analysis"""
+
+        latest_message = state["process_user_input_messages"][-1]
+        if "[Complex]" in latest_message.content:
+            return "complex_template_handle"
+        else:
+            return "template_provided"
+        
+
+
+    def _analyze_text_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
+        """This node performs a safety check on user text input when all uploaded files are irrelevant.
+        It validates if the user input contains meaningful table/Excel-related content.
+        Returns [Valid] or [Invalid] based on the analysis."""
+        
+        user_input = state.get("user_input", "")
+        
+        if not user_input or user_input.strip() == "":
+            return {
+                "text_input_validation": "[Invalid]",
+                "process_user_input_messages": [SystemMessage(content="❌ 用户输入为空，验证失败")]
+            }
+        
+        # Create validation prompt for text input safety check
+        system_prompt = f"""你是一个输入验证专家，需要判断用户的文本输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容。
+
+        用户输入: {user_input}
+
+        验证标准：
+        1. **有效输入 [Valid]**:
+           - 明确提到需要生成表格、填写表格、Excel相关操作
+           - 包含具体的表格要求、数据描述、字段信息
+           - 询问表格模板、表格格式相关问题
+           - 提供了表格相关的数据或信息
+
+        2. **无效输入 [Invalid]**:
+           - 完全与表格/Excel无关的内容
+           - 垃圾文本、随机字符、无意义内容
+           - 空白或只有标点符号
+           - 明显的测试输入或无关问题
+
+        请仔细分析用户输入，然后只回复以下选项之一：
+        [Valid] - 如果输入与表格相关且有意义
+        [Invalid] - 如果输入无关或无意义"""
+        
+        try:
+            # Get LLM validation
+            validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
+            
+            # Parse response
+            response_content = validation_response.content.strip()
+            
+            if "[Valid]" in response_content:
+                validation_result = "[Valid]"
+                status_message = "✅ 用户输入验证通过 - 内容与表格相关且有意义"
+            elif "[Invalid]" in response_content:
+                validation_result = "[Invalid]"
+                status_message = "❌ 用户输入验证失败 - 内容与表格无关或无意义"
+            else:
+                # Default to Invalid for safety
+                validation_result = "[Invalid]"
+                status_message = "❌ 用户输入验证失败 - 无法确定输入有效性，默认为无效"
+                print(f"⚠️ 无法解析验证结果，LLM响应: {response_content}")
+            
+            # Create validation summary
+            summary_message = f"""🔍 文本输入安全检查完成:
+            
+            📄 **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
+            ✅ **验证结果**: {validation_result}
+            📝 **状态**: {status_message}"""
+            
+            return {
+                "text_input_validation": validation_result,
+                "process_user_input_messages": [SystemMessage(content=summary_message)]
+            }
+                
+        except Exception as e:
+            print(f"❌ 验证文本输入时出错: {e}")
+            
+            # Default to Invalid for safety when there's an error
+            error_message = f"""❌ 文本输入验证出错: {e}
+            
+            📄 **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
+            🔒 **安全措施**: 默认标记为无效输入"""
+            
+            return {
+                "text_input_validation": "[Invalid]",
+                "process_user_input_messages": [SystemMessage(content=error_message)]
+            }
+
+
+
+    def _route_after_analyze_text_input(self, state: ProcessUserInputState) -> str:
+        """Route after text input validation based on [Valid] or [Invalid] result."""
+        
+        validation_result = state.get("text_input_validation", "[Invalid]")
+        
+        if validation_result == "[Valid]":
+            # Text input is valid and table-related, proceed to summary
+            return "valid_text_input"
+        else:
+            # Text input is invalid, route back to collect user input
+            return "invalid_text_input"
+        
+
+    
+    def _summary_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
+        """Basically this nodes act as a summry nodes, that summarize what the new information has been provided by the user in this round of human in the lopp also it needs to 
+        decide which node to route to next
+        """
+
+        system_prompt = f"""你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
+        规则如下，如何出现了复杂模板，返回"complex_template"，如果出现了简单模板，返回"simple_template"，其余情况请返回o"previous_node" 
+        你的回复需要包含对这一轮的总结，和节点路由信息，由json来表示
+        {
+            "summary": "总结用户在这一轮都提供了哪些信息",
+            "next_node": "节点路由信息"
+        }
+        
+        """
+        
+
+        response = self.llm_c.invoke(SystemMessage(content=system_prompt) + state["process_user_input_messages"])
+
+        return {"process_user_input_messages": [response]}
+    
+
+
+if __name__ == "__main__":
+    agent = ProcessUserInputAgent()
+    save_graph_visualization(agent.graph, "process_user_input_graph.png")
+    
