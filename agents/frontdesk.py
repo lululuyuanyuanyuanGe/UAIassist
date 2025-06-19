@@ -852,5 +852,5 @@ if __name__ == "__main__":
 
     save_graph_visualization(frontdeskagent.graph)
 
-    # user_input = input("🤖 你好我是一个智能填表助手，请告诉我你想填什么表格: \n")
-    # frontdeskagent.run_front_desk_agent(user_input)
+    user_input = input("羊村有100个人 \n")
+    frontdeskagent.run_front_desk_agent(user_input)

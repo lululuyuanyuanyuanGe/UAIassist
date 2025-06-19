@@ -47,6 +47,7 @@ class ProcessUserInputState(TypedDict):
     irrelevant_files_path: list[str]
     all_files_irrelevant: bool  # Flag to indicate all files are irrelevant
     text_input_validation: str  # Store validation result [Valid] or [Invalid]
+    previous_AI_messages: list[BaseMessage]
     session_id: str
     
 class ProcessUserInputAgent:
@@ -73,7 +74,8 @@ class ProcessUserInputAgent:
         self.llm_c_with_tools = self.llm_c.bind_tools(self.tools)
         self.llm_s = model_creation(model_name="gpt-3.5-turbo", temperature=2) # simple logic use 3-5turbo
         self.llm_s_with_tools = self.llm_s.bind_tools(self.tools)
-        self.graph = self._build_graph().compile()
+        self.memory = MemorySaver()
+        self.graph = self._build_graph().compile(checkpointer=self.memory)
 
 
     def _build_graph(self) -> StateGraph:
@@ -142,9 +144,10 @@ class ProcessUserInputAgent:
             "irrelevant_files_path": [],
             "all_files_irrelevant": False,
             "text_input_validation": None,
+            "previous_AI_messages": [AIMessage(content="请提供更多关于羊村人口普查的信息")],
             "session_id": session_id,
         }
-    
+
 
 
     def _collect_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -162,7 +165,11 @@ class ProcessUserInputAgent:
         based on the LLM's previous response, at the same time it will route the agent to the correct node"""
         # We should let LLM decide the route
         
-        user_upload_files = detect_and_process_file_paths(state["process_user_input_messages"][-1])
+        # Extract content from the message object
+        latest_message = state["process_user_input_messages"][-1]
+        message_content = latest_message.content if hasattr(latest_message, 'content') else str(latest_message)
+        
+        user_upload_files = detect_and_process_file_paths(message_content)
         # Filter out the new uploaded files
         new_upload_files = [item for item in user_upload_files if item not in state["upload_files_path"]]
         if new_upload_files:
@@ -522,7 +529,7 @@ class ProcessUserInputAgent:
         return {state}
     
 
-
+    
     def _process_template(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will process the template files, it will analyze the template files and determine if it's a valid template"""
         
@@ -654,8 +661,10 @@ class ProcessUserInputAgent:
             }
         
         # Create validation prompt for text input safety check
-        system_prompt = f"""你是一个输入验证专家，需要判断用户的文本输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容。
-
+        system_prompt = f"""你是一个输入验证专家，需要判断用户的文本输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容，你的判断需要根据上下文，
+        我会提供上一个AI的回复，以及用户输入，你需要根据上下文，判断用户输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容。
+        
+        上一个AI的回复: {state["previous_AI_messages"]}
         用户输入: {user_input}
 
         验证标准：
@@ -741,8 +750,8 @@ class ProcessUserInputAgent:
         decide which node to route to next
         """
 
-        system_prompt = f"""你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
-        规则如下，如何出现了复杂模板，返回"complex_template"，如果出现了简单模板，返回"simple_template"，其余情况请返回o"previous_node" 
+        system_prompt = """你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
+        规则如下，如何出现了复杂模板，返回"complex_template"，如果出现了简单模板，返回"simple_template"，其余情况请返回"previous_node" 
         你的回复需要包含对这一轮的总结，和节点路由信息，由json来表示
         {
             "summary": "总结用户在这一轮都提供了哪些信息",
@@ -751,14 +760,78 @@ class ProcessUserInputAgent:
         
         """
         
-
-        response = self.llm_c.invoke(SystemMessage(content=system_prompt) + state["process_user_input_messages"])
-
-        return {"process_user_input_messages": [response]}
+        try:
+            # Try the LLM call with detailed error handling
+            messages = [SystemMessage(content=system_prompt)] + state["process_user_input_messages"]
+            print(f"🔄 正在调用LLM进行总结，消息数量: {len(messages)}")
+            
+            response = self.llm_c.invoke(messages)
+            print(f"✅ LLM调用成功")
+            
+            return {"process_user_input_messages": [response]}
+            
+        except Exception as e:
+            print(f"❌ LLM调用失败: {type(e).__name__}: {e}")
+            
+            # Fallback response when LLM fails
+            fallback_response = AIMessage(content="""
+            {
+                "summary": "由于网络连接问题，无法完成智能分析。用户本轮提供了输入信息。",
+                "next_node": "previous_node"
+            }
+            """)
+            
+            return {"process_user_input_messages": [fallback_response]}
     
+
+    def run_process_user_input_agent(self, user_input: str, session_id: str = "1") -> None:
+        """This function runs the process user input agent"""
+        initial_state = self.create_initial_state(user_input, session_id)
+        config = {"configurable": {"thread_id": session_id}}
+        current_state = initial_state
+        
+        while True:
+            try:
+                has_interrupt = False
+                for chunk in self.graph.stream(current_state, config = config, stream_mode = "updates"):
+                    for node_name, node_output in chunk.items():
+                        print(f"\n📍 Node: {node_name}")
+                        print("-" * 30)
+
+                        # check if there is an interrupt
+                        if "__interrupt__" in chunk:
+                            has_interrupt = True
+                            interrupt_value = chunk['__interrupt__'][0].value
+                            print(f"\n💬 智能体: {interrupt_value}")
+                            user_response = input("👤 请输入您的回复: ")
+
+                            # set the next input
+                            current_state = Command(resume=user_response)
+                            break
+
+                        if isinstance(node_output, dict):
+                            if "messages" in node_output and node_output["messages"]:
+                                latest_message = node_output["messages"][-1]
+                                if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
+                                    print(f"💬 智能体回复: {latest_message.content}")
+
+                            for key, value in node_output.items():
+                                if key != "messages" and value:
+                                    print(f"📊 {key}: {value}")
+                        print("-" * 30)
+                
+                if not has_interrupt:
+                    break
+
+            
+            except Exception as e:
+                print(f"❌ 处理用户输入时出错: {e}")
+                break
+
 
 
 if __name__ == "__main__":
     agent = ProcessUserInputAgent()
-    save_graph_visualization(agent.graph, "process_user_input_graph.png")
-    
+    # save_graph_visualization(agent.graph, "process_user_input_graph.png")
+    agent.run_process_user_input_agent("羊村有100个人")
+

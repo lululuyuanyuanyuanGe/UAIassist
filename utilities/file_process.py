@@ -11,6 +11,7 @@ import chardet
 def detect_and_process_file_paths(user_input: str) -> list:
     """检测用户输入中的文件路径并验证文件是否存在，返回结果为用户上传的文件路径组成的数列"""
     file_paths = []
+    processed_paths = set()  # Track already processed paths to avoid duplicates
     
     # 改进的文件路径检测模式，支持中文字符
     # Windows路径模式 (C:\path\file.ext 或 D:\path\file.ext) - 支持中文字符
@@ -22,17 +23,39 @@ def detect_and_process_file_paths(user_input: str) -> list:
     
     patterns = [windows_pattern, relative_pattern, filename_pattern]
     
-    for pattern in patterns:
-        matches = re.findall(pattern, user_input)
-        for match in matches:
-            # 验证文件是否存在
-            if os.path.exists(match):
-                file_paths.append(match)
-                print(f"✅ 检测到文件: {match}")
-            else:
-                print(f"⚠️ 文件路径无效或文件不存在: {match}")
-    
+    # Run the absolute path pattern first
+    for match in re.findall(patterns[0], user_input):
+        if match in processed_paths:
+            continue
+        processed_paths.add(match)
+        _log_existence(match, file_paths)
+
+    # Run the relative path pattern
+    for match in re.findall(patterns[1], user_input):
+        if match in processed_paths:
+            continue
+        processed_paths.add(match)
+        _log_existence(match, file_paths)
+        
+    # Run the filename pattern if we didn't find any files
+    if not file_paths:
+        for match in re.findall(patterns[2], user_input):
+            if match in processed_paths:
+                continue
+            processed_paths.add(match)
+            _log_existence(match, file_paths)
+
     return file_paths
+
+
+# -- 小工具函数 ------------------------------------------------------------
+def _log_existence(path: str, container: list):
+    if os.path.exists(path):
+        container.append(path)
+        print(f"✅ 检测到文件: {path}")
+    else:
+        print(f"⚠️ 文件路径无效或文件不存在: {path}")
+
 
 def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
     """This function will retrieve the content of the file and store them in the conversation folder
@@ -48,7 +71,7 @@ def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
     from pathlib import Path
     
     # Create the conversation folder structure
-    project_root = Path.cwd().parent
+    project_root = Path.cwd()  # Use current directory instead of parent
     conversation_dir = project_root / "conversations" / session_id / "user_uploaded_files"
     conversation_dir.mkdir(parents=True, exist_ok=True)
     
@@ -57,6 +80,7 @@ def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
     # Define file type categories
     spreadsheet_extensions = {'.xlsx', '.xls', '.xlsm', '.ods', '.csv'}
     text_extensions = {'.txt', '.md', '.json', '.xml', '.html', '.htm', '.py', '.js', '.css', '.sql', '.log'}
+    document_extensions = {'.docx', '.doc', '.pptx', '.ppt'}  # Microsoft Office documents
     image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.svg'}
     
     for file_path in file_paths:
@@ -87,6 +111,27 @@ def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
                     
                 except Exception as e:
                     print(f"❌ Error processing spreadsheet {file_path}: {e}")
+                    # Fallback: copy original file
+                    destination = conversation_dir / source_path.name
+                    shutil.copy2(source_path, destination)
+                    processed_files.append(str(destination))
+                    
+            # Handle document files (DOCX, DOC, etc.)
+            elif file_extension in document_extensions:
+                try:
+                    # Use LibreOffice to convert document to HTML
+                    html_output_path = _convert_document2html(source_path, conversation_dir)
+                    
+                    # Read the HTML content and save as txt file
+                    html_content = html_output_path.read_text(encoding='utf-8')
+                    txt_file_path = conversation_dir / f"{file_stem}.txt"
+                    txt_file_path.write_text(html_content, encoding='utf-8')
+                    
+                    processed_files.append(str(txt_file_path))
+                    print(f"✅ Document converted and saved: {txt_file_path}")
+                    
+                except Exception as e:
+                    print(f"❌ Error processing document {file_path}: {e}")
                     # Fallback: copy original file
                     destination = conversation_dir / source_path.name
                     shutil.copy2(source_path, destination)
@@ -214,6 +259,32 @@ def _read_text_auto(path: Path) -> str:
             except UnicodeDecodeError:
                 pass
     return data.decode("utf-8", errors="replace")
+
+
+def _convert_document2html(input_path: str | Path, output_dir: str | Path) -> Path:
+    """
+    Convert a document (DOCX, DOC, etc.) to HTML using LibreOffice.
+    Returns the cleaned HTML path.
+    """
+    input_path  = Path(input_path).expanduser().resolve()
+    output_dir  = Path(output_dir).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # LibreOffice export
+    soffice = r"D:\LibreOffice\program\soffice.exe"
+    subprocess.run(
+        [soffice, "--headless", "--convert-to", "html", str(input_path),
+         "--outdir", str(output_dir)],
+        check=True
+    )
+
+    # The raw export path we expect LibreOffice to create
+    raw_html_path = output_dir / f"{input_path.stem}.html"
+    if not raw_html_path.exists():
+        raise FileNotFoundError(f"LibreOffice did not create {raw_html_path}")
+
+    # Clean and return the tidy file
+    return _clean_html(raw_html_path, output_dir)
 
 
 def _clean_html(raw_html_path: Path, out_dir: Path) -> Path:
