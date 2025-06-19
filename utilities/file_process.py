@@ -77,12 +77,6 @@ def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
     
     processed_files = []
     
-    # Define file type categories
-    spreadsheet_extensions = {'.xlsx', '.xls', '.xlsm', '.ods', '.csv'}
-    text_extensions = {'.txt', '.md', '.json', '.xml', '.html', '.htm', '.py', '.js', '.css', '.sql', '.log'}
-    document_extensions = {'.docx', '.doc', '.pptx', '.ppt'}  # Microsoft Office documents
-    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.svg'}
-    
     for file_path in file_paths:
         try:
             source_path = Path(file_path)
@@ -90,125 +84,173 @@ def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
                 print(f"❌ File not found: {file_path}")
                 continue
                 
-            file_extension = source_path.suffix.lower()
-            file_stem = source_path.stem
-            
             print(f"🔄 Processing file: {source_path.name}")
             
-            # Handle spreadsheet files
-            if file_extension in spreadsheet_extensions:
-                try:
-                    # Use convert_excel2html function to convert spreadsheet
-                    html_output_path = convert_excel2html(source_path, conversation_dir)
-                    
-                    # Read the HTML content and save as txt file
-                    html_content = html_output_path.read_text(encoding='utf-8')
-                    txt_file_path = conversation_dir / f"{file_stem}.txt"
-                    txt_file_path.write_text(html_content, encoding='utf-8')
-                    
-                    processed_files.append(str(txt_file_path))
-                    print(f"✅ Spreadsheet converted and saved: {txt_file_path}")
-                    
-                except Exception as e:
-                    print(f"❌ Error processing spreadsheet {file_path}: {e}")
-                    # Fallback: copy original file
-                    destination = conversation_dir / source_path.name
-                    shutil.copy2(source_path, destination)
-                    processed_files.append(str(destination))
-                    
-            # Handle document files (DOCX, DOC, etc.)
-            elif file_extension in document_extensions:
-                try:
-                    # Use LibreOffice to convert document to HTML
-                    html_output_path = _convert_document2html(source_path, conversation_dir)
-                    
-                    # Read the HTML content and save as txt file
-                    html_content = html_output_path.read_text(encoding='utf-8')
-                    txt_file_path = conversation_dir / f"{file_stem}.txt"
-                    txt_file_path.write_text(html_content, encoding='utf-8')
-                    
-                    processed_files.append(str(txt_file_path))
-                    print(f"✅ Document converted and saved: {txt_file_path}")
-                    
-                except Exception as e:
-                    print(f"❌ Error processing document {file_path}: {e}")
-                    # Fallback: copy original file
-                    destination = conversation_dir / source_path.name
-                    shutil.copy2(source_path, destination)
-                    processed_files.append(str(destination))
-                    
-            # Handle plain text files
-            elif file_extension in text_extensions:
-                try:
-                    # Read text content (with encoding detection)
-                    text_content = _read_text_auto(source_path)
-                    
-                    # Save as txt file with same stem name
-                    txt_file_path = conversation_dir / f"{file_stem}.txt"
-                    txt_file_path.write_text(text_content, encoding='utf-8')
-                    
-                    processed_files.append(str(txt_file_path))
-                    print(f"✅ Text file processed and saved: {txt_file_path}")
-                    
-                except Exception as e:
-                    print(f"❌ Error processing text file {file_path}: {e}")
-                    # Fallback: copy original file
-                    destination = conversation_dir / source_path.name
-                    shutil.copy2(source_path, destination)
-                    processed_files.append(str(destination))
-                    
-            # Handle image files
-            elif file_extension in image_extensions:
-                try:
-                    # Simply copy image file to destination
-                    destination = conversation_dir / source_path.name
-                    shutil.copy2(source_path, destination)
-                    
-                    processed_files.append(str(destination))
-                    print(f"✅ Image file copied: {destination}")
-                    
-                except Exception as e:
-                    print(f"❌ Error copying image file {file_path}: {e}")
-                    
-            # Handle other file types
+            # Use the new efficient processing function
+            processed_content = process_file_to_text(source_path)
+            
+            if processed_content is not None:
+                # Write the processed content to final destination file
+                txt_file_path = conversation_dir / f"{source_path.stem}.txt"
+                txt_file_path.write_text(processed_content, encoding='utf-8')
+                processed_files.append(str(txt_file_path))
+                print(f"✅ File processed and saved: {txt_file_path}")
             else:
-                # Try to detect if it's a text file by MIME type
-                mime_type, _ = mimetypes.guess_type(str(source_path))
+                # Fallback: copy original file if processing failed
+                destination = conversation_dir / source_path.name
+                shutil.copy2(source_path, destination)
+                processed_files.append(str(destination))
+                print(f"⚠️ File copied as-is (processing failed): {destination}")
                 
-                if mime_type and mime_type.startswith('text/'):
-                    try:
-                        # Treat as text file
-                        text_content = _read_text_auto(source_path)
-                        txt_file_path = conversation_dir / f"{file_stem}.txt"
-                        txt_file_path.write_text(text_content, encoding='utf-8')
-                        
-                        processed_files.append(str(txt_file_path))
-                        print(f"✅ Unknown text file processed: {txt_file_path}")
-                        
-                    except Exception as e:
-                        print(f"❌ Error processing unknown text file {file_path}: {e}")
-                        # Fallback: copy original file
-                        destination = conversation_dir / source_path.name
-                        shutil.copy2(source_path, destination)
-                        processed_files.append(str(destination))
-                else:
-                    # For binary files or unknown types, just copy them
-                    try:
-                        destination = conversation_dir / source_path.name
-                        shutil.copy2(source_path, destination)
-                        
-                        processed_files.append(str(destination))
-                        print(f"✅ Binary/unknown file copied: {destination}")
-                        
-                    except Exception as e:
-                        print(f"❌ Error copying file {file_path}: {e}")
-                        
         except Exception as e:
             print(f"❌ Unexpected error processing {file_path}: {e}")
             continue
     
     print(f"🎉 Successfully processed {len(processed_files)} out of {len(file_paths)} files")
     return processed_files
+
+
+def process_file_to_text(file_path: str | Path) -> str | None:
+    """
+    Efficiently process a file to readable text content in memory.
+    
+    This function does: 1 read → process in memory → return text
+    Instead of: read → write temp file → read temp file → write final file
+    
+    Returns:
+        str: The processed text content, or None if processing failed
+    """
+    source_path = Path(file_path)
+    file_extension = source_path.suffix.lower()
+    
+    # Define file type categories
+    spreadsheet_extensions = {'.xlsx', '.xls', '.xlsm', '.ods', '.csv'}
+    text_extensions = {'.txt', '.md', '.json', '.xml', '.html', '.htm', '.py', '.js', '.css', '.sql', '.log'}
+    document_extensions = {'.docx', '.doc', '.pptx', '.ppt'}
+    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.svg'}
+    
+    try:
+        # Handle spreadsheet files
+        if file_extension in spreadsheet_extensions:
+            return _process_spreadsheet_in_memory(source_path)
+        
+        # Handle document files (DOCX, DOC, etc.)
+        elif file_extension in document_extensions:
+            return _process_document_in_memory(source_path)
+        
+        # Handle plain text files
+        elif file_extension in text_extensions:
+            return _read_text_auto(source_path)
+        
+        # Handle image files - return metadata since we can't convert to text
+        elif file_extension in image_extensions:
+            return f"Image file: {source_path.name}\nFile size: {source_path.stat().st_size} bytes\nFormat: {file_extension}"
+        
+        # Handle other file types
+        else:
+            # Try to detect if it's a text file by MIME type
+            import mimetypes
+            mime_type, _ = mimetypes.guess_type(str(source_path))
+            
+            if mime_type and mime_type.startswith('text/'):
+                return _read_text_auto(source_path)
+            else:
+                # For binary files, return metadata
+                return f"Binary file: {source_path.name}\nFile size: {source_path.stat().st_size} bytes\nType: {mime_type or 'unknown'}"
+                
+    except Exception as e:
+        print(f"❌ Error processing file {file_path}: {e}")
+        return None
+
+
+def _process_spreadsheet_in_memory(source_path: Path) -> str:
+    """Process spreadsheet file in memory using LibreOffice"""
+    import tempfile
+    
+    # Create a temporary directory for LibreOffice processing
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        
+        # LibreOffice export to temp directory
+        soffice = r"D:\LibreOffice\program\soffice.exe"
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "html", str(source_path),
+             "--outdir", str(temp_dir_path)],
+            check=True
+        )
+        
+        # Read the generated HTML file
+        raw_html_path = temp_dir_path / f"{source_path.stem}.html"
+        if not raw_html_path.exists():
+            raise FileNotFoundError(f"LibreOffice did not create {raw_html_path}")
+        
+        # Clean HTML in memory and return the result
+        return _clean_html_in_memory(raw_html_path)
+
+
+def _process_document_in_memory(source_path: Path) -> str:
+    """Process document file in memory using LibreOffice"""
+    import tempfile
+    
+    # Create a temporary directory for LibreOffice processing
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        
+        # LibreOffice export to temp directory
+        soffice = r"D:\LibreOffice\program\soffice.exe"
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "html", str(source_path),
+             "--outdir", str(temp_dir_path)],
+            check=True
+        )
+        
+        # Read the generated HTML file
+        raw_html_path = temp_dir_path / f"{source_path.stem}.html"
+        if not raw_html_path.exists():
+            raise FileNotFoundError(f"LibreOffice did not create {raw_html_path}")
+        
+        # Clean HTML in memory and return the result
+        return _clean_html_in_memory(raw_html_path)
+
+
+def _clean_html_in_memory(raw_html_path: Path) -> str:
+    """
+    Clean HTML file in memory and return the clean HTML string.
+    This avoids writing intermediate cleaned HTML files.
+    """
+    KEEP          = {"table", "thead", "tbody", "tfoot", "tr", "td",
+                     "th", "col", "colgroup"}
+    ATTR_ALWAYS   = {"rowspan", "colspan"}
+    ATTR_EXTRA    = {"colgroup": {"span"}}
+
+    html = _read_text_auto(raw_html_path)
+
+    # drop DOCTYPE / XML prologs
+    html = re.sub(r'<!DOCTYPE[^>]*?>',           '', html, flags=re.I | re.S)
+    html = re.sub(r'<\?xml[^>]*?\?>',            '', html, flags=re.I)
+    html = re.sub(r'<\?mso-application[^>]*?\?>','', html, flags=re.I)
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    # remove <style>, <meta>, <link>
+    for t in soup.find_all(["style", "meta", "link"]):
+        t.decompose()
+
+    # prune unwanted tags / attributes
+    for t in soup.find_all(True):
+        if t.name not in KEEP:
+            t.unwrap()
+            continue
+        allowed = ATTR_ALWAYS | ATTR_EXTRA.get(t.name, set())
+        t.attrs = {k: v for k, v in t.attrs.items() if k in allowed}
+
+    # build minimal shell
+    shell = BeautifulSoup("<html><body></body></html>", "html.parser")
+    for tbl in soup.find_all("table"):
+        shell.body.append(tbl)
+
+    return shell.prettify()
+
 
 def convert_excel2html(input_path: str | Path, output_dir: str | Path) -> Path:
     """

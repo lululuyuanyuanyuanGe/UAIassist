@@ -9,9 +9,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
-from utilities.message_process import build_BaseMessage_type, filter_out_system_messages
 from utilities.file_process import detect_and_process_file_paths, retrieve_file_content
-from utilities.modelRelated import model_creation, detect_provider
+from utilities.modelRelated import model_creation
 
 import uuid
 import json
@@ -28,7 +27,7 @@ from langgraph.graph.message import add_messages
 # from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import Command, Interrupt, interrupt
+from langgraph.types import Command, interrupt
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 from langchain_core.tools import tool
 
@@ -171,11 +170,12 @@ class ProcessUserInputAgent:
         
         user_upload_files = detect_and_process_file_paths(message_content)
         # Filter out the new uploaded files
-        new_upload_files = [item for item in user_upload_files if item not in state["upload_files_path"]]
+        current_files = state.get("upload_files_path", [])
+        new_upload_files = [item for item in user_upload_files if item not in current_files]
         if new_upload_files:
             # Update state with new files - this is needed for the file_upload node
             state["new_upload_files_path"] = new_upload_files
-            state["upload_files_path"].extend(new_upload_files)
+            state["upload_files_path"] = current_files + new_upload_files
             return "file_upload"  # Route to file_upload first, then it goes to analyze_uploaded_files
         # User didn't upload any new files, we will analyze the text input
         return "analyze_text_input"
