@@ -7,7 +7,6 @@ from pathlib import Path
 import subprocess
 import chardet
 
-
 def detect_and_process_file_paths(user_input: str) -> list:
     """检测用户输入中的文件路径并验证文件是否存在，返回结果为用户上传的文件路径组成的数列"""
     file_paths = []

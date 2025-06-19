@@ -37,10 +37,9 @@ load_dotenv()
 class ProcessUserInputState(TypedDict):
     process_user_input_messages: Annotated[list[BaseMessage], add_messages]
     user_input: str
-    upload_files_path: list[str]
-    new_upload_files_path: list[str] # Track the new uploaded files
-    upload_files_processed_path: list[str]
-    new_upload_files_processed_path: list[str]
+    upload_files_path: list[str] # Store all uploaded files
+    new_upload_files_path: list[str] # Track the new uploaded files in this round
+    new_upload_files_processed_path: list[str] # Store the processed new uploaded files
     uploaded_template_files_path: list[str]
     supplement_files_path: dict[str, list[str]]
     irrelevant_files_path: list[str]
@@ -136,7 +135,6 @@ class ProcessUserInputAgent:
             "user_input": user_input,
             "upload_files_path": [],
             "new_upload_files_path": [],
-            "upload_files_processed_path": [],
             "new_upload_files_processed_path": [],
             "uploaded_template_files_path": [],
             "supplement_files_path": {"表格": [], "文档": []},
@@ -146,7 +144,6 @@ class ProcessUserInputAgent:
             "previous_AI_messages": [AIMessage(content="请提供更多关于羊村人口普查的信息")],
             "session_id": session_id,
         }
-
 
 
     def _collect_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -162,37 +159,59 @@ class ProcessUserInputAgent:
     def _route_after_collect_user_input(self, state: ProcessUserInputState) -> str:
         """This node act as a safety check node, it will analyze the user's input and determine if it's a valid input,
         based on the LLM's previous response, at the same time it will route the agent to the correct node"""
-        # We should let LLM decide the route
         
         # Extract content from the message object
         latest_message = state["process_user_input_messages"][-1]
         message_content = latest_message.content if hasattr(latest_message, 'content') else str(latest_message)
         
+        # Check if there are files in the user input
         user_upload_files = detect_and_process_file_paths(message_content)
-        # Filter out the new uploaded files
-        current_files = state.get("upload_files_path", [])
-        new_upload_files = [item for item in user_upload_files if item not in current_files]
-        if new_upload_files:
-            # Update state with new files - this is needed for the file_upload node
-            state["new_upload_files_path"] = new_upload_files
-            state["upload_files_path"] = current_files + new_upload_files
-            return "file_upload"  # Route to file_upload first, then it goes to analyze_uploaded_files
+        if user_upload_files:
+            # Files detected - route to file_upload 
+            # Note: We cannot modify state in routing functions, so file_upload node will re-detect files
+            return "file_upload"
+        
         # User didn't upload any new files, we will analyze the text input
         return "analyze_text_input"
-    
+
 
 
     def _file_upload(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will upload user's file to our system"""
-        # For now we simply store the file content 
-        result = retrieve_file_content(state["new_upload_files_path"], state["session_id"])
-        new_upload_files_processed_path = result
-        upload_files_processed_path = state.get("upload_files_processed_path", [])
-        upload_files_processed_path.extend(result)
-        print(f"✅ File uploaded: {upload_files_processed_path}")
+        
+        # Re-detect files from user input since routing functions cannot modify state
+        latest_message = state["process_user_input_messages"][-1]
+        message_content = latest_message.content if hasattr(latest_message, 'content') else str(latest_message)
+        
+        detected_files = detect_and_process_file_paths(message_content)
+        data_file = Path("agents/data.json")
+        with open(data_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for file in detected_files:
+            file_name = Path(file).name
+            if file_name in data["表格"] or file_name in data["文档"]:
+                detected_files.remove(file)
+                print(f"⚠️ 文件 {file} 已存在")
+        
+        if not detected_files:
+            print("⚠️ No new files to upload")
+            return {
+                "new_upload_files_path": [],
+                "new_upload_files_processed_path": []
+            }
+        
+        print(f"🔄 Processing {len(detected_files)} new files")
+        
+        # Process the files using the correct session_id
+        result = retrieve_file_content(detected_files, "files")
+        
+        print(f"✅ File uploaded: {result}")
+        
+        # Update state with new files
         return {
-            "new_upload_files_processed_path": new_upload_files_processed_path,
-            "upload_files_processed_path": upload_files_processed_path
+            "new_upload_files_path": detected_files,
+            "upload_files_path": state["upload_files_path"] + detected_files,
+            "new_upload_files_processed_path": result
         }
     
 
@@ -212,13 +231,14 @@ class ProcessUserInputAgent:
             "irrelevant": []
         }
         
-        # Process files in batch for efficiency
-        files_content = []
+        # Process files one by one for better accuracy
+        processed_files = []
         for file_path in state["new_upload_files_processed_path"]:
             try:
                 source_path = Path(file_path)
                 if not source_path.exists():
                     print(f"❌ 文件不存在: {file_path}")
+                    classification_results["irrelevant"].append(file_path)
                     continue
                 
                 # Read file content for analysis
@@ -226,17 +246,76 @@ class ProcessUserInputAgent:
                 # Truncate content for analysis (to avoid token limits)
                 analysis_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 
-                files_content.append({
-                    "file_path": file_path,
-                    "file_name": source_path.name,
-                    "content": analysis_content
-                })
+                # Create individual analysis prompt for this file
+                system_prompt = f"""你是一个表格生成智能体，需要分析用户上传的文件内容并进行分类。共有四种类型：
+
+                1. **模板类型 (template)**: 空白表格模板，只有表头没有具体数据
+                2. **补充表格 (supplement-表格)**: 已填写的完整表格，用于补充数据库
+                3. **补充文档 (supplement-文档)**: 包含重要信息的文本文件，如法律条文、政策信息等
+                4. **无关文件 (irrelevant)**: 与表格填写无关的文件
+
+                注意：所有文件已转换为txt格式，表格以HTML代码形式呈现，请根据内容而非文件名或后缀判断。
+
+                用户输入: {state.get("user_input", "")}
+
+                当前分析文件:
+                文件名: {source_path.name}
+                文件路径: {file_path}
+                文件内容:
+                {analysis_content}
+
+                请严格按照以下JSON格式回复，只返回这一个文件的分类结果（不要添加任何其他文字）：
+                {{
+                    "classification": "template" | "supplement-表格" | "supplement-文档" | "irrelevant"
+                }}"""
+                
+                # Get LLM analysis for this file
+                analysis_response = self.llm_c_with_tools.invoke([SystemMessage(content=system_prompt)])
+                
+                # Handle tool calls if LLM needs clarification
+                if hasattr(analysis_response, 'tool_calls') and analysis_response.tool_calls:
+                    print(f"⚠️ LLM对文件 {source_path.name} 需要使用工具，跳过此文件")
+                    classification_results["irrelevant"].append(file_path)
+                    continue
+                
+                # Parse JSON response for this file
+                try:
+                    # Extract JSON from response
+                    response_content = analysis_response.content.strip()
+                    # Remove markdown code blocks if present
+                    if response_content.startswith('```'):
+                        response_content = response_content.split('\n', 1)[1]
+                        response_content = response_content.rsplit('\n', 1)[0]
+                    
+                    file_classification = json.loads(response_content)
+                    classification_type = file_classification.get("classification", "irrelevant")
+                    
+                    # Add to appropriate category
+                    if classification_type == "template":
+                        classification_results["template"].append(file_path)
+                    elif classification_type == "supplement-表格":
+                        classification_results["supplement"]["表格"].append(file_path)
+                    elif classification_type == "supplement-文档":
+                        classification_results["supplement"]["文档"].append(file_path)
+                    else:  # irrelevant or unknown
+                        classification_results["irrelevant"].append(file_path)
+                    
+                    processed_files.append(source_path.name)
+                    print(f"✅ 文件 {source_path.name} 分类为: {classification_type}")
+                    
+                except json.JSONDecodeError as e:
+                    print(f"❌ 文件 {source_path.name} JSON解析错误: {e}")
+                    print(f"LLM响应: {analysis_response.content}")
+                    # Fallback: mark as irrelevant for safety
+                    classification_results["irrelevant"].append(file_path)
                 
             except Exception as e:
-                print(f"❌ 读取文件出错 {file_path}: {e}")
+                print(f"❌ 处理文件出错 {file_path}: {e}")
+                # Add to irrelevant on error
+                classification_results["irrelevant"].append(file_path)
                 continue
         
-        if not files_content:
+        if not processed_files and not classification_results["irrelevant"]:
             return {
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
@@ -245,125 +324,55 @@ class ProcessUserInputAgent:
                 "process_user_input_messages": [SystemMessage(content="没有找到可处理的文件，将分析用户文本输入")]
             }
         
-        # Create analysis prompt in Chinese
-        files_info = "\n\n".join([
-            f"文件名: {item['file_name']}\n文件路径: {item['file_path']}\n文件内容:\n{item['content']}"
-            for item in files_content
-        ])
+        # Update state with classification results
+        uploaded_template_files = classification_results.get("template", [])
+        supplement_files = classification_results.get("supplement", {"表格": [], "文档": []})
+        irrelevant_files = classification_results.get("irrelevant", [])
         
-        system_prompt = f"""你是一个表格生成智能体，需要分析用户上传的文件内容并进行分类。共有四种类型：
-
-        1. **模板类型 (template)**: 空白表格模板，只有表头没有具体数据
-        2. **补充表格 (supplement-表格)**: 已填写的完整表格，用于补充数据库
-        3. **补充文档 (supplement-文档)**: 包含重要信息的文本文件，如法律条文、政策信息等
-        4. **无关文件 (irrelevant)**: 与表格填写无关的文件
-
-        注意：所有文件已转换为txt格式，表格以HTML代码形式呈现，请根据内容而非文件名或后缀判断。
-
-        用户输入: {state.get("user_input", "")}
-
-        文件信息:
-        {files_info}
-
-        请严格按照以下JSON格式回复（不要添加任何其他文字）：
-        {{
-            "template": ["文件路径1", "文件路径2"],
-            "supplement": {{"表格": ["文件路径1"], "文档": ["文件路径2"]}},
-            "irrelevant": ["文件路径1"]
-        }}"""
+        # Check if all files are irrelevant
+        all_files_irrelevant = (
+            len(uploaded_template_files) == 0 and 
+            len(supplement_files.get("表格", [])) == 0 and 
+            len(supplement_files.get("文档", [])) == 0 and
+            len(irrelevant_files) == len(state["new_upload_files_processed_path"])
+        )
         
-        try:
-            # Get LLM analysis
-            analysis_response = self.llm_c_with_tools.invoke([SystemMessage(content=system_prompt)])
+        if all_files_irrelevant:
+            # All files are irrelevant, flag for text analysis
+            analysis_summary = f"""📋 文件分析完成 - 所有文件均与表格生成无关:
+            ❌ 无关文件: {len(irrelevant_files)} 个
             
-            # Handle tool calls if LLM needs clarification
-            if hasattr(analysis_response, 'tool_calls') and analysis_response.tool_calls:
-                # Add the analysis response to process messages for tool handling
-                return {
-                    "process_user_input_messages": [analysis_response]
-                }
+            文件列表: {[Path(f).name for f in irrelevant_files]}
             
-            # Parse JSON response
-            try:
-                # Extract JSON from response
-                response_content = analysis_response.content.strip()
-                # Remove markdown code blocks if present
-                if response_content.startswith('```'):
-                    response_content = response_content.split('\n', 1)[1]
-                    response_content = response_content.rsplit('\n', 1)[0]
-                
-                classification_results = json.loads(response_content)
-                
-            except json.JSONDecodeError as e:
-                print(f"❌ JSON解析错误: {e}")
-                print(f"LLM响应: {analysis_response.content}")
-                # Fallback: keep all files as irrelevant for safety
-                classification_results = {
-                    "template": [],
-                    "supplement": {"表格": [], "文档": []},
-                    "irrelevant": [item['file_path'] for item in files_content]
-                }
+            🔄 将转为分析用户文本输入内容"""
             
-            # Update state with classification results
-            uploaded_template_files = classification_results.get("template", [])
-            supplement_files = classification_results.get("supplement", {"表格": [], "文档": []})
-            irrelevant_files = classification_results.get("irrelevant", [])
-            
-            # Check if all files are irrelevant
-            all_files_irrelevant = (
-                len(uploaded_template_files) == 0 and 
-                len(supplement_files.get("表格", [])) == 0 and 
-                len(supplement_files.get("文档", [])) == 0 and
-                len(irrelevant_files) == len(files_content)
-            )
-            
-            if all_files_irrelevant:
-                # All files are irrelevant, flag for text analysis
-                analysis_summary = f"""📋 文件分析完成 - 所有文件均与表格生成无关:
-                ❌ 无关文件: {len(irrelevant_files)} 个
-                
-                文件列表: {[Path(f).name for f in irrelevant_files]}
-                
-                🔄 将转为分析用户文本输入内容"""
-                
-                return {
-                    "uploaded_template_files_path": [],
-                    "supplement_files_path": {"表格": [], "文档": []},
-                    "irrelevant_files_path": irrelevant_files,
-                    "all_files_irrelevant": True,  # Flag for routing
-                    "process_user_input_messages": [SystemMessage(content=analysis_summary)]
-                }
-            else:
-                # Some files are relevant, proceed with normal flow
-                analysis_summary = f"""📋 文件分析完成:
-                ✅ 模板文件: {len(uploaded_template_files)} 个
-                ✅ 补充表格: {len(supplement_files.get("表格", []))} 个  
-                ✅ 补充文档: {len(supplement_files.get("文档", []))} 个
-                ❌ 无关文件: {len(irrelevant_files)} 个
-
-                分类详情:
-                模板: {[Path(f).name for f in uploaded_template_files]}
-                表格: {[Path(f).name for f in supplement_files.get("表格", [])]}
-                文档: {[Path(f).name for f in supplement_files.get("文档", [])]}
-                无关: {[Path(f).name for f in irrelevant_files]}"""
-                
-                return {
-                    "uploaded_template_files_path": uploaded_template_files,
-                    "supplement_files_path": supplement_files,
-                    "irrelevant_files_path": irrelevant_files,
-                    "all_files_irrelevant": False,  # Flag for routing
-                    "process_user_input_messages": [SystemMessage(content=analysis_summary)]
-                }
-            
-        except Exception as e:
-            print(f"❌ 分析文件时出错: {e}")
-            # Fallback: keep all files as irrelevant for safety and flag for text analysis
             return {
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
-                "irrelevant_files_path": [item['file_path'] for item in files_content],
-                "all_files_irrelevant": True,  # Flag for routing to text analysis
-                "process_user_input_messages": [SystemMessage(content=f"文件分析出错: {e}，将转为分析用户文本输入")]
+                "irrelevant_files_path": irrelevant_files,
+                "all_files_irrelevant": True,  # Flag for routing
+                "process_user_input_messages": [SystemMessage(content=analysis_summary)]
+            }
+        else:
+            # Some files are relevant, proceed with normal flow
+            analysis_summary = f"""📋 文件分析完成:
+            ✅ 模板文件: {len(uploaded_template_files)} 个
+            ✅ 补充表格: {len(supplement_files.get("表格", []))} 个  
+            ✅ 补充文档: {len(supplement_files.get("文档", []))} 个
+            ❌ 无关文件: {len(irrelevant_files)} 个
+
+            分类详情:
+            模板: {[Path(f).name for f in uploaded_template_files]}
+            表格: {[Path(f).name for f in supplement_files.get("表格", [])]}
+            文档: {[Path(f).name for f in supplement_files.get("文档", [])]}
+            无关: {[Path(f).name for f in irrelevant_files]}"""
+            
+            return {
+                "uploaded_template_files_path": uploaded_template_files,
+                "supplement_files_path": supplement_files,
+                "irrelevant_files_path": irrelevant_files,
+                "all_files_irrelevant": False,  # Flag for routing
+                "process_user_input_messages": [SystemMessage(content=analysis_summary)]
             }
                 
     def _route_after_analyze_uploaded_files(self, state: ProcessUserInputState):
@@ -383,7 +392,7 @@ class ProcessUserInputAgent:
             sends.append(Send("analyze_text_input", state))
             return sends
         
-        # Some files are relevant - process them in parallel
+        # Some files are relevant - process them in parallel, then continue to text analysis
         sends = []
         if state.get("uploaded_template_files_path"):
             sends.append(Send("process_template", state))
@@ -391,6 +400,7 @@ class ProcessUserInputAgent:
             sends.append(Send("process_supplement", state))
         if state.get("irrelevant_files_path"):
             sends.append(Send("process_irrelevant", state))
+
         
         return sends if sends else [Send("analyze_text_input", state)]  # Fallback
     
@@ -495,7 +505,9 @@ class ProcessUserInputAgent:
         ✅ 文档文件: {len(document_files)} 个已分析并存储
         📝 数据库已更新，总计表格 {len(data['表格'])} 个，文档 {len(data['文档'])} 个"""
         
-        return {state}
+        return {
+            "process_user_input_messages": [SystemMessage(content=summary_message)]
+        }
         
         
     def _process_irrelevant(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -526,7 +538,9 @@ class ProcessUserInputAgent:
         删除的文件: {', '.join(deleted_files) if deleted_files else '无'}
         失败的文件: {', '.join(failed_deletes) if failed_deletes else '无'}"""
         
-        return {state}
+        return {
+            "process_user_input_messages": [SystemMessage(content=summary_message)]
+        }
     
 
     
@@ -749,20 +763,23 @@ class ProcessUserInputAgent:
         """Basically this nodes act as a summry nodes, that summarize what the new information has been provided by the user in this round of human in the lopp also it needs to 
         decide which node to route to next
         """
-
-        system_prompt = """你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
+        process_user_input_messages_conent = [item.conten for item in state["process_user_input_messages"]]
+        system_prompt = f"""你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
         规则如下，如何出现了复杂模板，返回"complex_template"，如果出现了简单模板，返回"simple_template"，其余情况请返回"previous_node" 
         你的回复需要包含对这一轮的总结，和节点路由信息，由json来表示
-        {
+
+        历史对话:{process_user_input_messages_conent}
+        {{
             "summary": "总结用户在这一轮都提供了哪些信息",
             "next_node": "节点路由信息"
-        }
+        }}
         
         """
         
         try:
             # Try the LLM call with detailed error handling
-            messages = [SystemMessage(content=system_prompt)] + state["process_user_input_messages"]
+            
+            messages = [SystemMessage(content=system_prompt)]
             print(f"🔄 正在调用LLM进行总结，消息数量: {len(messages)}")
             
             response = self.llm_c.invoke(messages)

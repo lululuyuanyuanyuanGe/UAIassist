@@ -12,5 +12,5 @@
 from utilities.modelRelated import model_creation
 
 model = model_creation(model_name="gpt-4o-mini", temperature=0.0)
-response = model.invoke("你好")
+response = model.invoke("Langgraph是什么")
 print(response)

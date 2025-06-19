@@ -32,6 +32,9 @@ from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, System
 from langchain_core.tools import tool
 
 
+# import other agents
+from agents.processUserInput import ProcessUserInputAgent
+
 load_dotenv()
 
 
