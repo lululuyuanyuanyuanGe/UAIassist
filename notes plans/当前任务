@@ -14,3 +14,5 @@
 10.清理process_user_input_messages的内容让大模型更好的分析
 10.消息数量不匹配
 11.允许上传图片
+
+12.将excel表格提取出表头后再交给模型进行分析，以节省context长度

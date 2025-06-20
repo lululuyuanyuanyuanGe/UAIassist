@@ -763,7 +763,7 @@ class ProcessUserInputAgent:
         """Basically this nodes act as a summry nodes, that summarize what the new information has been provided by the user in this round of human in the lopp also it needs to 
         decide which node to route to next
         """
-        process_user_input_messages_conent = [item.conten for item in state["process_user_input_messages"]]
+        process_user_input_messages_conent = [item.content for item in state["process_user_input_messages"]]
         system_prompt = f"""你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
         规则如下，如何出现了复杂模板，返回"complex_template"，如果出现了简单模板，返回"simple_template"，其余情况请返回"previous_node" 
         你的回复需要包含对这一轮的总结，和节点路由信息，由json来表示

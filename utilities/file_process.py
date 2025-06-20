@@ -66,7 +66,6 @@ def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
     txt file, finally if the file is an image then simply just store it as the image file in the right place"""
     
     import shutil
-    import mimetypes
     from pathlib import Path
     
     # Create the conversation folder structure
@@ -215,72 +214,84 @@ def _process_document_in_memory(source_path: Path) -> str:
 def _clean_html_in_memory(raw_html_path: Path) -> str:
     """
     Clean HTML file in memory and return the clean HTML string.
-    This avoids writing intermediate cleaned HTML files.
+    This function preserves both table structures and text content while
+    removing unnecessary decorative HTML elements.
     """
-    KEEP          = {"table", "thead", "tbody", "tfoot", "tr", "td",
-                     "th", "col", "colgroup"}
-    ATTR_ALWAYS   = {"rowspan", "colspan"}
-    ATTR_EXTRA    = {"colgroup": {"span"}}
+    # Tags to keep for table structure
+    TABLE_TAGS = {"table", "thead", "tbody", "tfoot", "tr", "td", "th", "col", "colgroup"}
+    
+    # Tags to keep for text content and basic formatting
+    TEXT_TAGS = {"p", "div", "span", "h1", "h2", "h3", "h4", "h5", "h6", 
+                 "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", 
+                 "blockquote", "pre", "code", "a"}
+    
+    # All tags we want to preserve
+    KEEP = TABLE_TAGS | TEXT_TAGS
+    
+    # Attributes to always keep
+    ATTR_ALWAYS = {"rowspan", "colspan"}
+    
+    # Additional attributes for specific tags
+    ATTR_EXTRA = {
+        "colgroup": {"span"},
+        "a": {"href"},  # Keep links
+        "td": {"width", "height"},  # Keep table cell dimensions
+        "th": {"width", "height"},  # Keep table header dimensions
+    }
 
     html = _read_text_auto(raw_html_path)
 
-    # drop DOCTYPE / XML prologs
+    # Drop DOCTYPE / XML prologs
     html = re.sub(r'<!DOCTYPE[^>]*?>',           '', html, flags=re.I | re.S)
     html = re.sub(r'<\?xml[^>]*?\?>',            '', html, flags=re.I)
     html = re.sub(r'<\?mso-application[^>]*?\?>','', html, flags=re.I)
 
     soup = BeautifulSoup(html, "html.parser")
 
-    # remove <style>, <meta>, <link>
-    for t in soup.find_all(["style", "meta", "link"]):
+    # Remove styling and metadata tags
+    for t in soup.find_all(["style", "meta", "link", "script", "noscript"]):
         t.decompose()
 
-    # prune unwanted tags / attributes
+    # Clean up attributes and unwrap unwanted tags
     for t in soup.find_all(True):
         if t.name not in KEEP:
+            # Unwrap tags we don't want to keep, but preserve their content
             t.unwrap()
             continue
+        
+        # For kept tags, clean up attributes
         allowed = ATTR_ALWAYS | ATTR_EXTRA.get(t.name, set())
-        t.attrs = {k: v for k, v in t.attrs.items() if k in allowed}
+        
+        # Remove style attributes and other formatting attributes
+        attrs_to_remove = []
+        for attr_name in t.attrs.keys():
+            if attr_name not in allowed and not attr_name.startswith('data-'):
+                # Remove style-related attributes but keep data attributes for potential use
+                if attr_name.lower() in ['style', 'class', 'id', 'onclick', 'onload', 
+                                       'onmouseover', 'onmouseout', 'bgcolor', 'color',
+                                       'font-size', 'font-family', 'text-align', 'valign',
+                                       'align', 'border', 'cellpadding', 'cellspacing']:
+                    attrs_to_remove.append(attr_name)
+        
+        for attr in attrs_to_remove:
+            del t.attrs[attr]
 
-    # build minimal shell
+    # Build a clean document structure
     shell = BeautifulSoup("<html><body></body></html>", "html.parser")
-    for tbl in soup.find_all("table"):
-        shell.body.append(tbl)
+    
+    # Add all content from the body, preserving both text and tables
+    if soup.body:
+        for element in soup.body.children:
+            if element.name or (hasattr(element, 'strip') and element.strip()):
+                # Add both tag elements and non-empty text nodes
+                shell.body.append(element)
+    else:
+        # If no body tag, add all content
+        for element in soup.children:
+            if element.name or (hasattr(element, 'strip') and element.strip()):
+                shell.body.append(element)
 
     return shell.prettify()
-
-
-def convert_excel2html(input_path: str | Path, output_dir: str | Path) -> Path:
-    """
-    Convert an Excel workbook to a minimal HTML file that contains only the
-    table structure.  Returns the *cleaned* HTML path.
-
-    Notes
-    -----
-    • LibreOffice writes `<workbook-stem>.html` into *output_dir*.  
-    • Because *output_dir* is reserved exclusively for these exports, we can
-      compute that file name directly instead of searching for it.
-    """
-    input_path  = Path(input_path).expanduser().resolve()
-    output_dir  = Path(output_dir).expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # 1️⃣  LibreOffice export --------------------------------------------------
-    soffice = r"D:\LibreOffice\program\soffice.exe"      # adjust if necessary
-    subprocess.run(
-        [soffice, "--headless", "--convert-to", "html", str(input_path),
-         "--outdir", str(output_dir)],
-        check=True
-    )
-
-    # 2️⃣  The raw export path we expect LibreOffice to create
-    raw_html_path = output_dir / f"{input_path.stem}.html"
-    if not raw_html_path.exists():
-        raise FileNotFoundError(f"LibreOffice did not create {raw_html_path}")
-
-    # 3️⃣  Clean & return the tidy file
-    return _clean_html(raw_html_path, output_dir)
 
 
 # ──────────────────────── private helpers ─────────────────────── #
@@ -300,76 +311,5 @@ def _read_text_auto(path: Path) -> str:
             except UnicodeDecodeError:
                 pass
     return data.decode("utf-8", errors="replace")
-
-
-def _convert_document2html(input_path: str | Path, output_dir: str | Path) -> Path:
-    """
-    Convert a document (DOCX, DOC, etc.) to HTML using LibreOffice.
-    Returns the cleaned HTML path.
-    """
-    input_path  = Path(input_path).expanduser().resolve()
-    output_dir  = Path(output_dir).expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # LibreOffice export
-    soffice = r"D:\LibreOffice\program\soffice.exe"
-    subprocess.run(
-        [soffice, "--headless", "--convert-to", "html", str(input_path),
-         "--outdir", str(output_dir)],
-        check=True
-    )
-
-    # The raw export path we expect LibreOffice to create
-    raw_html_path = output_dir / f"{input_path.stem}.html"
-    if not raw_html_path.exists():
-        raise FileNotFoundError(f"LibreOffice did not create {raw_html_path}")
-
-    # Clean and return the tidy file
-    return _clean_html(raw_html_path, output_dir)
-
-
-def _clean_html(raw_html_path: Path, out_dir: Path) -> Path:
-    """
-    Strip Excel/Sheets boiler-plate—*including the massive inline CSS*—and keep
-    only genuine table markup.
-
-    • Preserves:  <table>, <thead>, <tbody>, <tfoot>, <tr>, <td>, <th>,
-                 <col>, <colgroup>
-    • Keeps attributes:  rowspan/colspan everywhere, plus span on <colgroup>.
-    """
-    KEEP          = {"table", "thead", "tbody", "tfoot", "tr", "td",
-                     "th", "col", "colgroup"}
-    ATTR_ALWAYS   = {"rowspan", "colspan"}
-    ATTR_EXTRA    = {"colgroup": {"span"}}
-
-    html = _read_text_auto(raw_html_path)
-
-    # drop DOCTYPE / XML prologs
-    html = re.sub(r'<!DOCTYPE[^>]*?>',           '', html, flags=re.I | re.S)
-    html = re.sub(r'<\?xml[^>]*?\?>',            '', html, flags=re.I)
-    html = re.sub(r'<\?mso-application[^>]*?\?>','', html, flags=re.I)
-
-    soup = BeautifulSoup(html, "html.parser")
-
-    # remove <style>, <meta>, <link>
-    for t in soup.find_all(["style", "meta", "link"]):
-        t.decompose()
-
-    # prune unwanted tags / attributes
-    for t in soup.find_all(True):
-        if t.name not in KEEP:
-            t.unwrap()
-            continue
-        allowed = ATTR_ALWAYS | ATTR_EXTRA.get(t.name, set())
-        t.attrs = {k: v for k, v in t.attrs.items() if k in allowed}
-
-    # build minimal shell
-    shell = BeautifulSoup("<html><body></body></html>", "html.parser")
-    for tbl in soup.find_all("table"):
-        shell.body.append(tbl)
-
-    out_file = out_dir / f"{raw_html_path.stem}_clean.html"
-    out_file.write_text(shell.prettify(), encoding="utf-8")
-    return out_file
 
 
