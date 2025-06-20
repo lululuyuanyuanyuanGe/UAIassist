@@ -1,2784 +1,2785 @@
 <html>
  <body>
   <table>
-   <colgroup>
+   <colgroup width="61">
    </colgroup>
-   <colgroup>
+   <colgroup width="111">
    </colgroup>
-   <colgroup>
+   <colgroup width="72">
    </colgroup>
-   <colgroup>
+   <colgroup width="70">
    </colgroup>
-   <colgroup>
+   <colgroup width="109">
    </colgroup>
-   <colgroup>
+   <colgroup width="94">
    </colgroup>
-   <colgroup>
+   <colgroup width="133">
    </colgroup>
-   <colgroup>
+   <colgroup width="87">
    </colgroup>
-   <colgroup>
+   <colgroup width="219">
    </colgroup>
-   <colgroup>
+   <colgroup width="125">
    </colgroup>
-   <colgroup>
+   <colgroup width="142">
    </colgroup>
-   <colgroup>
+   <colgroup width="209">
    </colgroup>
-   <colgroup>
+   <colgroup width="150">
    </colgroup>
    <tr>
-    <td colspan="13">
+    <td colspan="13" data-sheets-value='{ "1": 2, "2": "一品街道燕云村2024年度党员名册"}' height="84">
      一品街道燕云村2024年度党员名册
     </td>
    </tr>
    <tr>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "序号"}' height="66">
      序号
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "姓名"}'>
      姓名
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "性别"}'>
      性别
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "民族"}'>
      民族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "籍贯"}'>
      籍贯
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "学历"}'>
      学历
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "出生日期"}' sdnum="4105;0;YYYYMMDD">
      出生日期
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "年龄"}' sdnum="4105;0;0_ ">
      年龄
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "公民身份证号"}'>
      公民身份证号
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "入党时间"}' sdnum="4105;0;YYYY-MM-DD">
      入党时间
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "转正时间"}'>
      转正时间
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "所属支部"}'>
      所属支部
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "电话"}'>
      电话
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="1">
      1
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "李  静"}'>
      李  静
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27555}' sdnum="4105;0;YYYYMMDD" sdval="27555">
      19750610
     </td>
-    <td>
+    <td sdnum="4105;" sdval="48">
      48
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219750610612X"}'>
      51022219750610612X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 41079}' sdnum="4105;0;YYYYMMDD" sdval="41079">
      20120619
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "@", "3": 1}' data-sheets-value='{ "1": 3, "3": 20130619}' sdnum="4105;0;@" sdval="20130619">
      20130619
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13452976295"}'>
      13452976295
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="2">
      2
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "余国兴"}'>
      余国兴
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中技"}'>
      中技
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 23157}' sdnum="4105;0;YYYYMMDD" sdval="23157">
      19630526
     </td>
-    <td>
+    <td sdnum="4105;" sdval="60">
      60
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222196305268312"}'>
      510222196305268312
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40014}' sdnum="4105;0;YYYYMMDD" sdval="40014">
      20090720
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40379}' sdnum="4105;0;YYYYMMDD" sdval="40379">
      20100720
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13752800424"}'>
      13752800424
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="3">
      3
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "岑恩禄"}'>
      岑恩禄
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中技"}'>
      中技
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 21686}' sdnum="4105;0;YYYYMMDD" sdval="21686">
      19590516
     </td>
-    <td>
+    <td sdnum="4105;" sdval="63">
      63
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195905168310"}'>
      510222195905168310
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38197}' sdnum="4105;0;YYYYMMDD" sdval="38197">
      20040729
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38562}' sdnum="4105;0;YYYYMMDD" sdval="38562">
      20050729
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13983626549"}'>
      13983626549
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="4">
      4
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "程昌明"}'>
      程昌明
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 19301}' sdnum="4105;0;YYYYMMDD" sdval="19301">
      19521103
     </td>
-    <td>
+    <td sdnum="4105;" sdval="71">
      71
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195211038319"}'>
      510222195211038319
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27098}' sdnum="4105;0;YYYYMMDD" sdval="27098">
      19740310
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27098}' sdnum="4105;0;YYYYMMDD" sdval="27098">
      19740310
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13883996783"}'>
      13883996783
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="5">
      5
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "周华利"}'>
      周华利
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中专"}'>
      中专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 22548}' sdnum="4105;0;YYYYMMDD" sdval="22548">
      19610924
     </td>
-    <td>
+    <td sdnum="4105;" sdval="62">
      62
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222196109248314"}'>
      510222196109248314
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 31375}' sdnum="4105;0;YYYYMMDD" sdval="31375">
      19851124
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 31740}' sdnum="4105;0;YYYYMMDD" sdval="31740">
      19861124
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13640588299"}'>
      13640588299
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="6">
      6
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "刁中其"}'>
      刁中其
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "@", "3": 1}' data-sheets-value='{ "1": 3, "3": 19490206}' sdnum="4105;0;@" sdval="19490206">
      19490206
     </td>
-    <td>
+    <td sdnum="4105;" sdval="74">
      74
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219490206831X"}'>
      51022219490206831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 32438}' sdnum="4105;0;YYYYMMDD" sdval="32438">
      19881022
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 32803}' sdnum="4105;0;YYYYMMDD" sdval="32803">
      19891022
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15922731181"}'>
      15922731181
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="7">
      7
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "周华安"}'>
      周华安
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 16749}' sdnum="4105;0;YYYYMMDD" sdval="16749">
      19451108
     </td>
-    <td>
+    <td sdnum="4105;" sdval="78">
      78
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194511088313"}'>
      510222194511088313
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26273}' sdnum="4105;0;YYYYMMDD" sdval="26273">
      19711206
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26273}' sdnum="4105;0;YYYYMMDD" sdval="26273">
      19711206
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13452026334"}'>
      13452026334
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="8">
      8
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "钟  兰"}'>
      钟  兰
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中专"}'>
      中专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 33651}' sdnum="4105;0;YYYYMMDD" sdval="33651">
      19920217
     </td>
-    <td>
+    <td sdnum="4105;" sdval="31">
      31
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113199202178322"}'>
      500113199202178322
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 42540}' sdnum="4105;0;YYYYMMDD" sdval="42540">
      20160619
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 42905}' sdnum="4105;0;YYYYMMDD" sdval="42905">
      20170619
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13982639297"}'>
      13982639297
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="9">
      9
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "何思容"}'>
      何思容
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18085}' sdnum="4105;0;YYYYMMDD" sdval="18085">
      19490706
     </td>
-    <td>
+    <td sdnum="4105;" sdval="74">
      74
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194907068327"}'>
      510222194907068327
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 32497}' sdnum="4105;0;YYYYMMDD" sdval="32497">
      19881220
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 32862}' sdnum="4105;0;YYYYMMDD" sdval="32862">
      19891220
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18008363309"}'>
      18008363309
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="10">
      10
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "瞿祥伙"}'>
      瞿祥伙
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 19284}' sdnum="4105;0;YYYYMMDD" sdval="19284">
      19521017
     </td>
-    <td>
+    <td sdnum="4105;" sdval="71">
      71
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195210178352"}'>
      510222195210178352
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27027}' sdnum="4105;0;YYYYMMDD" sdval="27027">
      19731229
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27027}' sdnum="4105;0;YYYYMMDD" sdval="27027">
      19731229
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13452951468"}'>
      13452951468
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="11">
      11
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "陈祯贵"}'>
      陈祯贵
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18670}' sdnum="4105;0;YYYYMMDD" sdval="18670">
      19510211
     </td>
-    <td>
+    <td sdnum="4105;" sdval="72">
      72
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219510211831X"}'>
      51022219510211831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28057}' sdnum="4105;0;YYYYMMDD" sdval="28057">
      19761024
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28057}' sdnum="4105;0;YYYYMMDD" sdval="28057">
      19761024
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13983166893"}'>
      13983166893
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="12">
      12
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "钟德敏"}'>
      钟德敏
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "本科"}'>
      本科
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 30631}' sdnum="4105;0;YYYYMMDD" sdval="30631">
      19831111
     </td>
-    <td>
+    <td sdnum="4105;" sdval="40">
      40
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113198311118324"}'>
      500113198311118324
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37904}' sdnum="4105;0;YYYYMMDD" sdval="37904">
      20031010
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38270}' sdnum="4105;0;YYYYMMDD" sdval="38270">
      20041010
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15111909665"}'>
      15111909665
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="13">
      13
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "刘中容"}'>
      刘中容
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18622}' sdnum="4105;0;YYYYMMDD" sdval="18622">
      19501225
     </td>
-    <td>
+    <td sdnum="4105;" sdval="73">
      73
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195012258327"}'>
      510222195012258327
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26990}' sdnum="4105;0;YYYYMMDD" sdval="26990">
      19731122
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26990}' sdnum="4105;0;YYYYMMDD" sdval="26990">
      19731122
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13271903070"}'>
      13271903070
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="14">
      14
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "邱东成"}'>
      邱东成
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18815}' sdnum="4105;0;YYYYMMDD" sdval="18815">
      19510706
     </td>
-    <td>
+    <td sdnum="4105;" sdval="72">
      72
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195107068315"}'>
      510222195107068315
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25746}' sdnum="4105;0;YYYYMMDD" sdval="25746">
      19700627
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25746}' sdnum="4105;0;YYYYMMDD" sdval="25746">
      19700627
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td sdnum="4105;" sdval="13678460768">
      13678460768
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="15">
      15
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "刘昌明"}'>
      刘昌明
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 16238}' sdnum="4105;0;YYYYMMDD" sdval="16238">
      19440615
     </td>
-    <td>
+    <td sdnum="4105;" sdval="79">
      79
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194406158316"}'>
      510222194406158316
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24038}' sdnum="4105;0;YYYYMMDD" sdval="24038">
      19651023
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24403}' sdnum="4105;0;YYYYMMDD" sdval="24403">
      19661023
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18716423859"}'>
      18716423859
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="16">
      16
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "余献奎"}'>
      余献奎
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 19022}' sdnum="4105;0;YYYYMMDD" sdval="19022">
      19520129
     </td>
-    <td>
+    <td sdnum="4105;" sdval="71">
      71
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219520129831X"}'>
      51022219520129831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39293}' sdnum="4105;0;YYYYMMDD" sdval="39293">
      20070730
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39659}' sdnum="4105;0;YYYYMMDD" sdval="39659">
      20080730
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13883406404"}'>
      13883406404
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="17">
      17
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "彭子伦"}'>
      彭子伦
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18181}' sdnum="4105;0;YYYYMMDD" sdval="18181">
      19491010
     </td>
-    <td>
+    <td sdnum="4105;" sdval="74">
      74
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194910108334"}'>
      510222194910108334
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25979}' sdnum="4105;0;YYYYMMDD" sdval="25979">
      19710215
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25979}' sdnum="4105;0;YYYYMMDD" sdval="25979">
      19710215
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15683752046"}'>
      15683752046
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="18">
      18
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "岑远伦"}'>
      岑远伦
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 17169}' sdnum="4105;0;YYYYMMDD" sdval="17169">
      19470102
     </td>
-    <td>
+    <td sdnum="4105;" sdval="76">
      76
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194701028311"}'>
      510222194701028311
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26400}' sdnum="4105;0;YYYYMMDD" sdval="26400">
      19720411
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26400}' sdnum="4105;0;YYYYMMDD" sdval="26400">
      19720411
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15683117072"}'>
      15683117072
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="19">
      19
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "李  林"}'>
      李  林
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24984}' sdnum="4105;0;YYYYMMDD" sdval="24984">
      19680526
     </td>
-    <td>
+    <td sdnum="4105;" sdval="55">
      55
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222196805268319"}'>
      510222196805268319
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38853}' sdnum="4105;0;YYYYMMDD" sdval="38853">
      20060516
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39218}' sdnum="4105;0;YYYYMMDD" sdval="39218">
      20070516
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13883130375"}'>
      13883130375
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="20">
      20
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "李春元"}'>
      李春元
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 20060}' sdnum="4105;0;YYYYMMDD" sdval="20060">
      19541202
     </td>
-    <td>
+    <td sdnum="4105;" sdval="69">
      69
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195412028336"}'>
      510222195412028336
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28302}' sdnum="4105;0;YYYYMMDD" sdval="28302">
      19770626
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28302}' sdnum="4105;0;YYYYMMDD" sdval="28302">
      19770626
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13996366647"}'>
      13996366647
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="21">
      21
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汪顺英"}'>
      汪顺英
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18025}' sdnum="4105;0;YYYYMMDD" sdval="18025">
      19490507
     </td>
-    <td>
+    <td sdnum="4105;" sdval="74">
      74
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194905158329"}'>
      510222194905158329
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28715}' sdnum="4105;0;YYYYMMDD" sdval="28715">
      19780813
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 29080}' sdnum="4105;0;YYYYMMDD" sdval="29080">
      19790813
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18983951517"}'>
      18983951517
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="22">
      22
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "张富华"}'>
      张富华
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 17935}' sdnum="4105;0;YYYYMMDD" sdval="17935">
      19490206
     </td>
-    <td>
+    <td sdnum="4105;" sdval="74">
      74
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194902068336"}'>
      510222194902068336
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28729}' sdnum="4105;0;YYYYMMDD" sdval="28729">
      19780827
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 29094}' sdnum="4105;0;YYYYMMDD" sdval="29094">
      19790827
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13883994313"}'>
      13883994313
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="23">
      23
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "李  渝"}'>
      李  渝
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24132}' sdnum="4105;0;YYYYMMDD" sdval="24132">
      19660125
     </td>
-    <td>
+    <td sdnum="4105;" sdval="57">
      57
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222196601258311"}'>
      510222196601258311
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38521}' sdnum="4105;0;YYYYMMDD" sdval="38521">
      20050618
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38886}' sdnum="4105;0;YYYYMMDD" sdval="38886">
      20060618
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15909359432"}'>
      15909359432
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="24">
      24
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "黄文彬"}'>
      黄文彬
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中专"}'>
      中专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27754}' sdnum="4105;0;YYYYMMDD" sdval="27754">
      19751226
     </td>
-    <td>
+    <td sdnum="4105;" sdval="48">
      48
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219751226831X"}'>
      51022219751226831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39293}' sdnum="4105;0;YYYYMMDD" sdval="39293">
      20070730
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39659}' sdnum="4105;0;YYYYMMDD" sdval="39659">
      20080730
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18716405157"}'>
      18716405157
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="25">
      25
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "郭富平"}'>
      郭富平
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26052}' sdnum="4105;0;YYYYMMDD" sdval="26052">
      19710429
     </td>
-    <td>
+    <td sdnum="4105;" sdval="52">
      52
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510225197104294745"}'>
      510225197104294745
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39627}' sdnum="4105;0;YYYYMMDD" sdval="39627">
      20080628
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39992}' sdnum="4105;0;YYYYMMDD" sdval="39992">
      20090628
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15823925784"}'>
      15823925784
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="26">
      26
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "李  顺"}'>
      李  顺
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 33547}' sdnum="4105;0;YYYYMMDD" sdval="33547">
      19911105
     </td>
-    <td>
+    <td sdnum="4105;" sdval="32">
      32
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113199111058317"}'>
      500113199111058317
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 41816}' sdnum="4105;0;YYYYMMDD" sdval="41816">
      20140626
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 42546}' sdnum="4105;0;YYYYMMDD" sdval="42546">
      20160625
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18908380485"}'>
      18908380485
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="27">
      27
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "李天寿"}'>
      李天寿
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 19230}' sdnum="4105;0;YYYYMMDD" sdval="19230">
      19520824
     </td>
-    <td>
+    <td sdnum="4105;" sdval="71">
      71
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195208248315"}'>
      510222195208248315
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37790}' sdnum="4105;0;YYYYMMDD" sdval="37790">
      20030618
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38156}' sdnum="4105;0;YYYYMMDD" sdval="38156">
      20040618
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15213428459"}'>
      15213428459
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="28">
      28
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "岑恩平"}'>
      岑恩平
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中专"}'>
      中专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "@", "3": 1}' data-sheets-value='{ "1": 3, "3": 19740615}' sdnum="4105;0;@" sdval="19740615">
      19740615
     </td>
-    <td>
+    <td sdnum="4105;" sdval="49">
      49
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222197406158336"}'>
      510222197406158336
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40339}' sdnum="4105;0;YYYYMMDD" sdval="40339">
      20100610
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40704}' sdnum="4105;0;YYYYMMDD" sdval="40704">
      20110610
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18166565321"}'>
      18166565321
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="29">
      29
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "彭  湃"}'>
      彭  湃
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "本科"}'>
      本科
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 34354}' sdnum="4105;0;YYYYMMDD" sdval="34354">
      19940120
     </td>
-    <td>
+    <td sdnum="4105;" sdval="29">
      29
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "50011319940120831X"}'>
      50011319940120831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 43280}' sdnum="4105;0;YYYYMMDD" sdval="43280">
      20180629
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 43645}' sdnum="4105;0;YYYYMMDD" sdval="43645">
      20190629
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13883312046"}'>
      13883312046
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="30">
      30
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "岑远贵"}'>
      岑远贵
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆北部"}'>
      重庆北部
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 16438}' sdnum="4105;0;YYYYMMDD" sdval="16438">
      19450101
     </td>
-    <td>
+    <td sdnum="4105;" sdval="78">
      78
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510215194501012557"}'>
      510215194501012557
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24101}' sdnum="4105;0;YYYYMMDD" sdval="24101">
      19651225
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24466}' sdnum="4105;0;YYYYMMDD" sdval="24466">
      19661225
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15213281937"}'>
      15213281937
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="32">
      32
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "於常红"}'>
      於常红
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "本科"}'>
      本科
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 33427}' sdnum="4105;0;YYYYMMDD" sdval="33427">
      19910708
     </td>
-    <td>
+    <td sdnum="4105;" sdval="32">
      32
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113199107088329"}'>
      500113199107088329
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 43830}' sdnum="4105;0;YYYYMMDD" sdval="43830">
      20191231
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 44196}' sdnum="4105;0;YYYYMMDD" sdval="44196">
      20201231
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18723038857"}'>
      18723038857
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="33">
      33
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "龚元林"}'>
      龚元林
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 31720}' sdnum="4105;0;YYYYMMDD" sdval="31720">
      19861104
     </td>
-    <td>
+    <td sdnum="4105;" sdval="37">
      37
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "50011319861104833X"}'>
      50011319861104833X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39342}' sdnum="4105;0;YYYYMMDD" sdval="39342">
      20070917
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39708}' sdnum="4105;0;YYYYMMDD" sdval="39708">
      20080917
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13983964313"}'>
      13983964313
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="34">
      34
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵  胜"}'>
      赵  胜
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 33130}' sdnum="4105;0;YYYYMMDD" sdval="33130">
      19900914
     </td>
-    <td>
+    <td sdnum="4105;" sdval="33">
      33
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113199009148316"}'>
      500113199009148316
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 41038}' sdnum="4105;0;YYYYMMDD" sdval="41038">
      20120509
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 41403}' sdnum="4105;0;YYYYMMDD" sdval="41403">
      20130509
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15023023650"}'>
      15023023650
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="35">
      35
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "岑  亮"}'>
      岑  亮
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 30287}' sdnum="4105;0;YYYYMMDD" sdval="30287">
      19821202
     </td>
-    <td>
+    <td sdnum="4105;" sdval="41">
      41
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510219198212028337"}'>
      510219198212028337
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "@", "3": 1}' data-sheets-value='{ "1": 3, "3": 20230630}' sdnum="4105;0;@" sdval="20230630">
      20230630
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "预备党员"}' sdnum="4105;0;YYYYMMDD">
      预备党员
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td sdnum="4105;" sdval="15998948989">
      15998948989
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="35">
      35
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "黄  静"}'>
      黄  静
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "本科"}'>
      本科
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 34168}' sdnum="4105;0;YYYYMMDD" sdval="34168">
      19930718
     </td>
-    <td>
+    <td sdnum="4105;" sdval="30">
      30
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113199307188340"}'>
      500113199307188340
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 42881}' sdnum="4105;0;YYYYMMDD" sdval="42881">
      20170526
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 43246}' sdnum="4105;0;YYYYMMDD" sdval="43246">
      20180526
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18225059632"}'>
      18225059632
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="36">
      36
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "王先惠"}'>
      王先惠
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 23430}' sdnum="4105;0;YYYYMMDD" sdval="23430">
      19640223
     </td>
-    <td>
+    <td sdnum="4105;" sdval="59">
      59
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222196402238369"}'>
      510222196402238369
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37790}' sdnum="4105;0;YYYYMMDD" sdval="37790">
      20030618
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38156}' sdnum="4105;0;YYYYMMDD" sdval="38156">
      20040618
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13996097075"}'>
      13996097075
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="37">
      37
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "郭华东"}'>
      郭华东
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 16851}' sdnum="4105;0;YYYYMMDD" sdval="16851">
      19460218
     </td>
-    <td>
+    <td sdnum="4105;" sdval="77">
      77
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219460218831X"}'>
      51022219460218831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 35421}' sdnum="4105;0;YYYYMMDD" sdval="35421">
      19961222
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 35786}' sdnum="4105;0;YYYYMMDD" sdval="35786">
      19971222
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13310217070"}'>
      13310217070
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="38">
      38
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "罗永来"}'>
      罗永来
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 29867}' sdnum="4105;0;YYYYMMDD" sdval="29867">
      19811008
     </td>
-    <td>
+    <td sdnum="4105;" sdval="42">
      42
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510219198110088339"}'>
      510219198110088339
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40357}' sdnum="4105;0;YYYYMMDD" sdval="40357">
      20100628
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40722}' sdnum="4105;0;YYYYMMDD" sdval="40722">
      20110628
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td sdnum="4105;" sdval="13657695858">
      13657695858
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="39">
      39
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "戴云书"}'>
      戴云书
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 13900}' sdnum="4105;0;YYYYMMDD" sdval="13900">
      19380120
     </td>
-    <td>
+    <td sdnum="4105;" sdval="85">
      85
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222193801208315"}'>
      510222193801208315
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24019}' sdnum="4105;0;YYYYMMDD" sdval="24019">
      19651004
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24384}' sdnum="4105;0;YYYYMMDD" sdval="24384">
      19661004
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15923055589"}'>
      15923055589
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="40">
      40
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "杨代君"}'>
      杨代君
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中技"}'>
      中技
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 23641}' sdnum="4105;0;YYYYMMDD" sdval="23641">
      19640921
     </td>
-    <td>
+    <td sdnum="4105;" sdval="59">
      59
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222196409218328"}'>
      510222196409218328
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38197}' sdnum="4105;0;YYYYMMDD" sdval="38197">
      20040729
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 38562}' sdnum="4105;0;YYYYMMDD" sdval="38562">
      20050729
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13608348140"}'>
      13608348140
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="41">
      41
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "杨  娜"}'>
      杨  娜
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 30080}' sdnum="4105;0;YYYYMMDD" sdval="30080">
      19820509
     </td>
-    <td>
+    <td sdnum="4105;" sdval="41">
      41
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510219198205098361"}'>
      510219198205098361
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37425}' sdnum="4105;0;YYYYMMDD" sdval="37425">
      20020618
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37790}' sdnum="4105;0;YYYYMMDD" sdval="37790">
      20030618
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15025397033"}'>
      15025397033
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="42">
      42
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "罗  政"}'>
      罗  政
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中专"}'>
      中专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 34233}' sdnum="4105;0;YYYYMMDD" sdval="34233">
      19930921
     </td>
-    <td>
+    <td sdnum="4105;" sdval="30">
      30
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113199309219155"}'>
      500113199309219155
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 42267}' sdnum="4105;0;YYYYMMDD" sdval="42267">
      20150920
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 42633}' sdnum="4105;0;YYYYMMDD" sdval="42633">
      20160920
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "17318203332"}'>
      17318203332
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="43">
      43
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "刘光明"}'>
      刘光明
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 11279}' sdnum="4105;0;YYYYMMDD" sdval="11279">
      19301117
     </td>
-    <td>
+    <td sdnum="4105;" sdval="93">
      93
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222193011178318"}'>
      510222193011178318
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 22082}' sdnum="4105;0;YYYYMMDD" sdval="22082">
      19600615
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 22447}' sdnum="4105;0;YYYYMMDD" sdval="22447">
      19610615
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13452373363"}'>
      13452373363
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="44">
      44
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "邱维财"}'>
      邱维财
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18501}' sdnum="4105;0;YYYYMMDD" sdval="18501">
      19500826
     </td>
-    <td>
+    <td sdnum="4105;" sdval="73">
      73
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195008268311"}'>
      510222195008268311
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28133}' sdnum="4105;0;YYYYMMDD" sdval="28133">
      19770108
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28133}' sdnum="4105;0;YYYYMMDD" sdval="28133">
      19770108
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13193188279"}'>
      13193188279
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="45">
      45
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "邱家鹏"}'>
      邱家鹏
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 16014}' sdnum="4105;0;YYYYMMDD" sdval="16014">
      19431104
     </td>
-    <td>
+    <td sdnum="4105;" sdval="80">
      80
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194311048317"}'>
      510222194311048317
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 29574}' sdnum="4105;0;YYYYMMDD" sdval="29574">
      19801219
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 29939}' sdnum="4105;0;YYYYMMDD" sdval="29939">
      19811219
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "17843802756"}'>
      17843802756
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="46">
      46
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "邱  珂"}'>
      邱  珂
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 36799}' sdnum="4105;0;YYYYMMDD" sdval="36799">
      20000930
     </td>
-    <td>
+    <td sdnum="4105;" sdval="23">
      23
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "50011320000930832X"}'>
      50011320000930832X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 44526}' sdnum="4105;0;YYYYMMDD" sdval="44526">
      20211126
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 44891}' sdnum="4105;0;YYYYMMDD" sdval="44891">
      20221126
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td sdnum="4105;" sdval="15922676449">
      15922676449
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="47">
      47
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "邱维孝"}'>
      邱维孝
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18131}' sdnum="4105;0;YYYYMMDD" sdval="18131">
      19490821
     </td>
-    <td>
+    <td sdnum="4105;" sdval="74">
      74
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194908218331"}'>
      510222194908218331
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25476}' sdnum="4105;0;YYYYMMDD" sdval="25476">
      19690930
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25476}' sdnum="4105;0;YYYYMMDD" sdval="25476">
      19690930
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "17830225552"}'>
      17830225552
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="48">
      48
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵  中"}'>
      赵  中
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27294}' sdnum="4105;0;YYYYMMDD" sdval="27294">
      19740922
     </td>
-    <td>
+    <td sdnum="4105;" sdval="49">
      49
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219740922831X"}'>
      51022219740922831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 34921}' sdnum="4105;0;YYYYMMDD" sdval="34921">
      19950810
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 35287}' sdnum="4105;0;YYYYMMDD" sdval="35287">
      19960810
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18523943154"}'>
      18523943154
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="49">
      49
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "李华瑜"}'>
      李华瑜
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 15860}' sdnum="4105;0;YYYYMMDD" sdval="15860">
      19430603
     </td>
-    <td>
+    <td sdnum="4105;" sdval="80">
      80
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194306038317"}'>
      510222194306038317
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24044}' sdnum="4105;0;YYYYMMDD" sdval="24044">
      19651029
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25983}' sdnum="4105;0;YYYYMMDD" sdval="25983">
      19710219
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18725928308"}'>
      18725928308
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="50">
      50
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "王真志"}'>
      王真志
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 23791}' sdnum="4105;0;YYYYMMDD" sdval="23791">
      19650218
     </td>
-    <td>
+    <td sdnum="4105;" sdval="58">
      58
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022519650218546X"}'>
      51022519650218546X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37425}' sdnum="4105;0;YYYYMMDD" sdval="37425">
      20020618
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37790}' sdnum="4105;0;YYYYMMDD" sdval="37790">
      20030618
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13594213713"}'>
      13594213713
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="51">
      51
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "刘禹碧"}'>
      刘禹碧
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 10141}' sdnum="4105;0;YYYYMMDD" sdval="10141">
      19271006
     </td>
-    <td>
+    <td sdnum="4105;" sdval="96">
      96
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222192710068324"}'>
      510222192710068324
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24042}' sdnum="4105;0;YYYYMMDD" sdval="24042">
      19651027
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25983}' sdnum="4105;0;YYYYMMDD" sdval="25983">
      19710219
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15823426408"}'>
      15823426408
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="52">
      52
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "杨远海"}'>
      杨远海
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中技"}'>
      中技
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 24916}' sdnum="4105;0;YYYYMMDD" sdval="24916">
      19680319
     </td>
-    <td>
+    <td sdnum="4105;" sdval="55">
      55
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510219196803198339"}'>
      510219196803198339
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 33170}' sdnum="4105;0;YYYYMMDD" sdval="33170">
      19901024
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 33535}' sdnum="4105;0;YYYYMMDD" sdval="33535">
      19911024
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18623074087"}'>
      18623074087
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="53">
      53
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "杜福康"}'>
      杜福康
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 17492}' sdnum="4105;0;YYYYMMDD" sdval="17492">
      19471121
     </td>
-    <td>
+    <td sdnum="4105;" sdval="76">
      76
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194711218311"}'>
      510222194711218311
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25486}' sdnum="4105;0;YYYYMMDD" sdval="25486">
      19691010
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25486}' sdnum="4105;0;YYYYMMDD" sdval="25486">
      19691010
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td sdnum="4105;" sdval="18623662858">
      18623662858
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="54">
      54
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "杜福华"}'>
      杜福华
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 19137}' sdnum="4105;0;YYYYMMDD" sdval="19137">
      19520523
     </td>
-    <td>
+    <td sdnum="4105;" sdval="71">
      71
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195205238314"}'>
      510222195205238314
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26400}' sdnum="4105;0;YYYYMMDD" sdval="26400">
      19720411
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 26400}' sdnum="4105;0;YYYYMMDD" sdval="26400">
      19720411
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15823426408"}'>
      15823426408
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="55">
      55
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵  磊"}'>
      赵  磊
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中专"}'>
      中专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 32435}' sdnum="4105;0;YYYYMMDD" sdval="32435">
      19881019
     </td>
-    <td>
+    <td sdnum="4105;" sdval="35">
      35
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113198810198314"}'>
      500113198810198314
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39778}' sdnum="4105;0;YYYYMMDD" sdval="39778">
      20081126
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40143}' sdnum="4105;0;YYYYMMDD" sdval="40143">
      20091126
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15215100713"}'>
      15215100713
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="56">
      56
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "王国廉"}'>
      王国廉
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中技"}'>
      中技
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 13972}' sdnum="4105;0;YYYYMMDD" sdval="13972">
      19380402
     </td>
-    <td>
+    <td sdnum="4105;" sdval="85">
      85
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "51022219380402831X"}'>
      51022219380402831X
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 23958}' sdnum="4105;0;YYYYMMDD" sdval="23958">
      19650804
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25981}' sdnum="4105;0;YYYYMMDD" sdval="25981">
      19710217
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15320590010"}'>
      15320590010
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="57">
      57
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵  发"}'>
      赵  发
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 31776}' sdnum="4105;0;YYYYMMDD" sdval="31776">
      19861230
     </td>
-    <td>
+    <td sdnum="4105;" sdval="37">
      37
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113198612308332"}'>
      500113198612308332
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39460}' sdnum="4105;0;YYYYMMDD" sdval="39460">
      20080113
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40045}' sdnum="4105;0;YYYYMMDD" sdval="40045">
      20090820
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13708387510"}'>
      13708387510
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="58">
      58
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵品常"}'>
      赵品常
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中专"}'>
      中专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 20325}' sdnum="4105;0;YYYYMMDD" sdval="20325">
      19550824
     </td>
-    <td>
+    <td sdnum="4105;" sdval="68">
      68
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222195508248333"}'>
      510222195508248333
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28071}' sdnum="4105;0;YYYYMMDD" sdval="28071">
      19761107
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 28071}' sdnum="4105;0;YYYYMMDD" sdval="28071">
      19761107
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13308349317"}'>
      13308349317
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="59">
      59
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵  亮"}'>
      赵  亮
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 29910}' sdnum="4105;0;YYYYMMDD" sdval="29910">
      19811120
     </td>
-    <td>
+    <td sdnum="4105;" sdval="42">
      42
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510219198111208312"}'>
      510219198111208312
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 39662}' sdnum="4105;0;YYYYMMDD" sdval="39662">
      20080802
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 40027}' sdnum="4105;0;YYYYMMDD" sdval="40027">
      20090802
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13983903096"}'>
      13983903096
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="60">
      60
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵零寒"}'>
      赵零寒
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "大专"}'>
      大专
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27879}' sdnum="4105;0;YYYYMMDD" sdval="27879">
      19760429
     </td>
-    <td>
+    <td sdnum="4105;" sdval="47">
      47
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222197604298313"}'>
      510222197604298313
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 41265}' sdnum="4105;0;YYYYMMDD" sdval="41265">
      20121222
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 41630}' sdnum="4105;0;YYYYMMDD" sdval="41630">
      20131222
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "18602306169"}'>
      18602306169
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="61">
      61
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵  勇"}'>
      赵  勇
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中技"}'>
      中技
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 27376}' sdnum="4105;0;YYYYMMDD" sdval="27376">
      19741213
     </td>
-    <td>
+    <td sdnum="4105;" sdval="49">
      49
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222197412138331"}'>
      510222197412138331
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 35609}' sdnum="4105;0;YYYYMMDD" sdval="35609">
      19970628
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 35974}' sdnum="4105;0;YYYYMMDD" sdval="35974">
      19980628
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15922604160"}'>
      15922604160
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="62">
      62
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵品学"}'>
      赵品学
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 12120}' sdnum="4105;0;YYYYMMDD" sdval="12120">
      19330307
     </td>
-    <td>
+    <td sdnum="4105;" sdval="90">
      90
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222193303078415"}'>
      510222193303078415
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 22452}' sdnum="4105;0;YYYYMMDD" sdval="22452">
      19610620
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 22817}' sdnum="4105;0;YYYYMMDD" sdval="22817">
      19620620
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td sdnum="4105;" sdval="13389657747">
      13389657747
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="63">
      63
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵行勇"}'>
      赵行勇
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "初中"}'>
      初中
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 22721}' sdnum="4105;0;YYYYMMDD" sdval="22721">
      19620316
     </td>
-    <td>
+    <td sdnum="4105;" sdval="61">
      61
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222196203168310"}'>
      510222196203168310
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 35609}' sdnum="4105;0;YYYYMMDD" sdval="35609">
      19970628
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 35974}' sdnum="4105;0;YYYYMMDD" sdval="35974">
      19980628
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15923318369"}'>
      15923318369
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="64">
      64
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵品刚"}'>
      赵品刚
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "中技"}'>
      中技
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 18189}' sdnum="4105;0;YYYYMMDD" sdval="18189">
      19491018
     </td>
-    <td>
+    <td sdnum="4105;" sdval="74">
      74
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "510222194910188311"}'>
      510222194910188311
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25963}' sdnum="4105;0;YYYYMMDD" sdval="25963">
      19710130
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 25963}' sdnum="4105;0;YYYYMMDD" sdval="25963">
      19710130
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 一网格支部委员会"}'>
      一网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "13637806431"}'>
      13637806431
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="65">
      65
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "赵玉虎"}'>
      赵玉虎
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "男"}'>
      男
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "本科"}'>
      本科
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 36000}' sdnum="4105;0;YYYYMMDD" sdval="36000">
      19980724
     </td>
-    <td>
+    <td sdnum="4105;" sdval="25">
      25
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113199807248311"}'>
      500113199807248311
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 43813}' sdnum="4105;0;YYYYMMDD" sdval="43813">
      20191214
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 44179}' sdnum="4105;0;YYYYMMDD" sdval="44179">
      20201214
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "15703060492"}'>
      15703060492
     </td>
    </tr>
    <tr>
-    <td>
+    <td height="66" sdnum="4105;" sdval="66">
      66
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "杜青青"}'>
      杜青青
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "女"}'>
      女
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "汉族"}'>
      汉族
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "重庆巴南"}'>
      重庆巴南
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "本科"}'>
      本科
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 37127}' sdnum="4105;0;YYYYMMDD" sdval="37127">
      20010824
     </td>
-    <td>
+    <td sdnum="4105;" sdval="22">
      22
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": "500113200108248369"}'>
      500113200108248369
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 44343}' sdnum="4105;0;YYYYMMDD" sdval="44343">
      20210527
     </td>
-    <td>
+    <td data-sheets-numberformat='{ "1": 2, "2": "YYYYMMDD", "3": 1}' data-sheets-value='{ "1": 3, "3": 44708}' sdnum="4105;0;YYYYMMDD" sdval="44708">
      20220527
     </td>
-    <td>
+    <td data-sheets-value='{ "1": 2, "2": " 二网格支部委员会"}'>
      二网格支部委员会
     </td>
-    <td>
+    <td sdnum="4105;" sdval="18908382630">
      18908382630
     </td>
    </tr>
   </table>
+  <!-- ************************************************************************** -->
  </body>
 </html>
