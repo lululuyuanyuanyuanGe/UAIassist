@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import chardet
+from typing import Union
 
 def detect_and_process_file_paths(user_input: str) -> list:
     """检测用户输入中的文件路径并验证文件是否存在，返回结果为用户上传的文件路径组成的数列"""
@@ -313,3 +314,10 @@ def _read_text_auto(path: Path) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def read_txt_file(file_path: Union[Path, str]) -> str:
+    """Read the content of a txt file"""
+    try:
+        path = Path(file_path).expanduser().resolve()
+        return path.read_text(encoding="utf-8")
+    except Exception as e:
+        return f"Error reading file {file_path}: {e}"
