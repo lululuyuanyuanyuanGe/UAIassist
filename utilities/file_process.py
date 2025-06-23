@@ -236,8 +236,6 @@ def _clean_html_in_memory(raw_html_path: Path) -> str:
     ATTR_EXTRA = {
         "colgroup": {"span"},
         "a": {"href"},  # Keep links
-        "td": {"width", "height"},  # Keep table cell dimensions
-        "th": {"width", "height"},  # Keep table header dimensions
     }
 
     html = _read_text_auto(raw_html_path)
@@ -266,13 +264,9 @@ def _clean_html_in_memory(raw_html_path: Path) -> str:
         # Remove style attributes and other formatting attributes
         attrs_to_remove = []
         for attr_name in t.attrs.keys():
-            if attr_name not in allowed and not attr_name.startswith('data-'):
-                # Remove style-related attributes but keep data attributes for potential use
-                if attr_name.lower() in ['style', 'class', 'id', 'onclick', 'onload', 
-                                       'onmouseover', 'onmouseout', 'bgcolor', 'color',
-                                       'font-size', 'font-family', 'text-align', 'valign',
-                                       'align', 'border', 'cellpadding', 'cellspacing']:
-                    attrs_to_remove.append(attr_name)
+            if attr_name not in allowed:
+                # Remove ALL styling and metadata attributes
+                attrs_to_remove.append(attr_name)
         
         for attr in attrs_to_remove:
             del t.attrs[attr]
@@ -292,7 +286,8 @@ def _clean_html_in_memory(raw_html_path: Path) -> str:
             if element.name or (hasattr(element, 'strip') and element.strip()):
                 shell.body.append(element)
 
-    return shell.prettify()
+    # Return HTML with preserved formatting (keep newlines for bs4 processing)
+    return str(shell)
 
 
 # ──────────────────────── private helpers ─────────────────────── #
