@@ -221,7 +221,6 @@ class ProcessUserInputAgent:
         supplement, or irrelevant. If all files are irrelevant, it will flag for text analysis instead."""
         
         import json
-        import os
         from pathlib import Path
         
         # Initialize classification results
@@ -666,7 +665,7 @@ class ProcessUserInputAgent:
         It validates if the user input contains meaningful table/Excel-related content.
         Returns [Valid] or [Invalid] based on the analysis."""
         
-        user_input = state.get("user_input", "")
+        user_input = state["user_input"]
         
         if not user_input or user_input.strip() == "":
             return {
@@ -850,5 +849,5 @@ class ProcessUserInputAgent:
 if __name__ == "__main__":
     agent = ProcessUserInputAgent()
     # save_graph_visualization(agent.graph, "process_user_input_graph.png")
-    agent.run_process_user_input_agent("羊村有100个人")
+    agent.run_process_user_input_agent("")
 

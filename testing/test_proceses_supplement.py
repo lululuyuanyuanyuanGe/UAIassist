@@ -90,6 +90,7 @@ def _process_supplement(file_path: list[str], model: ChatOpenAI):
                 }
                 
                 print(f"✅ 文档文件已分析: {source_path.name}")
+                print(f"分析结果: {analysis_response.content}")
                 
             except Exception as e:
                 print(f"❌ 处理文档文件出错 {document_file}: {e}")

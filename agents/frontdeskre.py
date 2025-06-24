@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 # Add root project directory to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent))=
 
 
 
@@ -86,7 +86,12 @@ class FrontdeskAgent:
         print("你好，我是一个表格处理助手！")
         # Here we will add a human in the loop to get user's response
 
-
+    def _collect_user_input(self, state: FrontdeskState) -> FrontdeskState:
+        """This node will use the ProcessUserInputAgent to collect user's input"""
+        process_user_input_agent = ProcessUserInputAgent()
+        
+        process_user_input_agent.run_process_user_input_agent(state["messages"][-1].content)
+        return {"messages": process_user_input_agent.state["messages"]}
 
     def _check_template(self, state: FrontdeskState) -> FrontdeskState:
         """This node will check if the user has provided a template"""
