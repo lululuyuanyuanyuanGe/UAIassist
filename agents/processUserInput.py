@@ -128,11 +128,11 @@ class ProcessUserInputAgent:
 
 
 
-    def create_initial_state(self, user_input: str, session_id: str = "1") -> ProcessUserInputState:
+    def create_initial_state(self, session_id: str = "1", previous_AI_messages: list[BaseMessage] = None) -> ProcessUserInputState:
         """This function initializes the state of the process user input agent"""
         return {
             "process_user_input_messages": [HumanMessage(content=user_input)],
-            "user_input": user_input,
+            "user_input": "",
             "upload_files_path": [],
             "new_upload_files_path": [],
             "new_upload_files_processed_path": [],
@@ -141,7 +141,7 @@ class ProcessUserInputAgent:
             "irrelevant_files_path": [],
             "all_files_irrelevant": False,
             "text_input_validation": None,
-            "previous_AI_messages": [AIMessage(content="请提供更多关于羊村人口普查的信息")],
+            "previous_AI_messages": previous_AI_messages,
             "session_id": session_id,
         }
 
@@ -800,9 +800,9 @@ class ProcessUserInputAgent:
             return {"process_user_input_messages": [fallback_response]}
     
 
-    def run_process_user_input_agent(self, user_input: str, session_id: str = "1") -> None:
+    def run_process_user_input_agent(self, user_input: str, session_id: str = "1", previous_AI_messages: list[BaseMessage] = None) -> None:
         """This function runs the process user input agent"""
-        initial_state = self.create_initial_state(user_input, session_id)
+        initial_state = self.create_initial_state(user_input, session_id, previous_AI_messages)
         config = {"configurable": {"thread_id": session_id}}
         current_state = initial_state
         
