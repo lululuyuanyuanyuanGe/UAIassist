@@ -46,7 +46,8 @@ class ProcessUserInputState(TypedDict):
     all_files_irrelevant: bool  # Flag to indicate all files are irrelevant
     text_input_validation: str  # Store validation result [Valid] or [Invalid]
     previous_AI_messages: list[BaseMessage]
-    session_id: str
+    summary_message: str  # Add the missing field
+
     
 class ProcessUserInputAgent:
 
@@ -128,7 +129,7 @@ class ProcessUserInputAgent:
 
 
 
-    def create_initial_state(self, session_id: str = "1", previous_AI_messages: list[BaseMessage] = None) -> ProcessUserInputState:
+    def create_initial_state(self, previous_AI_messages: list[BaseMessage] = None) -> ProcessUserInputState:
         """This function initializes the state of the process user input agent"""
         return {
             "process_user_input_messages": [],
@@ -142,7 +143,7 @@ class ProcessUserInputAgent:
             "all_files_irrelevant": False,
             "text_input_validation": None,
             "previous_AI_messages": previous_AI_messages,
-            "session_id": session_id,
+            "summary_message": "",
         }
 
 
@@ -243,7 +244,7 @@ class ProcessUserInputAgent:
                 # Read file content for analysis
                 file_content = source_path.read_text(encoding='utf-8')
                 # Truncate content for analysis (to avoid token limits)
-                analysis_content = file_content[:2000] if len(file_content) > 2000 else file_content
+                analysis_content = file_content[:1000] if len(file_content) > 2000 else file_content
                 
                 # Create individual analysis prompt for this file
                 system_prompt = f"""你是一个表格生成智能体，需要分析用户上传的文件内容并进行分类。共有四种类型：
@@ -269,13 +270,8 @@ class ProcessUserInputAgent:
                 }}"""
                 
                 # Get LLM analysis for this file
-                analysis_response = self.llm_c_with_tools.invoke([SystemMessage(content=system_prompt)])
-                
-                # Handle tool calls if LLM needs clarification
-                if hasattr(analysis_response, 'tool_calls') and analysis_response.tool_calls:
-                    print(f"⚠️ LLM对文件 {source_path.name} 需要使用工具，跳过此文件")
-                    classification_results["irrelevant"].append(file_path)
-                    continue
+                print("Debug: Calling LLM for file analysis")
+                analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                 
                 # Parse JSON response for this file
                 try:
@@ -376,7 +372,7 @@ class ProcessUserInputAgent:
                 
     def _route_after_analyze_uploaded_files(self, state: ProcessUserInputState):
         """Route after analyzing uploaded files. Uses Send objects for all routing."""
-        
+        print("Debug: route_after_analyze_uploaded_files")
         # Check if LLM request a tool call
         latest_message = state["process_user_input_messages"][-1]
         if hasattr(latest_message, 'tool_calls') and latest_message.tool_calls:
@@ -394,10 +390,13 @@ class ProcessUserInputAgent:
         # Some files are relevant - process them in parallel, then continue to text analysis
         sends = []
         if state.get("uploaded_template_files_path"):
+            print("Debug: process_template")
             sends.append(Send("process_template", state))
         if state.get("supplement_files_path", {}).get("表格") or state.get("supplement_files_path", {}).get("文档"):
+            print("Debug: process_supplement")
             sends.append(Send("process_supplement", state))
         if state.get("irrelevant_files_path"):
+            print("Debug: process_irrelevant")
             sends.append(Send("process_irrelevant", state))
 
         
@@ -457,6 +456,7 @@ class ProcessUserInputAgent:
             try:
                 source_path = Path(document_file)
                 file_content = source_path.read_text(encoding='utf-8')
+                file_content = file_content[:1000] if len(file_content) > 2000 else file_content
                 
                 system_prompt = f"""你是一个文档分析专家，现在这个文档已经被转换成了txt格式，你的任务是仔细阅读这个文档，分析文档的内容，并总结文档的内容。文档可能包含重要的信息，例如法律条文、政策规定等，你不能遗漏这些信息。
 
@@ -645,18 +645,6 @@ class ProcessUserInputAgent:
                 "uploaded_template_files_path": template_files,
                 "process_user_input_messages": [SystemMessage(content=f"模板分析出错: {e}\n默认为[Simple]")]
             }
-
-
-
-    def _route_after_process_template(self, state: ProcessUserInputState) -> str:
-        """It has two different routes, if it is [Complex] template we will go to complex template handle node, which for now is a placeholder.
-        if it is [Simple] template we simply go to the template_provided node to keep the analysis"""
-
-        latest_message = state["process_user_input_messages"][-1]
-        if "[Complex]" in latest_message.content:
-            return "complex_template_handle"
-        else:
-            return "template_provided"
         
 
 
@@ -759,50 +747,111 @@ class ProcessUserInputAgent:
 
     
     def _summary_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
-        """Basically this nodes act as a summry nodes, that summarize what the new information has been provided by the user in this round of human in the lopp also it needs to 
-        decide which node to route to next
-        """
-        process_user_input_messages_conent = [item.content for item in state["process_user_input_messages"]]
-        system_prompt = f"""你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
-        规则如下，如何出现了复杂模板，返回"complex_template"，如果出现了简单模板，返回"simple_template"，其余情况请返回"previous_node" 
-        你的回复需要包含对这一轮的总结，和节点路由信息，由json来表示
-
-        历史对话:{process_user_input_messages_conent}
-        {{
-            "summary": "总结用户在这一轮都提供了哪些信息",
-            "next_node": "节点路由信息"
-        }}
+        """Summary node that consolidates all information from this round and determines next routing."""
         
-        """
+        print(f"🔄 开始总结用户输入，当前消息数: {len(state.get('process_user_input_messages', []))}")
+        
+        # Extract content from all messages in this processing round
+        process_user_input_messages_content = [item.content for item in state["process_user_input_messages"]]
+        
+        system_prompt = f"""你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
+
+规则如下：
+- 如果出现了复杂模板（包含行标题和列标题的交叉表格），返回"complex_template"
+- 如果出现了简单模板（只有列标题的普通表格），返回"simple_template" 
+- 其余情况请返回"previous_node"
+
+你的回复需要包含对这一轮的总结，和节点路由信息，严格按照JSON格式：
+
+历史对话: {process_user_input_messages_content}
+
+请返回：
+{{
+    "summary": "总结用户在这一轮都提供了哪些信息",
+    "next_node": "complex_template/simple_template/previous_node"
+}}"""
         
         try:
-            # Try the LLM call with detailed error handling
-            
+            # Use the non-tool-bound LLM for summary to avoid tool call issues
             messages = [SystemMessage(content=system_prompt)]
             print(f"🔄 正在调用LLM进行总结，消息数量: {len(messages)}")
             
-            response = self.llm_c.invoke(messages)
-            print(f"✅ LLM调用成功")
+            # Use llm_s (simpler model without tools) for summary to avoid complications
+            # Add timeout handling by using invoke with shorter timeout
+            response = self.llm_s.invoke(messages)
+            print(f"✅ LLM调用成功，生成总结")
             
-            return {"process_user_input_messages": [response]}
+            # Parse the JSON response to ensure it's valid
+            try:
+                response_content = response.content.strip()
+                # Remove markdown code blocks if present
+                if response_content.startswith('```'):
+                    lines = response_content.split('\n')
+                    response_content = '\n'.join(lines[1:-1])
+                
+                # Try to parse as JSON to validate format
+                import json
+                parsed_response = json.loads(response_content)
+                
+                # Ensure required fields exist
+                if "summary" not in parsed_response or "next_node" not in parsed_response:
+                    raise ValueError("Missing required fields in response")
+                
+                # Create summary message with JSON string content (not dict!)
+                summary_message = AIMessage(content=response_content)  # Use JSON string, not dict
+                summary_message.name = "summary_message"
+                
+                print(f"✅ 解析成功 - 总结: {parsed_response.get('summary', '')[:100]}...")
+                print(f"✅ 路由决定: {parsed_response.get('next_node', 'unknown')}")
+                
+                return {
+                    "process_user_input_messages": [summary_message],
+                    "summary_message": response_content  # Store the raw JSON string
+                }
+                
+            except (json.JSONDecodeError, ValueError) as parse_error:
+                print(f"⚠️ JSON解析失败: {parse_error}")
+                print(f"⚠️ 原始响应: {response.content}")
+                
+                # Create fallback structured response
+                fallback_data = {
+                    "summary": f"用户输入处理完成。原始响应: {response.content[:200]}...",
+                    "next_node": "previous_node"
+                }
+                
+                fallback_json = json.dumps(fallback_data, ensure_ascii=False)
+                summary_message = AIMessage(content=fallback_json)  # Use JSON string, not dict
+                summary_message.name = "summary_message"
+                
+                return {
+                    "process_user_input_messages": [summary_message],
+                    "summary_message": fallback_json
+                }
             
         except Exception as e:
             print(f"❌ LLM调用失败: {type(e).__name__}: {e}")
+            import traceback
+            print(f"❌ 详细错误信息: {traceback.format_exc()}")
             
             # Fallback response when LLM fails
-            fallback_response = AIMessage(content="""
-            {
+            fallback_data = {
                 "summary": "由于网络连接问题，无法完成智能分析。用户本轮提供了输入信息。",
                 "next_node": "previous_node"
             }
-            """)
             
-            return {"process_user_input_messages": [fallback_response]}
+            fallback_json = json.dumps(fallback_data, ensure_ascii=False)
+            fallback_response = AIMessage(content=fallback_json)  # Use JSON string, not dict
+            fallback_response.name = "summary_message"
+            
+            return {
+                "process_user_input_messages": [fallback_response],
+                "summary_message": fallback_json
+            }
     
 
     def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: list[BaseMessage] = None) -> None:
         """This function runs the process user input agent"""
-        initial_state = self.create_initial_state(session_id, previous_AI_messages)
+        initial_state = self.create_initial_state( previous_AI_messages)
         config = {"configurable": {"thread_id": session_id}}
         current_state = initial_state
         

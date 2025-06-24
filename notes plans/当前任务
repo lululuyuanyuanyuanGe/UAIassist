@@ -17,3 +17,5 @@
 
 12.将excel表格提取出表头后再交给模型进行分析，以节省context长度
 13.采用assistant api调用4o来实现文件互传
+
+14.将文件喂给LLM前提取表头以节省token
