@@ -387,7 +387,7 @@ class ProcessUserInputAgent:
             sends.append(Send("analyze_text_input", state))
             return sends
         
-        # Some files are relevant - process them in parallel, then continue to text analysis
+        # Some files are relevant - process them in parallel
         sends = []
         if state.get("uploaded_template_files_path"):
             print("Debug: process_template")
@@ -399,7 +399,7 @@ class ProcessUserInputAgent:
             print("Debug: process_irrelevant")
             sends.append(Send("process_irrelevant", state))
 
-        
+        # The parallel nodes will automatically converge, then continue to analyze_text_input
         return sends if sends else [Send("analyze_text_input", state)]  # Fallback
     
     def _process_supplement(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -436,7 +436,32 @@ class ProcessUserInputAgent:
                     "关键字段": ["重要字段1", "重要字段2"]
                 }}"""
                                 
-                analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
+                # Add timeout to LLM call to prevent hanging
+                try:
+                    import signal
+                    
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError("LLM call timed out")
+                    
+                    # Set timeout for LLM call (30 seconds)
+                    signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(30)
+                    
+                    analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
+                    
+                    # Clear timeout
+                    signal.alarm(0)
+                    
+                except TimeoutError:
+                    print(f"⏰ LLM调用超时，使用备用分析: {source_path.name}")
+                    analysis_response = type('Response', (), {
+                        'content': f"表格文件分析超时，文件名: {source_path.name}，大小: {source_path.stat().st_size} bytes"
+                    })()
+                except Exception as e:
+                    print(f"❌ LLM调用出错: {e}")
+                    analysis_response = type('Response', (), {
+                        'content': f"表格文件分析失败: {str(e)}"
+                    })()
                 
                 # Store in data.json
                 data["表格"][source_path.name] = {
@@ -472,7 +497,32 @@ class ProcessUserInputAgent:
                     "应用场景": "这些信息在表格填写中的用途"
                 }}"""
                                 
-                analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
+                # Add timeout to LLM call to prevent hanging  
+                try:
+                    import signal
+                    
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError("LLM call timed out")
+                    
+                    # Set timeout for LLM call (30 seconds)
+                    signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(30)
+                    
+                    analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
+                    
+                    # Clear timeout
+                    signal.alarm(0)
+                    
+                except TimeoutError:
+                    print(f"⏰ LLM调用超时，使用备用分析: {source_path.name}")
+                    analysis_response = type('Response', (), {
+                        'content': f"文档文件分析超时，文件名: {source_path.name}，大小: {source_path.stat().st_size} bytes"
+                    })()
+                except Exception as e:
+                    print(f"❌ LLM调用出错: {e}")
+                    analysis_response = type('Response', (), {
+                        'content': f"文档文件分析失败: {str(e)}"
+                    })()
 
                 # Update state with analysis response
                 state["process_user_input_messages"].append(analysis_response)
@@ -613,7 +663,32 @@ class ProcessUserInputAgent:
             [Complex] - 如果是复杂模板（包含行表头和列表头）
             [Simple] - 如果是简单模板（只包含列表头）"""
             
-            analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
+            # Add timeout to LLM call to prevent hanging
+            try:
+                import signal
+                
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("LLM call timed out")
+                
+                # Set timeout for LLM call (30 seconds)
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(30)
+                
+                analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
+                
+                # Clear timeout
+                signal.alarm(0)
+                
+            except TimeoutError:
+                print(f"⏰ 模板分析LLM调用超时，使用默认分析")
+                analysis_response = type('Response', (), {
+                    'content': "模板分析超时，默认为[Simple]"
+                })()
+            except Exception as e:
+                print(f"❌ 模板分析LLM调用出错: {e}")
+                analysis_response = type('Response', (), {
+                    'content': f"模板分析失败: {str(e)}，默认为[Simple]"
+                })()
             
             # Parse response
             response_content = analysis_response.content.strip()
