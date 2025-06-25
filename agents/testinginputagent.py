@@ -74,7 +74,7 @@ class ProcessUserInputAgent:
         self.llm_s = model_creation(model_name="gpt-3.5-turbo", temperature=2) # simple logic use 3-5turbo
         self.llm_s_with_tools = self.llm_s.bind_tools(self.tools)
         self.memory = MemorySaver()
-        self.graph = self._build_graph().compile()
+        self.graph = self._build_graph().compile(checkpointer=self.memory)
 
 
     def _build_graph(self) -> StateGraph:
@@ -697,7 +697,7 @@ class ProcessUserInputAgent:
         if not user_input or user_input.strip() == "":
             return {
                 "text_input_validation": "[Invalid]",
-                "process_user_input_messages": [SystemMessage(content="❌ 用户输入为空，验证失败")]
+                "process_user_input_messages": [SystemMessage(content="用户输入为空，验证失败")]
             }
         
         # Create validation prompt for text input safety check
@@ -726,29 +726,33 @@ class ProcessUserInputAgent:
         
         try:
             # Get LLM validation
-            validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
+            print("用户输入:", user_input)
+            print(system_prompt)
+            # validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
+            validation_response = AIMessage(content="This is a test response")
+            print(f"验证结果: {validation_response}")
             
             # Parse response
             response_content = validation_response.content.strip()
             
             if "[Valid]" in response_content:
                 validation_result = "[Valid]"
-                status_message = "✅ 用户输入验证通过 - 内容与表格相关且有意义"
+                status_message = "用户输入验证通过 - 内容与表格相关且有意义"
             elif "[Invalid]" in response_content:
                 validation_result = "[Invalid]"
-                status_message = "❌ 用户输入验证失败 - 内容与表格无关或无意义"
+                status_message = "用户输入验证失败 - 内容与表格无关或无意义"
             else:
                 # Default to Invalid for safety
                 validation_result = "[Invalid]"
-                status_message = "❌ 用户输入验证失败 - 无法确定输入有效性，默认为无效"
+                status_message = "用户输入验证失败 - 无法确定输入有效性，默认为无效"
                 print(f"⚠️ 无法解析验证结果，LLM响应: {response_content}")
             
             # Create validation summary
-            summary_message = f"""🔍 文本输入安全检查完成:
+            summary_message = f"""文本输入安全检查完成:
             
-            📄 **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
-            ✅ **验证结果**: {validation_result}
-            📝 **状态**: {status_message}"""
+            **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
+            **验证结果**: {validation_result}
+            **状态**: {status_message}"""
             
             return {
                 "text_input_validation": validation_result,
@@ -759,10 +763,10 @@ class ProcessUserInputAgent:
             print(f"❌ 验证文本输入时出错: {e}")
             
             # Default to Invalid for safety when there's an error
-            error_message = f"""❌ 文本输入验证出错: {e}
+            error_message = f"""文本输入验证出错: {e}
             
-            📄 **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
-            🔒 **安全措施**: 默认标记为无效输入"""
+            **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
+            **安全措施**: 默认标记为无效输入"""
             
             return {
                 "text_input_validation": "[Invalid]",
@@ -792,6 +796,7 @@ class ProcessUserInputAgent:
         
         # Extract content from all messages in this processing round
         process_user_input_messages_content =("\n").join([item.content for item in state["process_user_input_messages"]])
+        print(f"历史对话: {process_user_input_messages_content}")
         
         # Simplify the prompt to avoid corruption
         system_prompt = f"""你是一个总结助手。请总结用户输入并决定下一步。
@@ -808,8 +813,9 @@ class ProcessUserInputAgent:
             "summary": "用户本轮提供的信息总结",
             "next_node": "路由决策"
         }}"""
-        
-        response = self.llm_c.invoke([SystemMessage(content = system_prompt)])
+
+        # response = self.llm_c.invoke([SystemMessage(content = system_prompt), HumanMessage(content = "请开始你的总结")])
+        response = self.llm_c.invoke([SystemMessage(content = "用户输入： “表格为复杂表头，里面有100行，验证结果为[valid]”")])
         print(response)
     
 
@@ -821,37 +827,18 @@ class ProcessUserInputAgent:
         
         while True:
             try:
-                has_interrupt = False
-                for chunk in self.graph.stream(current_state, config = config, stream_mode = "updates"):
-                    for node_name, node_output in chunk.items():
-                        print(f"\n📍 Node: {node_name}")
-                        print("-" * 30)
 
-                        # check if there is an interrupt
-                        if "__interrupt__" in chunk:
-                            has_interrupt = True
-                            interrupt_value = chunk['__interrupt__'][0].value
-                            print(f"\n💬 智能体: {interrupt_value}")
-                            user_response = input("👤 请输入您的回复: ")
+                output = self.graph.invoke(current_state, config = config)
 
-                            # set the next input
-                            current_state = Command(resume=user_response)
-                            break
+                if "__interrupt__" in output:
+                    has_interrupt = True
+                    interrupt_value = output['__interrupt__'][0].value
+                    print(f"\n💬 智能体: {interrupt_value}")
+                    user_response = input("👤 请输入您的回复: ")
 
-                        if isinstance(node_output, dict):
-                            if "messages" in node_output and node_output["messages"]:
-                                latest_message = node_output["messages"][-1]
-                                if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
-                                    print(f"💬 智能体回复: {latest_message.content}")
-
-                            for key, value in node_output.items():
-                                if key != "messages" and value:
-                                    print(f"📊 {key}: {value}")
-                        print("-" * 30)
-                
-                if not has_interrupt:
-                    break
-
+                    # set the next input
+                    current_state = Command(resume=user_response)
+                    continue
             
             except Exception as e:
                 print(f"❌ 处理用户输入时出错: {e}")

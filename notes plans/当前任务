@@ -19,3 +19,6 @@
 13.采用assistant api调用4o来实现文件互传
 
 14.将文件喂给LLM前提取表头以节省token
+
+15.summary节点json处理
+16.summary的时候文件大小

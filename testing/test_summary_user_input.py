@@ -56,6 +56,7 @@ def test_summary_user_input():
         
         # Extract content from messages
         process_user_input_messages_content = [item.content for item in process_user_input_messages]
+        process_user_input_messages_content = "\n".join(f"{item.type#}: {item.content}" for item in process_user_input_messages)
         
         system_prompt = f"""你的任务是负责总结用户在这一轮都提供了哪些信息，你需要根据整个对话记录，总结用户都提供了哪些信息，并且根据这些信息，决定下一步的流程
 
