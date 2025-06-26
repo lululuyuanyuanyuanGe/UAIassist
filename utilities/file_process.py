@@ -316,3 +316,40 @@ def read_txt_file(file_path: Union[Path, str]) -> str:
         return path.read_text(encoding="utf-8")
     except Exception as e:
         return f"Error reading file {file_path}: {e}"
+
+
+def read_processed_files_content(file_paths: list[str], separator: str = "\n\n--- File Separator ---\n\n") -> str:
+    """
+    Read the content of files returned by retrieve_file_content function and return as a combined string.
+    
+    Args:
+        file_paths: List of file paths returned by retrieve_file_content
+        separator: String to separate content from different files (optional)
+    
+    Returns:
+        str: Combined content of all files as a single string
+    """
+    if not file_paths:
+        return ""
+    
+    combined_content = []
+    
+    for file_path in file_paths:
+        try:
+            path = Path(file_path)
+            if path.exists():
+                content = _read_text_auto(path)
+                # Add file header for clarity
+                file_header = f"=== Content from: {path.name} ==="
+                combined_content.append(f"{file_header}\n{content}")
+                print(f"✅ Read content from: {path.name}")
+            else:
+                error_msg = f"File not found: {file_path}"
+                combined_content.append(f"❌ {error_msg}")
+                print(f"⚠️ {error_msg}")
+        except Exception as e:
+            error_msg = f"Error reading {file_path}: {e}"
+            combined_content.append(f"❌ {error_msg}")
+            print(f"❌ {error_msg}")
+    
+    return separator.join(combined_content)

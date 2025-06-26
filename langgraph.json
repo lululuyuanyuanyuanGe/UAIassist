@@ -1,10 +1,11 @@
 {
     "dockerfile_lines": [],
     "graphs": {
-        "process_user_input_Agent": "./agents/processUserInput.py:graph"
+        "process_user_input_Agent": "./agents/processUserInput.py:graph",
+        "test_prompt_graph": "./test_modesl/test_prompt.py:graph"
     },
     "python_version": "3.13",
-    "env": "。env",
+    "env": "./test_modesl/.env",
     "dependencies": [
         "."
     ]
