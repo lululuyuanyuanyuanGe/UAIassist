@@ -353,3 +353,44 @@ def read_processed_files_content(file_paths: list[str], separator: str = "\n\n--
             print(f"❌ {error_msg}")
     
     return separator.join(combined_content)
+
+
+def extract_filename(file_path: str) -> str:
+    """
+    Extract filename from a file path or URL.
+    
+    Handles various path formats:
+    - Windows: d:\folder\file.txt
+    - Linux/Mac: /folder/file.txt  
+    - HTTP URLs: https://example.com/folder/file.txt
+    
+    Args:
+        file_path: File path or URL string
+        
+    Returns:
+        str: The filename with extension
+        
+    Examples:
+        >>> extract_filename(r"d:\asianInfo\ExcelAssist\燕云村case\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc")
+        '[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc'
+        >>> extract_filename("/home/user/document.pdf")
+        'document.pdf'
+        >>> extract_filename("https://example.com/files/image.jpg")
+        'image.jpg'
+    """
+    if not file_path:
+        return ""
+    
+    # Replace backslashes with forward slashes for consistency
+    normalized_path = file_path.replace('\\', '/')
+    
+    # Split by forward slash and take the last part
+    filename = normalized_path.split('/')[-1]
+    
+    # Handle edge cases where path ends with slash
+    if not filename:
+        # If the path ends with a slash, try the second-to-last part
+        parts = [part for part in normalized_path.split('/') if part]
+        filename = parts[-1] if parts else file_path
+    
+    return filename

@@ -1,12 +1,13 @@
 import sys
 from pathlib import Path
+import json
 
 # Add root project directory to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 
-from typing import Dict, List, Optional, Any, TypedDict, Annotated
+from typing import Dict, List, Optional, Any, TypedDict, Annotated, Union
 from datetime import datetime
 
 from utilities.modelRelated import invoke_model, invoke_model_with_tools
@@ -24,8 +25,8 @@ from langgraph.graph.message import add_messages
 # from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import Command, Interrupt, interrupt
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
+from langgraph.types import Command
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
 # import other agents
@@ -33,66 +34,71 @@ from agents.processUserInput import ProcessUserInputAgent
 
 load_dotenv()
 
+def append_strings(left: list[str], right: Union[list[str], str]) -> list[str]:
+    """Custom reducer to append strings to a list"""
+    if isinstance(right, list):
+        return left + right
+    else:
+        return left + [right]
+    
 
 @tool
-def _collect_user_input(session_id: str, previous_AI_messages: BaseMessage) -> str:
-    """这是一个用来收集用户输入的工具，你需要调用这个工具来收集用户输入，
+def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage, List[Dict[str, Any]]]) -> Command:
+    """这是一个用来收集用户输入的工具，你需要调用这个工具来收集用户输入
     参数：
-        state: 当前FrontdeskAgengt的状态，包含当前的messages，session_id，previous_node
+        session_id: 当前会话ID
+        previous_AI_messages: 之前的AI消息
     返回：
-        FrontdeskState: 包含当前的messages，session_id，previous_node, 以及process_user_input_agent的返回结果等
+        Command: 包含状态更新的命令对象
     """
 
     print(f"🔄 开始收集用户输入，当前会话ID: {session_id}")
     
     # Create an instance of the ProcessUserInputAgent
     process_user_input_agent = ProcessUserInputAgent()
+    print("testtest111111")
     
-    final_chunk = process_user_input_agent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = previous_AI_messages)
+    # Handle both BaseMessage (manual calls) and List[Dict] (LLM calls)
+    if isinstance(previous_AI_messages, list):
+        # LLM tool call - convert dictionaries to BaseMessage
+        converted_messages = []
+        for msg_dict in previous_AI_messages:
+            if isinstance(msg_dict, dict):
+                if msg_dict.get('type') == 'ai':
+                    converted_messages.append(AIMessage(content=msg_dict.get('content', '')))
+                else:
+                    converted_messages.append(HumanMessage(content=msg_dict.get('content', '')))
+        last_message = converted_messages[-1] if converted_messages else AIMessage(content="")
+    else:
+        # Manual call - use BaseMessage directly (your intentional design)
+        last_message = previous_AI_messages
+    
+    summary_message = process_user_input_agent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = last_message)
+    summary_message_dict = json.loads(summary_message)
+    print("testtest")
     
     # Extract the final result
     try:
-        print(f"🔄 提取最终结果，final_chunk类型: {type(final_chunk)}")
+        print(f"🔄 提取最终结果，summary_message类型: {type(summary_message)}")
         
-        if final_chunk and "summary_user_input" in final_chunk:
-            summary_data = final_chunk["summary_user_input"]
+        if summary_message_dict and "summary" in summary_message_dict:
+            summary_data = summary_message_dict["summary"]
             
-            # Handle both cases: summary_message field or direct content
-            if "summary_message" in summary_data:
-                print("summary_message in summary_data")
-                summary_content = summary_data["summary_message"]
-            elif "process_user_input_messages" in summary_data and summary_data["process_user_input_messages"]:
-                # Extract from the last message
-                last_msg = summary_data["process_user_input_messages"][-1]
-                if hasattr(last_msg, 'content'):
-                    summary_content = last_msg.content
-                else:
-                    summary_content = str(last_msg)
-            else:
-                summary_content = str(summary_data)
             
-            print(f"✅ 成功提取总结信息: {str(summary_content)[:100]}...")
+            print(f"✅ 成功提取总结信息: {str(summary_data)[:100]}...")
             
-            # Create the message with the summary content  
-            # Content should always be a JSON string now
-            if isinstance(summary_content, str):
-                # Content is already a JSON string, use it directly
-                result_message = AIMessage(content=summary_content)
-            else:
-                # Convert to JSON string if it's not already
-                import json
-                result_message = AIMessage(content=json.dumps(summary_content, ensure_ascii=False))
-                
-            result_message.name = "summary_message"
-            
+
             return Command(
                 update = {
-                    "messages": [result_message],
-                    "chat_history": summary_content,
+                    "messages": [
+                        ToolMessage(content=summary_message, 
+                                    tool_call_id = tool_call_id)
+                    ],
+                    "chat_history": [summary_data]
                 }   
             )
         else:
-            print(f"⚠️ 未找到总结信息，final_chunk: {final_chunk}")
+            print(f"⚠️ 未找到总结信息，summary_message: {summary_message}")
             return Command(
                 update = {
                     "messages": [AIMessage(content="未能获取有效的处理结果")],
@@ -111,7 +117,7 @@ def _collect_user_input(session_id: str, previous_AI_messages: BaseMessage) -> s
     
 
 class FrontdeskState(TypedDict):
-    chat_history: Annotated[list[str], add_messages]
+    chat_history: Annotated[list[str], append_strings]
     messages: Annotated[list[BaseMessage], add_messages]
     table_structure: str
     previous_node: str # Track the previous node
@@ -199,38 +205,18 @@ class FrontdeskAgent:
 
     def _route_after_collect_user_input(self, state: FrontdeskState) -> str:
         """This node will route the agent to the next node based on the summary message from the ProcessUserInputAgent"""
-
-        try:
-            # Check if the last message has the expected structure
-            last_message = state["messages"][-1]
-            if hasattr(last_message, 'content') and isinstance(last_message.content, str):
-                # Content is a JSON string - parse it
-                import json
-                try:
-                    content_dict = json.loads(last_message.content)
-                    next_node = content_dict.get("next_node", "previous_node")
-                    print(f"✅ 成功解析JSON: {content_dict}")
-                except json.JSONDecodeError:
-                    print(f"⚠️ 无法解析JSON内容: {last_message.content}")
-                    next_node = "previous_node"
-            else:
-                print(f"⚠️ 消息格式不正确，期望字符串，得到: {type(last_message.content)}")
-                next_node = "previous_node"
+        print(state["chat_history"])
+        print(state["messages"][-1])
+        summary_message = json.loads(state["messages"][-1].content)
+        next_node = summary_message.get("next_node", "previous_node")
+        print(f"🔄 路由决定: {next_node}")
             
-            print(f"🔄 路由决定: {next_node}")
-            
-            if next_node == "complex_template":
-                return "complex_template_handle"
-            elif next_node == "simple_template":
-                return "simple_template_handle"
-            else:
-                return state.get("previous_node", "entry")  # Fallback to previous node
-                
-        except Exception as e:
-            print(f"❌ 路由决定时出错: {e}")
-            import traceback
-            print(f"❌ 详细错误: {traceback.format_exc()}")
-            return state.get("previous_node", "entry")  # Safe fallback
+        if next_node == "complex_template":
+            return "complex_template_handle"
+        elif next_node == "simple_template":
+            return "simple_template_handle"
+        else:
+            return state.get("previous_node", "entry")  # Fallback to previous node
             
 
 
@@ -240,40 +226,42 @@ class FrontdeskAgent:
 
     def _chat_with_user_to_determine_template(self, state: FrontdeskState) -> FrontdeskState:
         """This node will chat with the user to determine the template, when the template is not provided"""
-        system_prompt = """你是一个智能excel表格生成助手，现在你需要和用户进行对话，来确认用户想要生成的表格结构
-        内容，表格可能涉及到复杂的多级表头，因此你需要弄清楚所有的结构层级，不断询问用户，知道你搞清楚全部需求，并返回
-        以下格式：
-        1. 提取表格的多级表头结构；
+        # Use chat_history instead of the confusing JSON blob in messages
+        user_context = state["chat_history"][-1] if state.get("chat_history") else "用户需要确定表格结构"
+
+        system_prompt = f"""你是一个智能 Excel 表格生成助手，现在你需要和用户进行对话，来确认用户想要生成的表格结构内容。
+表格可能涉及到复杂的多级表头，因此你需要弄清楚所有的结构层级，不断询问用户，直到你搞清楚全部需求，并返回以下格式：
+
+1. 提取表格的多级表头结构：
    - 使用嵌套的 key-value 形式表示层级关系；
    - 每一级表头应以对象形式展示其子级字段或子表头；
    - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
 
-2. 提供一个对该表格内容的简要总结；
+2. 提供一个对该表格内容的简要总结：
    - 内容应包括表格用途、主要信息类别、适用范围等；
    - 语言简洁，不超过 150 字；
 
 输出格式如下：
-{
-  "表格结构": {
-    "顶层表头名称": {
+{{
+  "表格结构": {{
+    "顶层表头名称": {{
       "二级表头名称": [
         "字段1",
-        "字段2",
-        ...
-      ],
-      ...
-    },
-    ...
-  },
+        "字段2"
+      ]
+    }}
+  }},
   "表格总结": "该表格的主要用途及内容说明..."
-}
+}}
 
-        请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
+请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
 
-        你也可以调用工具来收集用户输入，来帮助你分析表格结构，有任何不确定的地方一定要询问用户，直到你完全明确表格结构为止
-        """
+你也可以调用工具来收集用户输入，来帮助你分析表格结构，有任何不确定的地方一定要询问用户，直到你完全明确表格结构为止。
 
-        response = invoke_model_with_tools(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)] + state["messages"], tools=self.tools)
+当前情况: {user_context}
+"""
+
+        response = invoke_model_with_tools(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
         
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:
@@ -327,7 +315,7 @@ class FrontdeskAgent:
 
 请忽略所有 HTML 样式标签，只关注表格结构和语义信息。"""
 
-        response = invoke_model_with_tools(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=prompt)] + state["messages"], tools=[self._collect_user_input])
+        response = invoke_model_with_tools(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=prompt)] + state["messages"], tools=self.tools)
         
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:

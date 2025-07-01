@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content
+from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, extract_filename
 from utilities.modelRelated import invoke_model
 
 import uuid
@@ -66,8 +66,7 @@ class ProcessUserInputAgent:
     
     tools = [request_user_clarification]
 
-    def __init__(self, model_name: str = "gpt-4o"):
-        self.model_name = model_name
+    def __init__(self):
         self.memory = MemorySaver()
         self.graph = self._build_graph().compile(checkpointer=self.memory)
 
@@ -426,21 +425,44 @@ class ProcessUserInputAgent:
                 source_path = Path(table_file)
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
+                file_name = extract_filename(table_file)
                 
-                system_prompt = f"""你是一位专业的文档分析专家。请阅读提供的 HTML 格式政策类文件，并对其进行简要总结。
+                # Define the JSON template separately to avoid f-string nesting issues
+                json_template = '''{{
+  "{file_name}": {{
+    "表格结构": {{
+      "顶层表头名称": {{
+        "二级表头名称": [
+          "字段1",
+          "字段2",
+          "..."
+        ],
+        "更多子表头": [
+          "字段A",
+          "字段B"
+        ]
+      }}
+    }},
+    "表格总结": "该表格的主要用途及内容说明..."
+  }}
+}}'''.format(file_name=file_name)
 
-总结要求如下：
 
-1. **忽略所有 HTML 标签**（如 <p>、<div>、<span>、<table> 等），仅关注文本内容；
-2. 总结内容为文件的简介，包含了哪些信息，文件内容等
-3. 总结语言应简洁明了、条理清晰、逻辑性强，避免冗长和具体数字；
-4. 输出格式为严格的 JSON 格式：
-   - 键（Key）为文件名；
-   - 值（Value）为对该文件内容的简要总结；
-5. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
-6. 保持输出语言与输入文档一致（若文档为中文，则输出中文）；
+                system_prompt = f"""你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
 
-请根据上述要求，对提供的 HTML 文件内容进行分析并返回结果。
+1. 提取表格的多级表头结构；
+   - 使用嵌套的 key-value 形式表示层级关系；
+   - 每一级表头应以对象形式展示其子级字段或子表头；
+   - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
+
+2. 提供一个对该表格内容的简要总结；
+   - 内容应包括表格用途、主要信息类别、适用范围等；
+   - 语言简洁，不超过 150 字；
+
+输出格式如下：
+{json_template}
+
+请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
 
 文件内容:
 {file_content}"""
@@ -450,7 +472,7 @@ class ProcessUserInputAgent:
                 
                 try:
                     # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
-                    analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
+                    analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
                     print("Debug: LLM for table analysis response received successfully")
                     print(f"Response content length: {len(analysis_response)} characters")
                     state["process_user_input_messages"].append(AIMessage(content=analysis_response))
@@ -480,38 +502,37 @@ class ProcessUserInputAgent:
                 source_path = Path(document_file)
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
+                file_name = extract_filename(document_file)
                 
-                prompt = """你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
+                system_prompt = """你是一位专业的文档分析专家，具备法律与政策解读能力。你的任务是阅读用户提供的 HTML 格式文件，并从中提取出最重要的 1-2 条关键信息进行总结，无需提取全部内容。
 
-1. 提取表格的多级表头结构；
-   - 使用嵌套的 key-value 形式表示层级关系；
-   - 每一级表头应以对象形式展示其子级字段或子表头；
-   - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
+请遵循以下要求：
 
-2. 提供一个对该表格内容的简要总结；
-   - 内容应包括表格用途、主要信息类别、适用范围等；
-   - 语言简洁，不超过 150 字；
+1. 自动从以下文件链接/路径中提取文件名：
+   - 示例输入：d:\\asianInfo\\ExcelAssist\\燕云村case\\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc → 文件名为：“[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc”
+   - 只保留文件主名（不含路径和扩展名），用于作为 JSON 的 key；
 
-输出格式如下：
-{
-  "表格结构": {
-    "顶层表头名称": {
-      "二级表头名称": [
-        "字段1",
-        "字段2",
-        ...
-      ],
-      ...
-    },
-    ...
-  },
-  "表格总结": "该表格的主要用途及内容说明..."
-}
+2. 忽略所有 HTML 标签（如 <p>、<div>、<table> 等），只关注文本内容；
 
-请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
+3. 从文件中提取你认为最重要的一到两项核心政策信息（例如补贴金额、适用对象、审批流程等），或者其他你觉得重要的信息，避免包含次要或重复内容；
+
+4. 对提取的信息进行结构化总结，语言正式、逻辑清晰、简洁明了；
+
+5. 输出格式为严格的 JSON：
+   {{
+     "{file_name}": "内容总结"
+   }}
+
+6. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
+
+7. 输出语言应与输入文档保持一致（若文档为中文，则输出中文）；
+
+请根据上述要求，对提供的 HTML 文件内容进行分析并返回结果。
 
 文件内容:
-{file_content}"""
+{file_content}
+""".format(file_name=file_name, file_content=file_content)
+
                                 
                     
                 print("Debug: Calling LLM for document analysis")
@@ -519,7 +540,7 @@ class ProcessUserInputAgent:
                 
                 try:
                     # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
-                    analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
+                    analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
                     print("Debug: LLM for document analysis response received successfully")
                     print(f"Response content length: {len(analysis_response)} characters")
                 except Exception as llm_error:
@@ -803,12 +824,9 @@ class ProcessUserInputAgent:
         # Simplify the prompt to avoid corruption
         system_prompt = f"""你是一个总结助手。请总结用户输入并决定下一步。
 
-        历史对话: {process_user_input_messages_content}
-
-        规则：
-        - 复杂表格模板 → "complex_template"  
-        - 简单表格模板 → "simple_template"
-        - 其他情况 → "previous_node"
+        历史对话: {process_user_input_messages_content}，判断是否为复杂表格的规则为表格是否同时包含行标题和列标题，
+        如果同时包含行标题和列标题，则返回"complex_template"，否则返回"simple_template"，你需要严格判断用户是否提供了模板，如果只有补充材料
+        而非模板，你需要返回"previous_node"，另外如果用户提供了补充数据excel表格，请不要误将其判断为提供了模板，你需要返回"previous_node"
 
         请只返回JSON格式，无其他文字：
         {{
@@ -820,14 +838,21 @@ class ProcessUserInputAgent:
         
         # response = self.llm_c.invoke([SystemMessage(content = system_prompt)])
         print(response)
+        return {"summary_message": response}
     
 
-    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: list[BaseMessage] = None) -> None:
+    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None) -> str:
         """This function runs the process user input agent"""
         initial_state = self.create_initial_state( previous_AI_messages)
         config = {"configurable": {"thread_id": session_id}}
+
+        # final_state = self.graph.invoke(initial_state, config = config)
+        # print(final_state)
+        # summar_mesage= final_state["summary_message"]
+        # print(summar_mesage)
+        # return summar_mesage
         current_state = initial_state
-        
+        summary_message = ""
         while True:
             try:
                 has_interrupt = False
@@ -856,10 +881,13 @@ class ProcessUserInputAgent:
                             for key, value in node_output.items():
                                 if key != "messages" and value:
                                     print(f"📊 {key}: {value}")
+                                if key == "summary_message":
+                                    summary_message = value
                         print("-" * 30)
                 
                 if not has_interrupt:
-                    return current_state
+                    print(summary_message)
+                    return summary_message
 
             
             except Exception as e:
