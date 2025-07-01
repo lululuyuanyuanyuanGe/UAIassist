@@ -83,45 +83,28 @@ class TestPromptGraph():
         sends.append(Send("LLM_node_3", state))
         return sends
 
-    def _LLM_node_1(self, state: TestPromptState) -> TestPromptState:
-        pass
-
-    def _LLM_node_2(self, state: TestPromptState) -> TestPromptState:
-        pass
-
-    def _LLM_summary(self, state: TestPromptState) -> TestPromptState:
-        pass
 
     def _LLM_node_3(self, state: TestPromptState) -> TestPromptState:
         """调用大模型"""
-        prompt = """你是一位专业的文档分析专家，具备法律与政策解读能力。你的任务是阅读提供的 HTML 格式政策类文件，并从中提取所有具有规范性、约束力或指导性的关键信息，包括但不限于：
+        prompt = """你是一位专业的文档分析专家。请阅读提供的 HTML 格式政策类文件，并对其进行简要总结。
 
-- 政策名称、发布单位、发布时间、适用范围；
-- 具体条款、执行细则、权利义务说明；
-- 补贴类型、补助金额、发放方式及频率；
-- 申请条件、评定对象、资格要求；
-- 审批流程、时间节点、责任主体；
-- 资金来源、使用监管机制；
-- 违规处理、责任追究、例外情形；
-- 相关附件、表格、申报流程说明；
-- 政策有效期、解释权归属、替代版本等。
+总结要求如下：
 
-在处理过程中，请遵循以下要求：
-
-1. 忽略所有 HTML 标签（如 <p>、<div>、<table> 等），仅关注文本内容；
-2. 对提取的信息进行结构化总结，确保逻辑清晰、条理分明、语言正式；
-3. 输出格式为严格的 JSON 格式：
+1. **忽略所有 HTML 标签**（如 <p>、<div>、<span>、<table> 等），仅关注文本内容；
+2. 总结内容为文件的简介，包含了哪些信息，文件内容等
+3. 总结语言应简洁明了、条理清晰、逻辑性强，避免冗长和具体数字；
+4. 输出格式为严格的 JSON 格式：
    - 键（Key）为文件名；
-   - 值（Value）为对文件内容的详细总结，包含上述列出的关键要素；
-4. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
-5. 保持输出语言与输入文档一致（若文档为中文，则输出中文）；
+   - 值（Value）为对该文件内容的简要总结；
+5. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
+6. 保持输出语言与输入文档一致（若文档为中文，则输出中文）；
 
 请根据上述要求，对提供的 HTML 文件内容进行分析并返回结果。"""
 
         message = [SystemMessage(content=prompt)] + state["messages"]
         
 
-        model_response = invoke_model(model_name="Tongyi-Zhiwen/QwenLong-L1-32B", messages=message)
+        model_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=message)
         state["messages"].append(AIMessage(content=model_response))
         print(model_response)
         state["messages"] = []

@@ -1,4 +1,3 @@
-from openai import OpenAI
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from dotenv import load_dotenv
 import os
@@ -67,7 +66,7 @@ class TestPromptGraph():
 
     def _process_file_input(self, state: TestPromptState) -> TestPromptState:
         """处理用户输入文件"""
-        file_paths = [r"D:\asianInfo\数据\七田村\七田村村信息简介.docx"]
+        file_paths = [r"D:\asianInfo\数据\郭坡村\2024低保公示格式（统一格式）.xlsx"]
         processed_content_paths = retrieve_file_content(file_paths, "1")
 
         # 读取文档信息
@@ -94,29 +93,34 @@ class TestPromptGraph():
 
     def _LLM_node_3(self, state: TestPromptState) -> TestPromptState:
         """调用大模型"""
-        prompt = """你是一位专业的文档分析专家，具备法律与政策解读能力。你的任务是阅读提供的 HTML 格式政策类文件，并从中提取所有具有规范性、约束力或指导性的关键信息，包括但不限于：
+        prompt = """你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
 
-- 政策名称、发布单位、发布时间、适用范围；
-- 具体条款、执行细则、权利义务说明；
-- 补贴类型、补助金额、发放方式及频率；
-- 申请条件、评定对象、资格要求；
-- 审批流程、时间节点、责任主体；
-- 资金来源、使用监管机制；
-- 违规处理、责任追究、例外情形；
-- 相关附件、表格、申报流程说明；
-- 政策有效期、解释权归属、替代版本等。
+1. 提取表格的多级表头结构；
+   - 使用嵌套的 key-value 形式表示层级关系；
+   - 每一级表头应以对象形式展示其子级字段或子表头；
+   - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
 
-在处理过程中，请遵循以下要求：
+2. 提供一个对该表格内容的简要总结；
+   - 内容应包括表格用途、主要信息类别、适用范围等；
+   - 语言简洁，不超过 150 字；
 
-1. 忽略所有 HTML 标签（如 <p>、<div>、<table> 等），仅关注文本内容；
-2. 对提取的信息进行结构化总结，确保逻辑清晰、条理分明、语言正式；
-3. 输出格式为严格的 JSON 格式：
-   - 键（Key）为文件名；
-   - 值（Value）为对文件内容的详细总结，包含上述列出的关键要素；
-4. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
-5. 保持输出语言与输入文档一致（若文档为中文，则输出中文）；
+输出格式如下：
+{
+  "表格结构": {
+    "顶层表头名称": {
+      "二级表头名称": [
+        "字段1",
+        "字段2",
+        ...
+      ],
+      ...
+    },
+    ...
+  },
+  "表格总结": "该表格的主要用途及内容说明..."
+}
 
-请根据上述要求，对提供的 HTML 文件内容进行分析并返回结果。"""
+请忽略所有 HTML 样式标签，只关注表格结构和语义信息。"""
 
         message = [SystemMessage(content=prompt)] + state["messages"]
         

@@ -8,9 +8,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.visualize_graph import save_graph_visualization
 from utilities.file_process import detect_and_process_file_paths, retrieve_file_content
-from utilities.modelRelated import model_creation
+from utilities.modelRelated import invoke_model
 
 import uuid
 import json
@@ -30,7 +29,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command, interrupt
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 from langchain_core.tools import tool
-
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
@@ -69,12 +68,8 @@ class ProcessUserInputAgent:
 
     def __init__(self, model_name: str = "gpt-4o"):
         self.model_name = model_name
-        self.llm_c = model_creation(model_name=model_name, temperature=2) # complex logic use user selected model
-        self.llm_c_with_tools = self.llm_c.bind_tools(self.tools)
-        self.llm_s = model_creation(model_name="gpt-3.5-turbo", temperature=2) # simple logic use 3-5turbo
-        self.llm_s_with_tools = self.llm_s.bind_tools(self.tools)
         self.memory = MemorySaver()
-        self.graph = self._build_graph().compile()
+        self.graph = self._build_graph().compile(checkpointer=self.memory)
 
 
     def _build_graph(self) -> StateGraph:
@@ -142,7 +137,7 @@ class ProcessUserInputAgent:
             "irrelevant_files_path": [],
             "all_files_irrelevant": False,
             "text_input_validation": None,
-            "previous_AI_messages": previous_AI_messages,
+            "previous_AI_messages": [],
             "summary_message": "",
         }
 
@@ -185,9 +180,16 @@ class ProcessUserInputAgent:
         message_content = latest_message.content if hasattr(latest_message, 'content') else str(latest_message)
         
         detected_files = detect_and_process_file_paths(message_content)
+        
+        # Load data.json with error handling
         data_file = Path("agents/data.json")
-        with open(data_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with open(data_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"⚠️ data.json文件出错: {e}")
+            # Initialize empty structure if file is missing or corrupted
+            data = {"表格": {}, "文档": {}}
         for file in detected_files:
             file_name = Path(file).name
             if file_name in data["表格"] or file_name in data["文档"]:
@@ -209,9 +211,11 @@ class ProcessUserInputAgent:
         print(f"✅ File uploaded: {result}")
         
         # Update state with new files
+        # Safely handle the case where upload_files_path might not exist in state
+        existing_files = state.get("upload_files_path", [])
         return {
             "new_upload_files_path": detected_files,
-            "upload_files_path": state["upload_files_path"] + detected_files,
+            "upload_files_path": existing_files + detected_files,
             "new_upload_files_processed_path": result
         }
     
@@ -233,7 +237,9 @@ class ProcessUserInputAgent:
         
         # Process files one by one for better accuracy
         processed_files = []
-        for file_path in state["new_upload_files_processed_path"]:
+        # Safely handle the case where new_upload_files_processed_path might not exist in state
+        new_files_to_process = state.get("new_upload_files_processed_path", [])
+        for file_path in new_files_to_process:
             try:
                 source_path = Path(file_path)
                 if not source_path.exists():
@@ -272,17 +278,20 @@ class ProcessUserInputAgent:
                 # Get LLM analysis for this file
                 print("Debug: Calling LLM for file_type analysis")
                 # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
-                analysis_response = AIMessage(content="This is a test response")
+                analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
 
                 # Parse JSON response for this file
                 try:
                     # Extract JSON from response
-                    response_content = analysis_response.content.strip()
+                    response_content = analysis_response.strip()
+                    print(f"🔍 调试信息 - 原始LLM响应: {repr(response_content)}")
+                    
                     # Remove markdown code blocks if present
                     if response_content.startswith('```'):
                         response_content = response_content.split('\n', 1)[1]
                         response_content = response_content.rsplit('\n', 1)[0]
                     
+                    print(f"🔍 调试信息 - 处理后的响应: {repr(response_content)}")
                     file_classification = json.loads(response_content)
                     classification_type = file_classification.get("classification", "irrelevant")
                     
@@ -301,7 +310,7 @@ class ProcessUserInputAgent:
                     
                 except json.JSONDecodeError as e:
                     print(f"❌ 文件 {source_path.name} JSON解析错误: {e}")
-                    print(f"LLM响应: {analysis_response.content}")
+                    print(f"LLM响应: {analysis_response}")
                     # Fallback: mark as irrelevant for safety
                     classification_results["irrelevant"].append(file_path)
                 
@@ -326,38 +335,32 @@ class ProcessUserInputAgent:
         irrelevant_files = classification_results.get("irrelevant", [])
         
         # Check if all files are irrelevant
+        # Safely handle the case where new_upload_files_processed_path might not exist in state
+        new_files_processed_count = len(state.get("new_upload_files_processed_path", []))
         all_files_irrelevant = (
             len(uploaded_template_files) == 0 and 
             len(supplement_files.get("表格", [])) == 0 and 
             len(supplement_files.get("文档", [])) == 0 and
-            len(irrelevant_files) == len(state["new_upload_files_processed_path"])
+            len(irrelevant_files) == new_files_processed_count
         )
         
         if all_files_irrelevant:
-            # All files are irrelevant, flag for text analysis
-            analysis_summary = f"""📋 文件分析完成 - 所有文件均与表格生成无关:
-            ❌ 无关文件: {len(irrelevant_files)} 个
-            
-            文件列表: {[Path(f).name for f in irrelevant_files]}
-            
-            🔄 将转为分析用户文本输入内容"""
             
             return {
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
                 "irrelevant_files_path": irrelevant_files,
                 "all_files_irrelevant": True,  # Flag for routing
-                "process_user_input_messages": [SystemMessage(content=analysis_summary)]
             }
         else:
             # Some files are relevant, proceed with normal flow
-            analysis_summary = f"""📋 文件分析完成:
-            ✅ 模板文件: {len(uploaded_template_files)} 个
-            ✅ 补充表格: {len(supplement_files.get("表格", []))} 个  
-            ✅ 补充文档: {len(supplement_files.get("文档", []))} 个
-            ❌ 无关文件: {len(irrelevant_files)} 个
-
-            分类详情:
+            analysis_summary = f"""文件分析完成:
+            模板文件: {len(uploaded_template_files)} 个
+            补充表格: {len(supplement_files.get("表格", []))} 个  
+            补充文档: {len(supplement_files.get("文档", []))} 个
+            无关文件: {len(irrelevant_files)} 个"""
+            
+            """            分类详情:
             模板: {[Path(f).name for f in uploaded_template_files]}
             表格: {[Path(f).name for f in supplement_files.get("表格", [])]}
             文档: {[Path(f).name for f in supplement_files.get("文档", [])]}
@@ -424,27 +427,33 @@ class ProcessUserInputAgent:
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 
-                system_prompt = f"""你是一个表格分析专家，现在这个excel表格已经被转换成了HTML格式，你的任务是仔细阅读这个表格，分析表格的结构，并总结表格的内容，所有的表头、列名、数据都要总结出来。
+                system_prompt = f"""你是一位专业的文档分析专家。请阅读提供的 HTML 格式政策类文件，并对其进行简要总结。
 
-                文件内容:
-                {file_content}
+总结要求如下：
 
-                请按照以下格式输出结果：
-                {{
-                    "表格结构": "描述表格的整体结构",
-                    "表头信息": ["列名1", "列名2", "列名3"],
-                    "数据概要": "数据的总体描述和重要信息",
-                    "行数统计": "总行数",
-                    "关键字段": ["重要字段1", "重要字段2"]
-                }}"""
+1. **忽略所有 HTML 标签**（如 <p>、<div>、<span>、<table> 等），仅关注文本内容；
+2. 总结内容为文件的简介，包含了哪些信息，文件内容等
+3. 总结语言应简洁明了、条理清晰、逻辑性强，避免冗长和具体数字；
+4. 输出格式为严格的 JSON 格式：
+   - 键（Key）为文件名；
+   - 值（Value）为对该文件内容的简要总结；
+5. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
+6. 保持输出语言与输入文档一致（若文档为中文，则输出中文）；
+
+请根据上述要求，对提供的 HTML 文件内容进行分析并返回结果。
+
+文件内容:
+{file_content}"""
+
                 print("Debug: Calling LLM for table analysis")
                 print(f"System prompt length: {len(system_prompt)} characters")
                 
                 try:
                     # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
-                    analysis_response = AIMessage(content="This is a test response")
+                    analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
                     print("Debug: LLM for table analysis response received successfully")
-                    print(f"Response content length: {len(analysis_response.content)} characters")
+                    print(f"Response content length: {len(analysis_response)} characters")
+                    state["process_user_input_messages"].append(AIMessage(content=analysis_response))
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
                     # Create fallback response
@@ -454,7 +463,7 @@ class ProcessUserInputAgent:
                 
                 # Store in data.json (this should happen for BOTH success and failure)
                 data["表格"][source_path.name] = {
-                    "summary": analysis_response.content,
+                    "summary": analysis_response,
                     "file_path": str(table_file),
                     "timestamp": datetime.now().isoformat(),
                     "file_size": source_path.stat().st_size
@@ -472,19 +481,37 @@ class ProcessUserInputAgent:
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 
-                system_prompt = f"""你是一个文档分析专家，现在这个文档已经被转换成了txt格式，你的任务是仔细阅读这个文档，分析文档的内容，并总结文档的内容。文档可能包含重要的信息，例如法律条文、政策规定等，你不能遗漏这些信息。
+                prompt = """你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
 
-                文件内容:
-                {file_content}
+1. 提取表格的多级表头结构；
+   - 使用嵌套的 key-value 形式表示层级关系；
+   - 每一级表头应以对象形式展示其子级字段或子表头；
+   - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
 
-                请按照以下格式输出结果：
-                {{
-                    "文档类型": "判断文档的类型（如政策文件、法律条文、说明文档等）",
-                    "主要内容": "文档的核心内容概要",
-                    "重要条款": ["重要条款1", "重要条款2"],
-                    "关键信息": ["关键信息1", "关键信息2"],
-                    "应用场景": "这些信息在表格填写中的用途"
-                }}"""
+2. 提供一个对该表格内容的简要总结；
+   - 内容应包括表格用途、主要信息类别、适用范围等；
+   - 语言简洁，不超过 150 字；
+
+输出格式如下：
+{
+  "表格结构": {
+    "顶层表头名称": {
+      "二级表头名称": [
+        "字段1",
+        "字段2",
+        ...
+      ],
+      ...
+    },
+    ...
+  },
+  "表格总结": "该表格的主要用途及内容说明..."
+}
+
+请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
+
+文件内容:
+{file_content}"""
                                 
                     
                 print("Debug: Calling LLM for document analysis")
@@ -492,9 +519,9 @@ class ProcessUserInputAgent:
                 
                 try:
                     # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
-                    analysis_response = AIMessage(content="This is a test response")
+                    analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
                     print("Debug: LLM for document analysis response received successfully")
-                    print(f"Response content length: {len(analysis_response.content)} characters")
+                    print(f"Response content length: {len(analysis_response)} characters")
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
                     # Create fallback response
@@ -503,11 +530,11 @@ class ProcessUserInputAgent:
                     })()
 
                 # Update state with analysis response
-                state["process_user_input_messages"].append(analysis_response)
+                state["process_user_input_messages"].append(AIMessage(content=analysis_response))
                 
                 # Store in data.json (this should happen for BOTH success and failure)
                 data["文档"][source_path.name] = {
-                    "summary": analysis_response.content,
+                    "summary": analysis_response,
                     "file_path": str(document_file),
                     "timestamp": datetime.now().isoformat(),
                     "file_size": source_path.stat().st_size
@@ -526,15 +553,7 @@ class ProcessUserInputAgent:
         except Exception as e:
             print(f"❌ 保存 data.json 时出错: {e}")
         
-        # Create summary message
-        summary_message = f"""📊 补充文件处理完成:
-        ✅ 表格文件: {len(table_files)} 个已分析并存储
-        ✅ 文档文件: {len(document_files)} 个已分析并存储
-        📝 数据库已更新，总计表格 {len(data['表格'])} 个，文档 {len(data['文档'])} 个"""
-        
-        return {
-            "process_user_input_messages": [SystemMessage(content=summary_message)]
-        }
+        return state
         
         
     def _process_irrelevant(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -557,18 +576,7 @@ class ProcessUserInputAgent:
                 failed_deletes.append(Path(file_path).name)
                 print(f"❌ 删除文件时出错 {file_path}: {e}")
 
-        # Create summary message
-        summary_message = f"""🗑️ 无关文件处理完成:
-        ✅ 成功删除: {len(deleted_files)} 个文件
-        ❌ 删除失败: {len(failed_deletes)} 个文件
-
-        删除的文件: {', '.join(deleted_files) if deleted_files else '无'}
-        失败的文件: {', '.join(failed_deletes) if failed_deletes else '无'}"""
-        
-        return {
-            "process_user_input_messages": [SystemMessage(content=summary_message)]
-        }
-    
+        return state
 
     
     def _process_template(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -644,8 +652,8 @@ class ProcessUserInputAgent:
 
             print("Debug: Calling LLM for template analysis")
             print(system_prompt)
-            # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
-            analysis_response = AIMessage(content="This is a test response")
+            
+            analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
                 
 
         except Exception as e:
@@ -666,10 +674,10 @@ class ProcessUserInputAgent:
                 print("⚠️ 无法确定模板类型，默认为简单模板")
             
             # Create analysis summary
-            summary_message = f"""📋 模板分析完成:
-            ✅ 选定模板: {Path(template_file).name}
-            🔍 模板类型: {template_type}
-            📁 模板路径: {template_file}
+            summary_message = f"""模板分析完成:
+            选定模板: {Path(template_file).name}
+            模板类型: {template_type}
+            模板路径: {template_file}
 
             {template_type}"""
             
@@ -726,29 +734,28 @@ class ProcessUserInputAgent:
         
         try:
             # Get LLM validation
-            validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
+            validation_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
+            # validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
             
-            # Parse response
-            response_content = validation_response.content.strip()
             
-            if "[Valid]" in response_content:
+            if "[Valid]" in validation_response:
                 validation_result = "[Valid]"
-                status_message = "✅ 用户输入验证通过 - 内容与表格相关且有意义"
-            elif "[Invalid]" in response_content:
+                status_message = "用户输入验证通过 - 内容与表格相关且有意义"
+            elif "[Invalid]" in validation_response:
                 validation_result = "[Invalid]"
-                status_message = "❌ 用户输入验证失败 - 内容与表格无关或无意义"
+                status_message = "用户输入验证失败 - 内容与表格无关或无意义"
             else:
                 # Default to Invalid for safety
                 validation_result = "[Invalid]"
-                status_message = "❌ 用户输入验证失败 - 无法确定输入有效性，默认为无效"
-                print(f"⚠️ 无法解析验证结果，LLM响应: {response_content}")
+                status_message = "用户输入验证失败 - 无法确定输入有效性，默认为无效"
+                print(f"⚠️ 无法解析验证结果，LLM响应: {validation_response}")
             
             # Create validation summary
-            summary_message = f"""🔍 文本输入安全检查完成:
+            summary_message = f"""文本输入安全检查完成:
             
-            📄 **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
-            ✅ **验证结果**: {validation_result}
-            📝 **状态**: {status_message}"""
+            **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
+            **验证结果**: {validation_result}
+            **状态**: {status_message}"""
             
             return {
                 "text_input_validation": validation_result,
@@ -792,7 +799,7 @@ class ProcessUserInputAgent:
         
         # Extract content from all messages in this processing round
         process_user_input_messages_content =("\n").join([item.content for item in state["process_user_input_messages"]])
-        
+        print(process_user_input_messages_content)
         # Simplify the prompt to avoid corruption
         system_prompt = f"""你是一个总结助手。请总结用户输入并决定下一步。
 
@@ -805,11 +812,13 @@ class ProcessUserInputAgent:
 
         请只返回JSON格式，无其他文字：
         {{
-            "summary": "用户本轮提供的信息总结",
+            "summary": "用户本轮提供的信息总结，输入了什么信息，提供了哪些文件等",
             "next_node": "路由决策"
         }}"""
+
+        response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
         
-        response = self.llm_c.invoke([SystemMessage(content = system_prompt)])
+        # response = self.llm_c.invoke([SystemMessage(content = system_prompt)])
         print(response)
     
 
@@ -850,12 +859,13 @@ class ProcessUserInputAgent:
                         print("-" * 30)
                 
                 if not has_interrupt:
-                    break
+                    return current_state
 
             
             except Exception as e:
                 print(f"❌ 处理用户输入时出错: {e}")
                 break
+
 
 
 # Langgraph studio to export the compiled graph

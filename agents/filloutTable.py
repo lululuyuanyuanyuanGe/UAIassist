@@ -13,7 +13,7 @@ from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 from utilities.message_process import build_BaseMessage_type, filter_out_system_messages
 from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, read_txt_file
-from utilities.modelRelated import model_creation, detect_provider
+from utilities.modelRelated import invoke_model
 
 import uuid
 import json
@@ -384,6 +384,8 @@ class FilloutTableAgent:
         except Exception as e:
             print(f"❌ 处理用户输入时出错: {e}")
     
+agent = FilloutTableAgent()
+agent_graph = agent._build_graph()
 
 if __name__ == "__main__":
     fillout_table_agent = FilloutTableAgent()
