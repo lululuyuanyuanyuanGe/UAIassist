@@ -675,7 +675,7 @@ class ProcessUserInputAgent:
             print(system_prompt)
             
             analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
-                
+            return {"process_user_input_messages": [AIMessage(content=analysis_response)]}
 
         except Exception as e:
             print(f"❌ 模板分析LLM调用出错: {e}")
@@ -705,13 +705,6 @@ class ProcessUserInputAgent:
             return {
                 "uploaded_template_files_path": template_files,  # Only selected template
                 "process_user_input_messages": [SystemMessage(content=summary_message)]
-            }
-            
-        except Exception as e:
-            print(f"❌ 分析模板时出错: {e}")
-            return {
-                "uploaded_template_files_path": template_files,
-                "process_user_input_messages": [SystemMessage(content=f"模板分析出错: {e}\n默认为[Simple]")]
             }
         
 
@@ -887,7 +880,7 @@ class ProcessUserInputAgent:
                 
                 if not has_interrupt:
                     print(summary_message)
-                    return summary_message
+                    return [summary_message, state]
 
             
             except Exception as e:

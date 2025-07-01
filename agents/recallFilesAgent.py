@@ -36,10 +36,12 @@ class RecallFilesState(TypedDict):
     related_files: list[str]
     headers_mapping: dict[str, str]
     template_structure: str
+    headers_mapping_: dict[any, any]
 
 class RecallFilesAgent:
     def __init__(self):
         self.graph = self._build_graph()
+
 
     def _build_graph(self):
         pass
@@ -61,5 +63,16 @@ class RecallFilesAgent:
         {state["template_structure"]}
         文件库内容:
         {file_content}
+        返回严格为一个数组，包含所有相关文件的全名，不要有任何其他内容
         """
 
+        response = invoke_model(system_promt, model_name = "Qwen/Qwen3-32b", messages = AIMessage(content = system_promt))
+        state["related_files"] = response
+        return {
+            "messages": [AIMessage(content = response)]
+        }
+    
+
+    def _determine_the_mapping_of_headers(self, state: RecallFilesState) -> RecallFilesState:
+        """确认模板表头和数据文件表头的映射关系"""
+        state

@@ -43,13 +43,13 @@ def append_strings(left: list[str], right: Union[list[str], str]) -> list[str]:
     
 
 @tool
-def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage, List[Dict[str, Any]]]) -> Command:
+def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage, List[Dict[str, Any]]]) -> str:
     """这是一个用来收集用户输入的工具，你需要调用这个工具来收集用户输入
     参数：
         session_id: 当前会话ID
         previous_AI_messages: 之前的AI消息
     返回：
-        Command: 包含状态更新的命令对象
+        str: 总结后的用户输入信息
     """
 
     print(f"🔄 开始收集用户输入，当前会话ID: {session_id}")
@@ -74,46 +74,16 @@ def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage
         last_message = previous_AI_messages
     
     summary_message = process_user_input_agent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = last_message)
-    summary_message_dict = json.loads(summary_message)
     print("testtest")
     
     # Extract the final result
     try:
         print(f"🔄 提取最终结果，summary_message类型: {type(summary_message)}")
-        
-        if summary_message_dict and "summary" in summary_message_dict:
-            summary_data = summary_message_dict["summary"]
-            
-            
-            print(f"✅ 成功提取总结信息: {str(summary_data)[:100]}...")
-            
-
-            return Command(
-                update = {
-                    "messages": [
-                        ToolMessage(content=summary_message, 
-                                    tool_call_id = tool_call_id)
-                    ],
-                    "chat_history": [summary_data]
-                }   
-            )
-        else:
-            print(f"⚠️ 未找到总结信息，summary_message: {summary_message}")
-            return Command(
-                update = {
-                    "messages": [AIMessage(content="未能获取有效的处理结果")],
-                    "chat_history": "未能获取有效的处理结果",
-                }
-            )
+        return summary_message
             
     except Exception as e:
         print(f"❌ 提取结果时出错: {type(e).__name__}: {e}")
-        return Command(
-            update = {
-                "messages": [AIMessage(content=f"提取结果时出错: {e}")],
-                "chat_history": f"提取结果时出错: {e}",
-            }
-        )
+        return f"提取结果时出错: {e}"
     
 
 class FrontdeskState(TypedDict):
@@ -148,14 +118,14 @@ class FrontdeskAgent:
 
         graph.add_node("entry", self._entry_node)
         graph.add_node("collect_user_input", ToolNode(self.tools))
-        graph.add_node("force_collect_user_input", self._force_collect_user_input)
+        graph.add_node("initial_collect_user_input", self._initial_collect_user_input)
         graph.add_node("complex_template_handle", self._complex_template_analysis)
         graph.add_node("simple_template_handle", self._simple_template_analysis)
         graph.add_node("chat_with_user_to_determine_template", self._chat_with_user_to_determine_template)
 
         graph.add_edge(START, "entry")
-        graph.add_edge("entry", "force_collect_user_input")
-        graph.add_conditional_edges("force_collect_user_input", self._route_after_collect_user_input)
+        graph.add_edge("entry", "initial_collect_user_input")
+        graph.add_conditional_edges("initial_collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
         graph.add_conditional_edges("simple_template_handle", self._route_after_simple_template_analysis)
@@ -190,18 +160,16 @@ class FrontdeskAgent:
         }
     
 
-    def _force_collect_user_input(self, state: FrontdeskState) -> FrontdeskState:
-        """直接调用工具收集用户输入"""
+    def _initial_collect_user_input(self, state: FrontdeskState) -> FrontdeskState:
+        """调用ProcessUserInputAgent来收集用户输入"""
         session_id = state["session_id"]
         previous_AI_messages = state["messages"][-1]
-         # ✅ Use .invoke() method with proper input format
-        tool_input = {
-        "session_id": session_id,
-        "previous_AI_messages": previous_AI_messages
+        processUserInputAgent = ProcessUserInputAgent()
+        summary_message = processUserInputAgent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = previous_AI_messages)
+        return {
+            "messages": [AIMessage(content=summary_message)],
         }
-        command_result = _collect_user_input.invoke(tool_input)
-
-        return command_result.update
+        
 
     def _route_after_collect_user_input(self, state: FrontdeskState) -> str:
         """This node will route the agent to the next node based on the summary message from the ProcessUserInputAgent"""
@@ -272,7 +240,7 @@ class FrontdeskAgent:
             ai_message = AIMessage(content=str(response.content) if hasattr(response, 'content') else str(response))
         
         return {"table_structure": str(response),
-                "previous_node": "complex_template_handle",
+                "previous_node": "chat_with_user_to_determine_template",
                 "messages": [ai_message]
                 }
     
@@ -315,7 +283,7 @@ class FrontdeskAgent:
 
 请忽略所有 HTML 样式标签，只关注表格结构和语义信息。"""
 
-        response = invoke_model_with_tools(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=prompt)] + state["messages"], tools=self.tools)
+        response = invoke_model_with_tools(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=prompt)], tools=self.tools)
         
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:
