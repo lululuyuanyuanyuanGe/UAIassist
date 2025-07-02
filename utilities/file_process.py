@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import chardet
-from typing import Union
+from typing import Union, List, Dict
 
 def detect_and_process_file_paths(user_input: str) -> list:
     """检测用户输入中的文件路径并验证文件是否存在，返回结果为用户上传的文件路径组成的数列"""
@@ -394,3 +394,37 @@ def extract_filename(file_path: str) -> str:
         filename = parts[-1] if parts else file_path
     
     return filename
+
+
+def fetch_related_files_content(related_files: List[str], base_path: str = "D:/asianInfo/ExcelAssist/conversations/1/user_uploaded_files") -> Dict[str, str]:
+        """
+        Fetch the content of related files from the specified directory
+        
+        Args:
+            related_files: List of filenames to fetch
+            base_path: Base directory path where files are stored
+            
+        Returns:
+            Dictionary mapping filename to file content
+        """
+        files_content = {}
+        base_directory = Path(base_path)
+        
+        for filename in related_files:
+            # Handle both .txt and non-.txt filenames
+            txt_filename = filename if filename.endswith('.txt') else f"{filename}.txt"
+            file_path = base_directory / txt_filename
+            
+            try:
+                if file_path.exists():
+                    content = file_path.read_text(encoding='utf-8')
+                    files_content[filename] = content
+                    print(f"✅ 成功读取文件: {filename}")
+                else:
+                    print(f"⚠️  文件不存在: {file_path}")
+                    files_content[filename] = ""
+            except Exception as e:
+                print(f"❌ 读取文件 {filename} 时出错: {e}")
+                files_content[filename] = ""
+        
+        return files_content
