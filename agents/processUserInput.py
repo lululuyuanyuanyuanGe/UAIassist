@@ -46,6 +46,7 @@ class ProcessUserInputState(TypedDict):
     text_input_validation: str  # Store validation result [Valid] or [Invalid]
     previous_AI_messages: list[BaseMessage]
     summary_message: str  # Add the missing field
+    template_complexity: str
 
     
 class ProcessUserInputAgent:
@@ -138,6 +139,7 @@ class ProcessUserInputAgent:
             "text_input_validation": None,
             "previous_AI_messages": [],
             "summary_message": "",
+            "template_complexity": ""
         }
 
 
@@ -508,24 +510,20 @@ class ProcessUserInputAgent:
 
 请遵循以下要求：
 
-1. 自动从以下文件链接/路径中提取文件名：
-   - 示例输入：d:\\asianInfo\\ExcelAssist\\燕云村case\\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc → 文件名为：“[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc”
-   - 只保留文件主名（不含路径和扩展名），用于作为 JSON 的 key；
+1. 忽略所有 HTML 标签（如 <p>、<div>、<table> 等），只关注文本内容；
 
-2. 忽略所有 HTML 标签（如 <p>、<div>、<table> 等），只关注文本内容；
+2. 从文件中提取你认为最重要的一到两项核心政策信息（例如补贴金额、适用对象、审批流程等），或者其他你觉得重要的信息，避免包含次要或重复内容；
 
-3. 从文件中提取你认为最重要的一到两项核心政策信息（例如补贴金额、适用对象、审批流程等），或者其他你觉得重要的信息，避免包含次要或重复内容；
+3. 对提取的信息进行结构化总结，语言正式、逻辑清晰、简洁明了；
 
-4. 对提取的信息进行结构化总结，语言正式、逻辑清晰、简洁明了；
-
-5. 输出格式为严格的 JSON：
+4. 输出格式为严格的 JSON：
    {{
      "{file_name}": "内容总结"
    }}
 
-6. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
+5. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
 
-7. 输出语言应与输入文档保持一致（若文档为中文，则输出中文）；
+6. 输出语言应与输入文档保持一致（若文档为中文，则输出中文）；
 
 请根据上述要求，对提供的 HTML 文件内容进行分析并返回结果。
 
@@ -661,7 +659,7 @@ class ProcessUserInputAgent:
 
             判断标准：
             - **复杂模板**: 表格同时包含行表头和列表头，即既有行标题又有列标题的二维表格结构
-            - **简单模板**: 表格只包含列表头，每行是独立的数据记录
+            - **简单模板**: 表格只包含列表头或者只包含行表头，但是可以是多级表头，每行是独立的数据记录
 
             模板内容（HTML格式）：
             {template_content}
@@ -674,37 +672,31 @@ class ProcessUserInputAgent:
             print("Debug: Calling LLM for template analysis")
             print(system_prompt)
             
-            analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
-            return {"process_user_input_messages": [AIMessage(content=analysis_response)]}
+            analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
+            
+            # Extract the classification from the response
+            if "[Complex]" in analysis_response:
+                template_type = "[Complex]"
+            elif "[Simple]" in analysis_response:
+                template_type = "[Simple]"
+            else:
+                template_type = "[Simple]"  # Default fallback
+                
+            print(f"🔍 Template analysis result: {template_type}")
+
+            return {"template_complexity": template_type,
+                    "uploaded_template_files_path": [template_file]
+                    }
 
         except Exception as e:
             print(f"❌ 模板分析LLM调用出错: {e}")
-            analysis_response = type('Response', (), {
-                'content': f"模板分析失败: {str(e)}，默认为[Simple]"
-            })()
-            
-            # Parse response
-            response_content = analysis_response.content.strip()
-            if "[Complex]" in response_content:
-                template_type = "[Complex]"
-            elif "[Simple]" in response_content:
-                template_type = "[Simple]"
-            else:
-                # Default to Simple if unclear
-                template_type = "[Simple]"
-                print("⚠️ 无法确定模板类型，默认为简单模板")
-            
-            # Create analysis summary
-            summary_message = f"""模板分析完成:
-            选定模板: {Path(template_file).name}
-            模板类型: {template_type}
-            模板路径: {template_file}
-
-            {template_type}"""
+            # Default to Simple if analysis fails
+            template_type = "[Simple]"
+            print("⚠️ 模板分析失败，默认为简单模板")
             
             return {
-                "uploaded_template_files_path": template_files,  # Only selected template
-                "process_user_input_messages": [SystemMessage(content=summary_message)]
+                "template_complexity": template_type,
+                "uploaded_template_files_path": [template_file]
             }
         
 
@@ -723,10 +715,17 @@ class ProcessUserInputAgent:
             }
         
         # Create validation prompt for text input safety check
+        # Get the previous AI message content safely
+        previous_ai_content = ""
+        if state.get("previous_AI_messages") and len(state["previous_AI_messages"]) > 0:
+            latest_ai_msg = state["previous_AI_messages"][-1]
+            if hasattr(latest_ai_msg, 'content'):
+                previous_ai_content = latest_ai_msg.content
+        
         system_prompt = f"""你是一个输入验证专家，需要判断用户的文本输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容，你的判断需要根据上下文，
         我会提供上一个AI的回复，以及用户输入，你需要根据上下文，判断用户输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容。
         
-        上一个AI的回复: {state["previous_AI_messages"]}
+        上一个AI的回复: {previous_ai_content}
         用户输入: {user_input}
 
         验证标准：
@@ -814,25 +813,60 @@ class ProcessUserInputAgent:
         # Extract content from all messages in this processing round
         process_user_input_messages_content =("\n").join([item.content for item in state["process_user_input_messages"]])
         print(process_user_input_messages_content)
-        # Simplify the prompt to avoid corruption
-        system_prompt = f"""你是一个总结助手。请总结用户输入并决定下一步。
-
-        历史对话: {process_user_input_messages_content}，判断是否为复杂表格的规则为表格是否同时包含行标题和列标题，
-        如果同时包含行标题和列标题，则返回"complex_template"，否则返回"simple_template"，你需要严格判断用户是否提供了模板，如果只有补充材料
-        而非模板，你需要返回"previous_node"，另外如果用户提供了补充数据excel表格，请不要误将其判断为提供了模板，你需要返回"previous_node"
-
+        
+        # Determine route decision based on template complexity (with proper parsing)
+        template_complexity = state.get("template_complexity", "")
+        print(f"🔍 Debug - Raw template_complexity: {repr(template_complexity)}")
+        template_complexity = template_complexity.strip()
+        print(f"🔍 Debug - Cleaned template_complexity: '{template_complexity}'")
+        
+        if "[Complex]" in template_complexity:
+            route_decision = "complex_template"
+        elif "[Simple]" in template_complexity:
+            route_decision = "simple_template"
+        else:
+            route_decision = "previous_node"
+        
+        print(f"🔍 Debug - route_decision: {route_decision}")
+        
+        system_prompt = f"""
+        根据历史对话总结这轮用户信息收集过程中，用户都提供了哪些有价值的信息，包括文件上传，文本输入，模板上传等
+        历史对话: {process_user_input_messages_content}，
         请只返回JSON格式，无其他文字：
         {{
-            "summary": "用户本轮提供的信息总结，输入了什么信息，提供了哪些文件等",
-            "next_node": "路由决策"
+            "summary": "用户本轮提供的信息总结，输入了什么信息，提供了哪些文件等"
         }}"""
 
-        response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
-        
-        # response = self.llm_c.invoke([SystemMessage(content = system_prompt)])
-        print(response)
-        return {"summary_message": response}
-    
+        try:
+            response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
+            print(f"🔍 Debug - Raw LLM response: {repr(response)}")
+            
+            # Clean the response to handle malformed JSON
+            cleaned_response = response.strip()
+            
+            # If there are multiple JSON objects, take the first valid one
+            if '}{' in cleaned_response:
+                print("⚠️ 检测到多个JSON对象，取第一个")
+                cleaned_response = cleaned_response.split('}{')[0] + '}'
+            
+            response_json = json.loads(cleaned_response)
+            response_json["next_node"] = route_decision
+            final_response = json.dumps(response_json, ensure_ascii=False)
+            
+            print(f"🔍 Debug - final_response: {final_response}")
+            return {"summary_message": final_response}
+            
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON解析错误: {e}")
+            print(f"❌ 原始响应: {repr(response)}")
+            # Fallback response
+            fallback_response = {
+                "summary": "用户本轮提供了文件信息，但解析过程中出现错误",
+                "next_node": route_decision
+            }
+            return {"summary_message": json.dumps(fallback_response, ensure_ascii=False)}
+
+
 
     def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None) -> str:
         """This function runs the process user input agent"""
@@ -846,6 +880,7 @@ class ProcessUserInputAgent:
         # return summar_mesage
         current_state = initial_state
         summary_message = ""
+        uploaded_template_files_path = []
         while True:
             try:
                 has_interrupt = False
@@ -879,8 +914,17 @@ class ProcessUserInputAgent:
                         print("-" * 30)
                 
                 if not has_interrupt:
-                    print(summary_message)
-                    return [summary_message, state]
+                    # Access the final state after streaming completes
+                    final_state = self.graph.get_state(config)
+                    print(f"Final state: {final_state.values}")
+                    
+                    # Extract what you need from the final state
+                    summary_message = final_state.values.get("summary_message", "")
+                    uploaded_template_files_path = final_state.values.get("uploaded_template_files_path", [])
+                    print("收集信息返回：", summary_message, uploaded_template_files_path)
+                    return_list = [summary_message, uploaded_template_files_path]
+                    print("收集信息返回数组：", return_list)
+                    return [summary_message, uploaded_template_files_path]
 
             
             except Exception as e:

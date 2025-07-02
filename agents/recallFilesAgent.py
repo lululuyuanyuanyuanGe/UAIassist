@@ -75,4 +75,8 @@ class RecallFilesAgent:
 
     def _determine_the_mapping_of_headers(self, state: RecallFilesState) -> RecallFilesState:
         """确认模板表头和数据文件表头的映射关系"""
-        state
+        # 读取文件内容，只读取表头即可
+        related_files = json.loads(state["related_files"])
+        for file in related_files:
+            file_content = retrieve_file_content(file, state["session_id"])
+            

@@ -43,7 +43,7 @@ def append_strings(left: list[str], right: Union[list[str], str]) -> list[str]:
     
 
 @tool
-def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage, List[Dict[str, Any]]]) -> str:
+def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage, List[Dict[str, Any]]]) -> list[str]:
     """这是一个用来收集用户输入的工具，你需要调用这个工具来收集用户输入
     参数：
         session_id: 当前会话ID
@@ -73,13 +73,14 @@ def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage
         # Manual call - use BaseMessage directly (your intentional design)
         last_message = previous_AI_messages
     
-    summary_message = process_user_input_agent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = last_message)
+    summary_messages = process_user_input_agent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = last_message)
+
     print("testtest")
     
     # Extract the final result
     try:
-        print(f"🔄 提取最终结果，summary_message类型: {type(summary_message)}")
-        return summary_message
+        print(f"🔄 提取最终结果，summary_message类型: {type(summary_messages)}")
+        return summary_messages
             
     except Exception as e:
         print(f"❌ 提取结果时出错: {type(e).__name__}: {e}")
@@ -92,7 +93,7 @@ class FrontdeskState(TypedDict):
     table_structure: str
     previous_node: str # Track the previous node
     session_id: str
-    template_structure: str
+    template_file_path: str
     table_summary: str
 
 
@@ -125,7 +126,7 @@ class FrontdeskAgent:
 
         graph.add_edge(START, "entry")
         graph.add_edge("entry", "initial_collect_user_input")
-        graph.add_conditional_edges("initial_collect_user_input", self._route_after_collect_user_input)
+        graph.add_conditional_edges("initial_collect_user_input", self._route_after_initial_collect_user_input)
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
         graph.add_conditional_edges("simple_template_handle", self._route_after_simple_template_analysis)
@@ -166,16 +167,45 @@ class FrontdeskAgent:
         previous_AI_messages = state["messages"][-1]
         processUserInputAgent = ProcessUserInputAgent()
         summary_message = processUserInputAgent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = previous_AI_messages)
+        print("原始返回信息：", summary_message)
+        
+        # Handle the case where summary_message might be None
+        if summary_message is None or len(summary_message) < 2:
+            error_msg = "用户输入处理失败，请重新输入"
+            print(f"❌ {error_msg}")
+            return {
+                "messages": [AIMessage(content=error_msg)],
+                "template_file_path": ""
+            }
+            
+        print("返回信息joson dump：", json.dumps(summary_message[0]))
+        
         return {
-            "messages": [AIMessage(content=summary_message)],
+            "messages": [AIMessage(content=summary_message[0])],
+            "template_file_path": summary_message[1]
         }
+        
+    def _route_after_initial_collect_user_input(self, state: FrontdeskState) -> str:
+        """初始调用ProcessUserInputAgent后，根据返回信息决定下一步的流程"""
+        summary_message = json.loads(state["messages"][-1].content)
+        next_node = summary_message.get("next_node", "previous_node")
+        print(f"🔄 路由决定: {next_node}")
+            
+        if next_node == "complex_template":
+            return "complex_template_handle"
+        elif next_node == "simple_template":
+            return "simple_template_handle"
+        else:
+            return state.get("previous_node", "entry")  # Fallback to previous node
         
 
     def _route_after_collect_user_input(self, state: FrontdeskState) -> str:
         """This node will route the agent to the next node based on the summary message from the ProcessUserInputAgent"""
-        print(state["chat_history"])
-        print(state["messages"][-1])
-        summary_message = json.loads(state["messages"][-1].content)
+        summary_message_str = state["messages"][-1].content
+        summary_message_json = json.loads(summary_message_str)
+        summary_message = json.loads(summary_message_json[0])
+        state["template_file_path"] = summary_message_json[1]
+        print("summary_message测试: ", summary_message)
         next_node = summary_message.get("next_node", "previous_node")
         print(f"🔄 路由决定: {next_node}")
             
@@ -229,7 +259,7 @@ class FrontdeskAgent:
 当前情况: {user_context}
 """
 
-        response = invoke_model_with_tools(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
+        response = invoke_model_with_tools(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
         
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:
@@ -254,37 +284,58 @@ class FrontdeskAgent:
 
     def _simple_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
         """处理用户上传的简单模板"""
-        prompt = """你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
+        # Handle the case where template_file_path might be a list
+        template_file_path_raw = state["template_file_path"]
+        print(f"🔍 Debug - template_file_path_raw: {template_file_path_raw} (type: {type(template_file_path_raw)})")
+        
+        if isinstance(template_file_path_raw, list):
+            if len(template_file_path_raw) > 0:
+                template_file_path = Path(template_file_path_raw[0])  # Take the first file
+                print(f"🔍 Debug - Using first file from list: {template_file_path}")
+            else:
+                raise ValueError("template_file_path list is empty")
+        else:
+            template_file_path = Path(template_file_path_raw)
+            print(f"🔍 Debug - Using single file path: {template_file_path}")
+        template_file_content = template_file_path.read_text(encoding="utf-8")
+
+        prompt = f"""你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
         你也可以调用工具来收集用户输入，来帮助你分析表格结构，有任何不确定的地方一定要询问用户，直到你完全明确表格结构为止
-1. 提取表格的多级表头结构；
-   - 使用嵌套的 key-value 形式表示层级关系；
-   - 每一级表头应以对象形式展示其子级字段或子表头；
-   - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
+        你不要所有问题都问用户，自己根据html的结构来分析，如果分析不出来，再问用户
+        1. 提取表格的多级表头结构；
+        - 使用嵌套的 key-value 形式表示层级关系；
+        - 每一级表头应以对象形式展示其子级字段或子表头；
+        - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
 
-2. 提供一个对该表格内容的简要总结；
-   - 内容应包括表格用途、主要信息类别、适用范围等；
-   - 语言简洁，不超过 150 字；
+        2. 提供一个对该表格内容的简要总结；
+        - 内容应包括表格用途、主要信息类别、适用范围等；
+        - 语言简洁，不超过 150 字；
 
-输出格式如下：
-{
-  "表格结构": {
-    "顶层表头名称": {
-      "二级表头名称": [
-        "字段1",
-        "字段2",
-        ...
-      ],
-      ...
-    },
-    ...
-  },
-  "表格总结": "该表格的主要用途及内容说明..."
-}
+        输出格式如下：
+        {{
+        "表格结构": {{
+            "顶层表头名称": {{
+            "二级表头名称": [
+                "字段1",
+                "字段2",
+                ...
+            ]
+            }}
+        }},
+        "表格总结": "该表格的主要用途及内容说明..."
+        }}
 
-请忽略所有 HTML 样式标签，只关注表格结构和语义信息。"""
+        请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
+
+        下面是用户上传的模板表格内容:
+        {template_file_content}
+        """
+
 
         response = invoke_model_with_tools(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=prompt)], tools=self.tools)
-        
+        if response.content:
+            print(response.content)
+        print(response)
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:
             # 如果有工具调用，创建包含tool_calls的AIMessage
