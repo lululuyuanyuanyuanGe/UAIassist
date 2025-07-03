@@ -48,11 +48,11 @@ def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
         total_tokens_used = {"input": 0, "output": 0, "total": 0}
         
         # Use execution timeout context manager for total time control
-        with execution_timeout(100) as timeout_flag:  # 100 seconds total execution limit
+        with execution_timeout(180) as timeout_flag:  # 180 seconds total execution limit
             for chunk in llm.stream(messages):
                 # Check if timeout occurred
                 if timeout_flag.is_set():
-                    raise TimeoutError(f"LLM execution exceeded 100 seconds")
+                    raise TimeoutError(f"LLM execution exceeded 180 seconds")
                 
                 chunk_content = chunk.content
                 print(chunk_content, end="", flush=True)
@@ -124,11 +124,11 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(call_llm)
             try:
-                response = future.result(timeout=100)  # 100 seconds timeout
+                response = future.result(timeout=180)  # 180 seconds timeout
             except FuturesTimeoutError:
                 # Cancel the future if it's still running
                 future.cancel()
-                raise TimeoutError(f"LLM execution exceeded 100 seconds")
+                raise TimeoutError(f"LLM execution exceeded 180 seconds")
         
         print("📥 LLM响应接收完成")
         

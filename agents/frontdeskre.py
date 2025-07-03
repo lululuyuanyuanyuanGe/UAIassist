@@ -410,7 +410,7 @@ class FrontdeskAgent:
         """
 
         print("📤 正在调用LLM进行模板分析...")
-        response = invoke_model_with_tools(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=prompt)], tools=self.tools)
+        response = invoke_model_with_tools(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=prompt)], tools=self.tools)
         print("📥 LLM响应接收成功")
         
         if response.content:

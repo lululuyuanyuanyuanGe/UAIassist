@@ -571,7 +571,7 @@ class ProcessUserInputAgent:
                 print("📤 正在调用LLM进行表格分析...")
                 
                 try:
-                    analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
+                    analysis_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
                     print("📥 表格分析响应接收成功")
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")

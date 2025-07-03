@@ -51,6 +51,7 @@ class FilloutTableState(TypedDict):
     file_process_code: str
     final_table: str
     error_message: str
+    error_message_summary: str
     execution_successful: bool
     retry: int
 
@@ -82,7 +83,7 @@ class FilloutTableAgent:
         graph.add_conditional_edges("execute_code", self._route_after_execute_code)
         graph.add_edge("summary_error_message", "generate_code")
         graph.add_edge("style_html_table", "convert_html_to_excel")
-        graph.add_edge("convert_html_to_excel", "END")
+        graph.add_edge("convert_html_to_excel", END)
 
         
         # Compile the graph
@@ -142,7 +143,7 @@ class FilloutTableAgent:
         """We will feed the combined data to the model, and ask it to generate the code to that is used to fill out the table for 
         our new template table"""
 
-        error_block = f"\n【上一次执行错误】\n{state['error_message']}" if state["error_message"] else ""
+        error_block = f"\n【上一次执行错误】\n{state['error_message_summary']}" if state["error_message_summary"] else ""
         code_block  = f"\n【上一次生成的代码】\n{state['file_process_code']}" if state["file_process_code"] else ""
         system_prompt = f"""
 你是一位专业的 Python 表格处理工程师，擅长使用 BeautifulSoup 和 pandas 操作 HTML 表格，并将结构化数据自动填写到模板表格中。
@@ -199,7 +200,7 @@ class FilloutTableAgent:
 
 
         print("🤖 正在生成表格填写代码...")
-        response = self.llm.invoke([SystemMessage(content=system_prompt)])
+        response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content=system_prompt)])
         print("✅ 代码生成完成")
         
         # Extract code from response if it's wrapped in markdown
@@ -346,8 +347,11 @@ class FilloutTableAgent:
         {state["error_message"]}
         下面是上一次的代码:
         {state["file_process_code"]}
-        
         """
+        response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content=system_prompt)])
+        return {
+            "error_message_summary": response
+        }
 
     def _route_after_execute_code(self, state: FilloutTableState) -> str:
         """This node will route back to the generate_code node, and ask the model to fix the error if error occurs"""
