@@ -48,12 +48,9 @@ class FilloutTableState(TypedDict):
     template_file: str
     rules: str
     combined_data: str
-    file_process_code: str
-    code_with_line: str
     final_table: str
     styled_html_table: str
     error_message: str
-    error_message_summary: str
     execution_successful: bool
     retry: int
 
@@ -72,19 +69,15 @@ class FilloutTableAgent:
         
         # Add nodes
         graph.add_node("combine_data", self._combine_data)
-        graph.add_node("generate_code", self._generate_file_process_code_from_LLM)
-        graph.add_node("execute_code", self._execute_code_from_LLM)
-        graph.add_node("summary_error_message", self._summary_error_message)
+        graph.add_node("generate_html_table", self._generate_html_table)
         graph.add_node("validate_html_table", self._validate_html_table)
         graph.add_node("style_html_table", self._style_html_table)
         graph.add_node("convert_html_to_excel", self._convert_html_to_excel)
         
         # Define the workflow
         graph.add_edge(START, "combine_data")
-        graph.add_edge("combine_data", "generate_code")
-        graph.add_edge("generate_code", "execute_code")
-        graph.add_conditional_edges("execute_code", self._route_after_execute_code)
-        graph.add_edge("summary_error_message", "generate_code")
+        graph.add_edge("combine_data", "generate_html_table")
+        graph.add_edge("generate_html_table", "validate_html_table")
         graph.add_edge("validate_html_table", "style_html_table")
         graph.add_edge("style_html_table", "convert_html_to_excel")
         graph.add_edge("convert_html_to_excel", END)
@@ -103,12 +96,9 @@ class FilloutTableAgent:
             "template_file": template_file,
             "rules": rules,
             "combined_data": "",
-            "file_process_code": "",
-            "code_with_line": "",
             "final_table": "",
             "styled_html_table": "",
             "error_message": "",
-            "error_message_summary": "",
             "execution_successful": True,
             "retry": 0,
         }
@@ -124,9 +114,10 @@ class FilloutTableAgent:
             file_content.append(f"=== Data File: {Path(file).name} ===\n{content}\n")
         
         # Combine supplement files
-        # for file in state["supplement_files_path"]:
-        #     content = file + "\n" + read_txt_file(file)
-        #     file_content.append(f"=== Supplement File: {Path(file).name} ===\n{content}\n")
+        if state.get("supplement_files_path"):
+            for file in state["supplement_files_path"]:
+                content = file + "\n" + read_txt_file(file)
+                file_content.append(f"=== Supplement File: {Path(file).name} ===\n{content}\n")
         
         # Add template file
         if state["template_file"]:
@@ -146,109 +137,18 @@ class FilloutTableAgent:
         
 
 
-    def _generate_file_process_code_from_LLM(self, state: FilloutTableState) -> FilloutTableState:
-        """We will feed the combined data to the model, and ask it to generate the code to that is used to fill out the table for 
-        our new template table"""
-
-        error_block = f"\n【上一次执行错误】\n{state['error_message_summary']}" if state["error_message_summary"] else ""
-        code_block  = f"\n【上一次生成的代码】\n{state['code_with_line']}" if state["code_with_line"] else ""
-        system_prompt = f"""
-你是一位专业的 Python 表格处理工程师，擅长使用 BeautifulSoup 和 pandas 操作 HTML 表格，并将结构化数据自动填写到模板表格中。
-
-【你的任务】
-用户会上传以下文件：
-1. 一个 HTML 格式的模板文件（通常是 Excel 导出的空表格）；
-2. 一个或多个 HTML 格式的数据文件（例如党员名册）；
-3. 补充说明文档（可选，可能包括字段含义、计算规则等）。
-
-你需要根据这些输入，生成一个完整可运行的 Python 脚本，请仔细思考，一步一步的思考，并完成以下任务：
-
-1. 使用 BeautifulSoup 对所有 HTML 文件进行 DOM 解析；
-2. 从数据文件中逐行提取 `<tr>` 和 `<td>` 内容，构造中间结构（例如 DataFrame），**严禁使用 `pandas.read_html()` 自动解析整个表格**；
-3. **不能通过字段名访问字段值**，必须使用列索引或说明中提供的映射顺序；
-4. 如果需要填写的字段内容需要计算（如"党龄"、"补贴"），必须根据说明编写 Python 函数实现；
-5. **模板表格中的原始数据行不能直接修改或重用，必须使用 `copy.deepcopy()` 备份模板行结构，并根据数据数量循环克隆并插入**；
-6. 不依赖模板中原有数据行数，必须覆盖全部数据；
-7. 最终生成的新 HTML 文件，其结构和格式必须与原模板保持一致，仅替换 `<td>` 中的文本内容，你也可以用代码完全重新生成填入数据的文件，但是需要保证文件的结构和格式与原模板保持一致
-8. 模板内已有的空白行需要删除，而不是保留
-9. 输出路径为：`D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html`
-
-【关键技术规范】
-- 使用 `BeautifulSoup` 解析 HTML；
-- 使用 `copy.deepcopy()` 克隆模板 `<tr>` 行；
-- 使用 `DataFrame` 临时管理提取后的数据行；
-- 使用 `.insert()` 将新行插入 `<table>` 末尾；
-- 每行 `<td>` 内容需用 `.string = str(...)` 逐个赋值；
-- 输出时用 `f.write(str(soup))` 写入完整 HTML。
-
-【调试机制】
-- 如果你生成的代码运行出错，系统会返回错误信息和之前的代码；
-- 你需要根据错误分析并修复代码，重新输出一个完整、可执行的 Python 脚本。
-
-【输出要求】
-- 仅输出纯 Python 脚本代码；
-- 不得输出 markdown、注释、解释性文字；
-- 代码应为完整可执行脚本，可直接传入 `exec()` 执行；
-- 输出路径为：`D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html`
-
-【当前输入】
-以下是用户上传的文件和说明：
-{state["combined_data"]}
-
-【上一次生成的代码和报错信息】
-{code_block}{error_block}
-
-请生成符合要求的完整 Python 脚本，或在原基础上修复错误并补充完善。
-"""
-
-
-
-
-
-
-
-        print("🤖 正在生成表格填写代码...")
-        response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content=system_prompt)])
-        print("✅ 代码生成完成")
-        
-        # Extract code from response if it's wrapped in markdown
-        code_content = response.strip()
-        if code_content.startswith('```python'):
-            code_content = code_content[9:]  # Remove ```python
-        elif code_content.startswith('```'):
-            code_content = code_content[3:]  # Remove ```
-            
-        if code_content.endswith('```'):
-            code_content = code_content[:-3]  # Remove ```
-            
-        # Clean up the code - remove any potential trailing characters
-        code_content = code_content.strip()
-        
-        state["retry"] = state.get("retry", 0) + 1
-        if state["retry"] > 3: 
-            print("❌ 已重试 3 次仍失败，终止。")
-            return "END"
-        
-        return {
-            "file_process_code": code_content,
-            "messages": [response],
-            "execution_successful": False     # code not yet run
-        }
-    
-
     def _clean_html_content(self, html_content: str) -> str:
-        """Clean up excessive whitespace and non-breaking spaces from HTML content"""
+        """清理HTML内容中的过多空白字符和非断行空格"""
         try:
-            # Replace multiple consecutive &nbsp; with a maximum of 3
             import re
             
-            # Replace 4+ consecutive &nbsp; with just 3
+            # 替换4个以上连续的&nbsp;为最多3个
             html_content = re.sub(r'(&nbsp;){4,}', r'&nbsp;&nbsp;&nbsp;', html_content)
             
-            # Replace excessive whitespace
+            # 替换过多的空白字符
             html_content = re.sub(r'\s{4,}', ' ', html_content)
             
-            # Remove extra newlines
+            # 移除多余的换行符
             html_content = re.sub(r'\n\s*\n', '\n', html_content)
             
             print(f"✅ HTML内容已清理，长度: {len(html_content)} 字符")
@@ -259,174 +159,82 @@ class FilloutTableAgent:
             print(f"⚠️ HTML清理失败: {e}")
             return html_content
 
-    def _execute_code_from_LLM(self, state: FilloutTableState) -> FilloutTableState:
-        """We will run the code from the model, and get the result. use exec() to execute the code in memroy"""
-        code = state["file_process_code"]
-        output_buffer = io.StringIO()
-        error_buffer = io.StringIO()
+    def _generate_html_table(self, state: FilloutTableState) -> FilloutTableState:
+        """直接生成完整的HTML表格，无需代码执行"""
 
-        print("🚀 正在执行生成的代码...")
-        
-        # Print the code for debugging
-        print("📝 生成的代码:")
-        lines = code.split('\n')
-        code_with_line = ""
-        for i, line in enumerate(lines, 1):
-            code_with_line += f"{i:2d}: {line}\n"
-            print(f"{i:2d}: {line}")
-        print("-" * 50)
-        
-        # Prepare execution environment
-        global_vars = {
-            "pd": pd, 
-            "BeautifulSoup": BeautifulSoup,
-            "Path": Path,
-            "json": json,
-            "re": re,
-            "datetime": datetime
-        }
-        
-        try:
-            # Directly execute the code
-            with contextlib.redirect_stdout(output_buffer):
-                with contextlib.redirect_stderr(error_buffer):
-                    exec(code, global_vars)
-            
-            output = output_buffer.getvalue()
-            errors = error_buffer.getvalue()
-            
-            if errors:
-                print(f"⚠️ 执行过程中有警告: {errors}")
-            
-            # Check if the output contains error messages from the generated code
-            error_patterns = [
-                "An error occurred:",
-                "Error:",
-                "Exception:",
-                "Traceback",
-                "NameError:",
-                "KeyError:",
-                "AttributeError:",
-                "TypeError:",
-                "ValueError:"
-            ]
-            
-            has_error_in_output = any(pattern in output for pattern in error_patterns)
-            
-            if has_error_in_output:
-                print("❌ 代码执行过程中发生错误")
-                print("错误输出:")
-                print(output)
-                
-                return {
-                    "final_table": output,
-                    "execution_successful": False,
-                    "error_message": f"Generated code internal error: {output}"
-                }
-            else:
-                print("✅ 代码执行成功")
-                
-                # If output from stdout is empty or minimal, try to find the HTML file
-                html_content = output.strip()
-                
-                if not html_content or len(html_content) < 100:
-                    # Look for common HTML output file patterns
-                    potential_files = [
-                        "agents/output/老党员补贴_结果.html",
-                        "老党员补贴_结果.html",
-                        "output.html",
-                        "result.html",
-                        "table.html"
-                    ]
-                    
-                    for file_path in potential_files:
-                        if Path(file_path).exists():
-                            try:
-                                html_content = read_txt_file(file_path)
-                                print(f"✅ 找到HTML文件: {file_path}")
-                                break
-                            except Exception as e:
-                                print(f"⚠️ 无法读取文件 {file_path}: {e}")
-                    
-                    # If still no HTML content, check if there's any HTML in the output
-                    if not html_content or len(html_content) < 100:
-                        if "<html>" in output or "<table>" in output:
-                            html_content = output
-                        else:
-                            print("⚠️ 未找到HTML内容，使用原始输出")
-                            html_content = output or "No HTML content generated"
-                
-                # Clean up the HTML content to prevent token limit issues
-                html_content = self._clean_html_content(html_content)
-                
-                return {
-                    "final_table": html_content,
-                    "execution_successful": True,
-                    "error_message": "",
-                    "code_with_line": code_with_line
-                }
-            
-        except SyntaxError as e:
-            # Handle syntax errors with detailed information
-            import traceback
-            full_traceback = traceback.format_exc()
-            error_msg = f"语法错误: {str(e)} (第{e.lineno}行, 第{e.offset}列)"
-            
-            # Print detailed syntax error information
-            print(f"❌ {error_msg}")
-            if e.lineno and e.lineno <= len(lines):
-                print(f"问题代码: {lines[e.lineno-1]}")
-            print("完整错误信息:")
-            print(full_traceback)
-            
-            return {
-                "final_table": f"执行失败: {error_msg}",
-                "execution_error": error_msg,
-                "execution_successful": False,
-                "error_message": full_traceback
-            }
-            
-        except Exception as e:
-            # Handle runtime errors with full traceback
-            import traceback
-            full_traceback = traceback.format_exc()
-            error_msg = f"代码执行错误: {str(e)}"
-            
-            # Print the complete error message
-            print(f"❌ {error_msg}")
-            print("完整错误信息:")
-            print(full_traceback)
-            
-            return {
-                "final_table": f"执行失败: {error_msg}",
-                "execution_error": error_msg,
-                "execution_successful": False,
-                "error_message": full_traceback
-            }
-        
+        system_prompt = f"""你是一位专业的智能表格填写专家，擅长分析结构化数据并自动生成完整的HTML表格。
 
-    def _route_after_execute_code(self, state: FilloutTableState) -> str:
-        """This node will route back to the generate_code node, and ask the model to fix the error if error occurs"""
-        if state["execution_successful"]:
-            return "validate_html_table"
-        else:
-            print("🔄 代码执行失败，返回重新生成代码...")
-            return "summary_error_message"
-        
+【核心任务】
+根据提供的数据文件、模板表格和补充规则，直接生成一个完整填写好的HTML表格。
 
-    def _summary_error_message(self, state: FilloutTableState) -> FilloutTableState:
-        """这个节点用于整理总结代码执行中的错误，并返回给智能体重新生成"""
-        system_prompt = f"""你的任务是根据报错信息和上一次的代码，总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码，
-        下面是报错信息:
-        {state["error_message"]}
-        下面是上一次的代码:
-        {state["file_process_code"]}
-        """
-        response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content=system_prompt)])
+【输入材料分析】
+1. **模板表格**：包含表头结构和格式要求
+2. **数据文件**：包含需要填入的原始数据
+3. **补充规则**：包含计算公式、筛选条件、填写规范等
+
+【处理要求】
+
+**数据提取与映射：**
+- 仔细分析模板表格的表头结构，识别每个字段的含义
+- 从数据文件中提取对应的信息，建立字段映射关系
+- 对于找不到直接对应的字段，根据补充规则进行推理计算
+
+**计算逻辑处理：**
+- 党龄计算：根据转正时间计算到2024年12月31日的年限
+- 补贴金额：严格按照补充文件中的标准进行计算
+- 年龄计算：根据身份证号或出生日期计算实际年龄
+- 其他计算字段：根据规则文档进行相应计算
+
+**数据完整性：**
+- 确保所有数据行都被正确处理，不遗漏任何记录
+- 对于缺失数据，根据上下文和规则进行合理填充
+- 删除模板中的空白行，只保留有效数据
+
+**HTML格式要求：**
+- 保持与原模板完全一致的表格结构
+- 保留原有的HTML标签、属性和样式
+- 确保生成的HTML代码规范、完整、可解析
+
+【输出格式】
+请直接返回完整的HTML表格代码，包含：
+1. 完整的HTML文档结构（如果原模板有）
+2. 所有表头和数据行
+3. 正确的HTML标签闭合
+4. 与模板一致的格式和样式
+
+【质量标准】
+✓ 数据准确性：所有计算结果必须正确
+✓ 完整性：不遗漏任何数据记录
+✓ 格式一致性：与模板表格格式完全一致
+✓ HTML规范性：生成的代码符合HTML标准
+
+【注意事项】
+- 严格按照补充文件中的计算规则执行
+- 注意日期格式的统一处理
+- 确保数值计算的精确性
+- 保持表格的专业性和可读性
+
+---
+
+【数据文件和补充规则】
+{state["combined_data"][:10000]}
+
+【模板表格结构】
+{state.get("template_file", "未提供模板文件")}
+
+请基于以上材料，直接生成完整填写好的HTML表格："""
+
+        print("🤖 正在生成HTML表格...")
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
+        print("✅ HTML表格生成完成")
+        
+        # 清理生成的HTML内容
+        cleaned_response = self._clean_html_content(response)
+        
         return {
-            "error_message_summary": response
+            "final_table": cleaned_response,
+            "messages": [AIMessage(content="HTML表格已生成完成")]
         }
-
 
     def _validate_html_table(self, state: FilloutTableState) -> FilloutTableState:
         """这个节点用于验证模型生成的html表格是否符合要求，并提出修改意见"""
