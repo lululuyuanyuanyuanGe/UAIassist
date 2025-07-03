@@ -145,7 +145,16 @@ class ProcessUserInputAgent:
 
     def _collect_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This is the node where we get user's input"""
+        print("\n🔍 开始执行: _collect_user_input")
+        print("=" * 50)
+        print("⌨️ 等待用户输入...")
+        
         user_input = interrupt("用户：")
+        
+        print(f"📥 接收到用户输入: {user_input[:100]}{'...' if len(user_input) > 100 else ''}")
+        print("✅ _collect_user_input 执行完成")
+        print("=" * 50)
+        
         return {
             "process_user_input_messages": [HumanMessage(content=user_input)],
             "user_input": user_input
@@ -175,12 +184,16 @@ class ProcessUserInputAgent:
 
     def _file_upload(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will upload user's file to our system"""
+        print("\n🔍 开始执行: _file_upload")
+        print("=" * 50)
         
         # Re-detect files from user input since routing functions cannot modify state
         latest_message = state["process_user_input_messages"][-1]
         message_content = latest_message.content if hasattr(latest_message, 'content') else str(latest_message)
         
+        print("📁 正在检测用户输入中的文件路径...")
         detected_files = detect_and_process_file_paths(message_content)
+        print(f"📋 检测到 {len(detected_files)} 个文件")
         
         # Load data.json with error handling
         data_file = Path("agents/data.json")
@@ -191,6 +204,8 @@ class ProcessUserInputAgent:
             print(f"⚠️ data.json文件出错: {e}")
             # Initialize empty structure if file is missing or corrupted
             data = {"表格": {}, "文档": {}}
+        
+        print("🔍 正在检查文件是否已存在...")
         for file in detected_files:
             file_name = Path(file).name
             if file_name in data["表格"] or file_name in data["文档"]:
@@ -198,18 +213,22 @@ class ProcessUserInputAgent:
                 print(f"⚠️ 文件 {file} 已存在")
         
         if not detected_files:
-            print("⚠️ No new files to upload")
+            print("⚠️ 没有新文件需要上传")
+            print("✅ _file_upload 执行完成")
+            print("=" * 50)
             return {
                 "new_upload_files_path": [],
                 "new_upload_files_processed_path": []
             }
         
-        print(f"🔄 Processing {len(detected_files)} new files")
+        print(f"🔄 正在处理 {len(detected_files)} 个新文件...")
         
         # Process the files using the correct session_id
         result = retrieve_file_content(detected_files, "files")
         
-        print(f"✅ File uploaded: {result}")
+        print(f"✅ 文件上传完成: {result}")
+        print("✅ _file_upload 执行完成")
+        print("=" * 50)
         
         # Update state with new files
         # Safely handle the case where upload_files_path might not exist in state
@@ -226,6 +245,9 @@ class ProcessUserInputAgent:
         """This node will analyze the user's uploaded files, it need to classify the file into template
         supplement, or irrelevant. If all files are irrelevant, it will flag for text analysis instead."""
         
+        print("\n🔍 开始执行: _analyze_uploaded_files")
+        print("=" * 50)
+        
         import json
         from pathlib import Path
         
@@ -240,9 +262,14 @@ class ProcessUserInputAgent:
         processed_files = []
         # Safely handle the case where new_upload_files_processed_path might not exist in state
         new_files_to_process = state.get("new_upload_files_processed_path", [])
+        
+        print(f"📁 需要分析的文件数量: {len(new_files_to_process)}")
+        
         for file_path in new_files_to_process:
             try:
                 source_path = Path(file_path)
+                print(f"🔍 正在分析文件: {source_path.name}")
+                
                 if not source_path.exists():
                     print(f"❌ 文件不存在: {file_path}")
                     classification_results["irrelevant"].append(file_path)
@@ -277,7 +304,7 @@ class ProcessUserInputAgent:
                 }}"""
                 
                 # Get LLM analysis for this file
-                print("Debug: Calling LLM for file_type analysis")
+                print("📤 正在调用LLM进行文件分类...")
                 # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                 analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
 
@@ -285,14 +312,13 @@ class ProcessUserInputAgent:
                 try:
                     # Extract JSON from response
                     response_content = analysis_response.strip()
-                    print(f"🔍 调试信息 - 原始LLM响应: {repr(response_content)}")
+                    print(f"📥 LLM分类响应: {response_content}")
                     
                     # Remove markdown code blocks if present
                     if response_content.startswith('```'):
                         response_content = response_content.split('\n', 1)[1]
                         response_content = response_content.rsplit('\n', 1)[0]
                     
-                    print(f"🔍 调试信息 - 处理后的响应: {repr(response_content)}")
                     file_classification = json.loads(response_content)
                     classification_type = file_classification.get("classification", "irrelevant")
                     
@@ -321,7 +347,16 @@ class ProcessUserInputAgent:
                 classification_results["irrelevant"].append(file_path)
                 continue
         
+        print(f"📊 文件分析完成:")
+        print(f"  - 模板文件: {len(classification_results['template'])} 个")
+        print(f"  - 补充表格: {len(classification_results['supplement']['表格'])} 个")
+        print(f"  - 补充文档: {len(classification_results['supplement']['文档'])} 个")
+        print(f"  - 无关文件: {len(classification_results['irrelevant'])} 个")
+        
         if not processed_files and not classification_results["irrelevant"]:
+            print("⚠️ 没有找到可处理的文件")
+            print("✅ _analyze_uploaded_files 执行完成")
+            print("=" * 50)
             return {
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
@@ -346,7 +381,9 @@ class ProcessUserInputAgent:
         )
         
         if all_files_irrelevant:
-            
+            print("⚠️ 所有文件都被分类为无关文件")
+            print("✅ _analyze_uploaded_files 执行完成")
+            print("=" * 50)
             return {
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
@@ -361,11 +398,9 @@ class ProcessUserInputAgent:
             补充文档: {len(supplement_files.get("文档", []))} 个
             无关文件: {len(irrelevant_files)} 个"""
             
-            """            分类详情:
-            模板: {[Path(f).name for f in uploaded_template_files]}
-            表格: {[Path(f).name for f in supplement_files.get("表格", [])]}
-            文档: {[Path(f).name for f in supplement_files.get("文档", [])]}
-            无关: {[Path(f).name for f in irrelevant_files]}"""
+            print("✅ 文件分析完成，存在有效文件")
+            print("✅ _analyze_uploaded_files 执行完成")
+            print("=" * 50)
             
             return {
                 "uploaded_template_files_path": uploaded_template_files,
@@ -409,7 +444,10 @@ class ProcessUserInputAgent:
     
     def _process_supplement(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will process the supplement files, it will analyze the supplement files and summarize the content of the files as well as stored the summary in data.json"""
+        print("\n🔍 开始执行: _process_supplement")
+        print("=" * 50)
         print("Debug: Start to process_supplement")
+        
         # Load existing data.json
         data_json_path = Path("agents/data.json")
         try:
@@ -421,10 +459,15 @@ class ProcessUserInputAgent:
         table_files = state["supplement_files_path"]["表格"]
         document_files = state["supplement_files_path"]["文档"]
         
+        print(f"📊 需要处理的表格文件: {len(table_files)} 个")
+        print(f"📄 需要处理的文档文件: {len(document_files)} 个")
+        
         # Process table files
         for table_file in table_files:
             try:
                 source_path = Path(table_file)
+                print(f"🔍 正在处理表格文件: {source_path.name}")
+                
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(table_file)
@@ -469,14 +512,12 @@ class ProcessUserInputAgent:
 文件内容:
 {file_content}"""
 
-                print("Debug: Calling LLM for table analysis")
-                print(f"System prompt length: {len(system_prompt)} characters")
+                print("📤 正在调用LLM进行表格分析...")
                 
                 try:
                     # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                     analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
-                    print("Debug: LLM for table analysis response received successfully")
-                    print(f"Response content length: {len(analysis_response)} characters")
+                    print("📥 表格分析响应接收成功")
                     state["process_user_input_messages"].append(AIMessage(content=analysis_response))
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
@@ -502,6 +543,8 @@ class ProcessUserInputAgent:
         for document_file in document_files:
             try:
                 source_path = Path(document_file)
+                print(f"🔍 正在处理文档文件: {source_path.name}")
+                
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(document_file)
@@ -533,14 +576,12 @@ class ProcessUserInputAgent:
 
                                 
                     
-                print("Debug: Calling LLM for document analysis")
-                print(f"System prompt length: {len(system_prompt)} characters")
+                print("📤 正在调用LLM进行文档分析...")
                 
                 try:
                     # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                     analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
-                    print("Debug: LLM for document analysis response received successfully")
-                    print(f"Response content length: {len(analysis_response)} characters")
+                    print("📥 文档分析响应接收成功")
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
                     # Create fallback response
@@ -572,22 +613,32 @@ class ProcessUserInputAgent:
         except Exception as e:
             print(f"❌ 保存 data.json 时出错: {e}")
         
+        print("✅ _process_supplement 执行完成")
+        print("=" * 50)
         return state
         
         
     def _process_irrelevant(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will process the irrelevant files, it will delete the irrelevant files from the conversations folder"""
         
+        print("\n🔍 开始执行: _process_irrelevant")
+        print("=" * 50)
+        
+        irrelevant_files = state["irrelevant_files_path"]
+        print(f"🗑️ 需要删除的无关文件数量: {len(irrelevant_files)}")
+        
         deleted_files = []
         failed_deletes = []
         
-        for file_path in state["irrelevant_files_path"]:
+        for file_path in irrelevant_files:
             try:
                 file_to_delete = Path(file_path)
+                print(f"🗑️ 正在删除: {file_to_delete.name}")
+                
                 if file_to_delete.exists():
                     os.remove(file_to_delete)
                     deleted_files.append(file_to_delete.name)
-                    print(f"🗑️ 已删除无关文件: {file_to_delete.name}")
+                    print(f"✅ 已删除无关文件: {file_to_delete.name}")
                 else:
                     print(f"⚠️ 文件不存在，跳过删除: {file_path}")
                     
@@ -595,22 +646,32 @@ class ProcessUserInputAgent:
                 failed_deletes.append(Path(file_path).name)
                 print(f"❌ 删除文件时出错 {file_path}: {e}")
 
+        print(f"📊 删除结果: 成功 {len(deleted_files)} 个，失败 {len(failed_deletes)} 个")
+        print("✅ _process_irrelevant 执行完成")
+        print("=" * 50)
+        
         return state
 
     
     def _process_template(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node will process the template files, it will analyze the template files and determine if it's a valid template"""
         
+        print("\n🔍 开始执行: _process_template")
+        print("=" * 50)
+        
         template_files = state["uploaded_template_files_path"]
+        print(f"📋 需要处理的模板文件数量: {len(template_files)}")
         
         # If multiple templates, ask user to choose
         if len(template_files) > 1:
+            print("⚠️ 检测到多个模板文件，需要用户选择")
             template_names = [Path(f).name for f in template_files]
             question = f"检测到多个模板文件，请选择要使用的模板：\n" + \
                       "\n".join([f"{i+1}. {name}" for i, name in enumerate(template_names)]) + \
                       "\n请输入序号（如：1）："
             
             try:
+                print("🤝 正在请求用户确认模板选择...")
                 user_choice = self.request_user_clarification(question, "系统需要确定使用哪个模板文件进行后续处理")
                 
                 # Parse user choice
@@ -631,6 +692,7 @@ class ProcessUserInputAgent:
                         
                         # Update state to only include selected template
                         template_files = [selected_template]
+                        print(f"✅ 用户选择了模板: {Path(selected_template).name}")
                         
                     else:
                         print("❌ 无效的选择，使用第一个模板")
@@ -649,6 +711,7 @@ class ProcessUserInputAgent:
         
         # Analyze the selected template for complexity
         template_file = template_files[0]
+        print(f"🔍 正在分析模板复杂度: {Path(template_file).name}")
         
         try:
             source_path = Path(template_file)
@@ -669,8 +732,7 @@ class ProcessUserInputAgent:
             [Simple] - 如果是简单模板（只包含列表头）"""
             
 
-            print("Debug: Calling LLM for template analysis")
-            print(system_prompt)
+            print("📤 正在调用LLM进行模板复杂度分析...")
             
             analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
             
@@ -682,7 +744,9 @@ class ProcessUserInputAgent:
             else:
                 template_type = "[Simple]"  # Default fallback
                 
-            print(f"🔍 Template analysis result: {template_type}")
+            print(f"📥 模板分析结果: {template_type}")
+            print("✅ _process_template 执行完成")
+            print("=" * 50)
 
             return {"template_complexity": template_type,
                     "uploaded_template_files_path": [template_file]
@@ -693,6 +757,8 @@ class ProcessUserInputAgent:
             # Default to Simple if analysis fails
             template_type = "[Simple]"
             print("⚠️ 模板分析失败，默认为简单模板")
+            print("✅ _process_template 执行完成")
+            print("=" * 50)
             
             return {
                 "template_complexity": template_type,
@@ -706,9 +772,16 @@ class ProcessUserInputAgent:
         It validates if the user input contains meaningful table/Excel-related content.
         Returns [Valid] or [Invalid] based on the analysis."""
         
+        print("\n🔍 开始执行: _analyze_text_input")
+        print("=" * 50)
+        
         user_input = state["user_input"]
+        print(f"📝 正在分析用户文本输入: {user_input[:100]}{'...' if len(user_input) > 100 else ''}")
         
         if not user_input or user_input.strip() == "":
+            print("❌ 用户输入为空")
+            print("✅ _analyze_text_input 执行完成")
+            print("=" * 50)
             return {
                 "text_input_validation": "[Invalid]",
                 "process_user_input_messages": [SystemMessage(content="❌ 用户输入为空，验证失败")]
@@ -746,10 +819,12 @@ class ProcessUserInputAgent:
         [Invalid] - 如果输入无关或无意义"""
         
         try:
+            print("📤 正在调用LLM进行文本输入验证...")
             # Get LLM validation
             validation_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
             # validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
             
+            print(f"📥 验证响应: {validation_response}")
             
             if "[Valid]" in validation_response:
                 validation_result = "[Valid]"
@@ -763,12 +838,18 @@ class ProcessUserInputAgent:
                 status_message = "用户输入验证失败 - 无法确定输入有效性，默认为无效"
                 print(f"⚠️ 无法解析验证结果，LLM响应: {validation_response}")
             
+            print(f"📊 验证结果: {validation_result}")
+            print(f"📋 状态说明: {status_message}")
+            
             # Create validation summary
             summary_message = f"""文本输入安全检查完成:
             
             **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
             **验证结果**: {validation_result}
             **状态**: {status_message}"""
+            
+            print("✅ _analyze_text_input 执行完成")
+            print("=" * 50)
             
             return {
                 "text_input_validation": validation_result,
@@ -783,6 +864,9 @@ class ProcessUserInputAgent:
             
             📄 **用户输入**: {user_input[:100]}{'...' if len(user_input) > 100 else ''}
             🔒 **安全措施**: 默认标记为无效输入"""
+            
+            print("✅ _analyze_text_input 执行完成 (出错)")
+            print("=" * 50)
             
             return {
                 "text_input_validation": "[Invalid]",
@@ -808,17 +892,20 @@ class ProcessUserInputAgent:
     def _summary_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """Summary node that consolidates all information from this round and determines next routing."""
         
+        print("\n🔍 开始执行: _summary_user_input")
+        print("=" * 50)
+        
         print(f"🔄 开始总结用户输入，当前消息数: {len(state.get('process_user_input_messages', []))}")
         
         # Extract content from all messages in this processing round
         process_user_input_messages_content =("\n").join([item.content for item in state["process_user_input_messages"]])
-        print(process_user_input_messages_content)
+        print(f"📝 处理的消息内容长度: {len(process_user_input_messages_content)} 字符")
         
         # Determine route decision based on template complexity (with proper parsing)
         template_complexity = state.get("template_complexity", "")
-        print(f"🔍 Debug - Raw template_complexity: {repr(template_complexity)}")
+        print(f"🔍 原始模板复杂度: {repr(template_complexity)}")
         template_complexity = template_complexity.strip()
-        print(f"🔍 Debug - Cleaned template_complexity: '{template_complexity}'")
+        print(f"🔍 清理后模板复杂度: '{template_complexity}'")
         
         if "[Complex]" in template_complexity:
             route_decision = "complex_template"
@@ -827,7 +914,7 @@ class ProcessUserInputAgent:
         else:
             route_decision = "previous_node"
         
-        print(f"🔍 Debug - route_decision: {route_decision}")
+        print(f"🎯 路由决定: {route_decision}")
         
         system_prompt = f"""
         根据历史对话总结这轮用户信息收集过程中，用户都提供了哪些有价值的信息，包括文件上传，文本输入，模板上传等
@@ -838,8 +925,9 @@ class ProcessUserInputAgent:
         }}"""
 
         try:
+            print("📤 正在调用LLM生成总结...")
             response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
-            print(f"🔍 Debug - Raw LLM response: {repr(response)}")
+            print(f"📥 LLM总结响应长度: {len(response)} 字符")
             
             # Clean the response to handle malformed JSON
             cleaned_response = response.strip()
@@ -853,7 +941,11 @@ class ProcessUserInputAgent:
             response_json["next_node"] = route_decision
             final_response = json.dumps(response_json, ensure_ascii=False)
             
-            print(f"🔍 Debug - final_response: {final_response}")
+            print(f"✅ 总结生成成功")
+            print(f"📊 最终响应: {final_response}")
+            print("✅ _summary_user_input 执行完成")
+            print("=" * 50)
+            
             return {"summary_message": final_response}
             
         except json.JSONDecodeError as e:
@@ -864,72 +956,56 @@ class ProcessUserInputAgent:
                 "summary": "用户本轮提供了文件信息，但解析过程中出现错误",
                 "next_node": route_decision
             }
-            return {"summary_message": json.dumps(fallback_response, ensure_ascii=False)}
+            final_fallback = json.dumps(fallback_response, ensure_ascii=False)
+            print(f"🔄 使用备用响应: {final_fallback}")
+            print("✅ _summary_user_input 执行完成 (备用)")
+            print("=" * 50)
+            return {"summary_message": final_fallback}
 
 
 
-    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None) -> str:
-        """This function runs the process user input agent"""
-        initial_state = self.create_initial_state( previous_AI_messages)
+    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None) -> List:
+        """This function runs the process user input agent using invoke method instead of streaming"""
+        print("\n🚀 开始运行 ProcessUserInputAgent")
+        print("=" * 60)
+        
+        initial_state = self.create_initial_state(previous_AI_messages)
         config = {"configurable": {"thread_id": session_id}}
-
-        # final_state = self.graph.invoke(initial_state, config = config)
-        # print(final_state)
-        # summar_mesage= final_state["summary_message"]
-        # print(summar_mesage)
-        # return summar_mesage
-        current_state = initial_state
-        summary_message = ""
-        uploaded_template_files_path = []
-        while True:
-            try:
-                has_interrupt = False
-                for chunk in self.graph.stream(current_state, config = config, stream_mode = "updates"):
-                    for node_name, node_output in chunk.items():
-                        print(f"\n📍 Node: {node_name}")
-                        print("-" * 30)
-
-                        # check if there is an interrupt
-                        if "__interrupt__" in chunk:
-                            has_interrupt = True
-                            interrupt_value = chunk['__interrupt__'][0].value
-                            print(f"\n💬 智能体: {interrupt_value}")
-                            user_response = input("👤 请输入您的回复: ")
-
-                            # set the next input
-                            current_state = Command(resume=user_response)
-                            break
-
-                        if isinstance(node_output, dict):
-                            if "messages" in node_output and node_output["messages"]:
-                                latest_message = node_output["messages"][-1]
-                                if hasattr(latest_message, 'content') and not isinstance(latest_message, HumanMessage):
-                                    print(f"💬 智能体回复: {latest_message.content}")
-
-                            for key, value in node_output.items():
-                                if key != "messages" and value:
-                                    print(f"📊 {key}: {value}")
-                                if key == "summary_message":
-                                    summary_message = value
-                        print("-" * 30)
-                
-                if not has_interrupt:
-                    # Access the final state after streaming completes
-                    final_state = self.graph.get_state(config)
-                    print(f"Final state: {final_state.values}")
-                    
-                    # Extract what you need from the final state
-                    summary_message = final_state.values.get("summary_message", "")
-                    uploaded_template_files_path = final_state.values.get("uploaded_template_files_path", [])
-                    print("收集信息返回：", summary_message, uploaded_template_files_path)
-                    return_list = [summary_message, uploaded_template_files_path]
-                    print("收集信息返回数组：", return_list)
-                    return [summary_message, uploaded_template_files_path]
-
+        
+        print(f"📋 会话ID: {session_id}")
+        print(f"📝 初始状态已创建")
+        print("🔄 正在执行用户输入处理工作流...")
+        
+        try:
+            # Use invoke instead of stream for simpler execution
+            final_state = self.graph.invoke(initial_state, config=config)
             
-            except Exception as e:
-                print(f"❌ 处理用户输入时出错: {e}")
-                break
+            print("\n🎉 ProcessUserInputAgent 执行完成！")
+            print("=" * 60)
+            
+            # Extract results from final state
+            summary_message = final_state.get("summary_message", "")
+            uploaded_template_files_path = final_state.get("uploaded_template_files_path", [])
+            
+            print("📊 最终结果:")
+            print(f"- 总结消息: {'已生成' if summary_message else '未生成'}")
+            print(f"- 模板文件数量: {len(uploaded_template_files_path)}")
+            if uploaded_template_files_path:
+                for i, file_path in enumerate(uploaded_template_files_path, 1):
+                    print(f"  {i}. {Path(file_path).name}")
+            
+            return_list = [summary_message, uploaded_template_files_path]
+            print(f"🔄 返回结果: {len(return_list)} 项")
+            return return_list
+            
+        except Exception as e:
+            print(f"❌ 执行过程中发生错误: {e}")
+            # Return empty results on error
+            error_summary = json.dumps({
+                "summary": f"处理用户输入时发生错误: {str(e)}",
+                "next_node": "previous_node"
+            }, ensure_ascii=False)
+            return [error_summary, []]
 
 
 

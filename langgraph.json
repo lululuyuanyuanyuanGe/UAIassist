@@ -3,9 +3,7 @@
     "graphs": {
         "process_user_input_Agent": "./agents/processUserInput.py:graph",
         "test_prompt_graph": "./test_modesl/test_prompt.py:graph",
-        "frontdesk_agent": "./agents/frontdeskre.py:graph",
-        "table_fillout_agent": "./agents/filloutTable.py:graph"
-        
+        "frontdesk_agent": "./agents/frontdeskre.py:graph"
     },
     "python_version": "3.13",
     "env": "./test_modesl/.env",

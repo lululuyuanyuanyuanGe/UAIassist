@@ -57,8 +57,7 @@ class FilloutTableState(TypedDict):
 
 
 class FilloutTableAgent:
-    def __init__(self, model_name: str = "gpt-4o"):
-        self.llm = model_creation(model_name)
+    def __init__(self):
         self.graph = self._build_graph()
         
 

@@ -187,7 +187,9 @@ class FrontdeskAgent:
         
     def _route_after_initial_collect_user_input(self, state: FrontdeskState) -> str:
         """初始调用ProcessUserInputAgent后，根据返回信息决定下一步的流程"""
+        print("state测试", state["messages"][-1].content)
         summary_message = json.loads(state["messages"][-1].content)
+        print("summary_message测试: ", summary_message)
         next_node = summary_message.get("next_node", "previous_node")
         print(f"🔄 路由决定: {next_node}")
             
