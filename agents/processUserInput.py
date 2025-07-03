@@ -250,6 +250,7 @@ class ProcessUserInputAgent:
         
         import json
         from pathlib import Path
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         
         # Initialize classification results
         classification_results = {
@@ -265,15 +266,27 @@ class ProcessUserInputAgent:
         
         print(f"📁 需要分析的文件数量: {len(new_files_to_process)}")
         
-        for file_path in new_files_to_process:
+        if not new_files_to_process:
+            print("⚠️ 没有找到可处理的文件")
+            print("✅ _analyze_uploaded_files 执行完成")
+            print("=" * 50)
+            return {
+                "uploaded_template_files_path": [],
+                "supplement_files_path": {"表格": [], "文档": []},
+                "irrelevant_files_path": [],
+                "all_files_irrelevant": True,  # Flag for routing to text analysis
+                "process_user_input_messages": [SystemMessage(content="没有找到可处理的文件，将分析用户文本输入")]
+            }
+        
+        def analyze_single_file(file_path: str) -> tuple[str, str, str]:
+            """Analyze a single file and return (file_path, classification, file_name)"""
             try:
                 source_path = Path(file_path)
                 print(f"🔍 正在分析文件: {source_path.name}")
                 
                 if not source_path.exists():
                     print(f"❌ 文件不存在: {file_path}")
-                    classification_results["irrelevant"].append(file_path)
-                    continue
+                    return file_path, "irrelevant", source_path.name
                 
                 # Read file content for analysis
                 file_content = source_path.read_text(encoding='utf-8')
@@ -306,7 +319,6 @@ class ProcessUserInputAgent:
                 
                 # Get LLM analysis for this file
                 print("📤 正在调用LLM进行文件分类...")
-                # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                 analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
 
                 # Parse JSON response for this file
@@ -323,36 +335,60 @@ class ProcessUserInputAgent:
                     file_classification = json.loads(response_content)
                     classification_type = file_classification.get("classification", "irrelevant")
                     
-                    # Add to appropriate category
-                    if classification_type == "template":
-                        classification_results["template"].append(file_path)
-                    elif classification_type == "supplement-表格":
-                        classification_results["supplement"]["表格"].append(file_path)
-                    elif classification_type == "supplement-文档":
-                        classification_results["supplement"]["文档"].append(file_path)
-                    else:  # irrelevant or unknown
-                        classification_results["irrelevant"].append(file_path)
-                    
-                    processed_files.append(source_path.name)
                     print(f"✅ 文件 {source_path.name} 分类为: {classification_type}")
+                    return file_path, classification_type, source_path.name
                     
                 except json.JSONDecodeError as e:
                     print(f"❌ 文件 {source_path.name} JSON解析错误: {e}")
                     print(f"LLM响应: {analysis_response}")
                     # Fallback: mark as irrelevant for safety
-                    classification_results["irrelevant"].append(file_path)
+                    return file_path, "irrelevant", source_path.name
                 
             except Exception as e:
                 print(f"❌ 处理文件出错 {file_path}: {e}")
-                # Add to irrelevant on error
-                classification_results["irrelevant"].append(file_path)
-                continue
+                # Return irrelevant on error
+                return file_path, "irrelevant", Path(file_path).name
         
-        print(f"📊 文件分析完成:")
+        # Use ThreadPoolExecutor for parallel processing
+        max_workers = min(len(new_files_to_process), 5)  # Limit to 5 concurrent requests
+        print(f"🚀 开始并行处理文件，使用 {max_workers} 个工作线程")
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all file analysis tasks
+            future_to_file = {
+                executor.submit(analyze_single_file, file_path): file_path 
+                for file_path in new_files_to_process
+            }
+            
+            # Process completed tasks as they finish
+            for future in as_completed(future_to_file):
+                file_path = future_to_file[future]
+                try:
+                    file_path_result, classification_type, file_name = future.result()
+                    
+                    # Add to appropriate category
+                    if classification_type == "template":
+                        classification_results["template"].append(file_path_result)
+                    elif classification_type == "supplement-表格":
+                        classification_results["supplement"]["表格"].append(file_path_result)
+                    elif classification_type == "supplement-文档":
+                        classification_results["supplement"]["文档"].append(file_path_result)
+                    else:  # irrelevant or unknown
+                        classification_results["irrelevant"].append(file_path_result)
+                    
+                    processed_files.append(file_name)
+                    
+                except Exception as e:
+                    print(f"❌ 并行处理文件任务失败 {file_path}: {e}")
+                    # Add to irrelevant on error
+                    classification_results["irrelevant"].append(file_path)
+        
+        print(f"🎉 并行文件分析完成:")
         print(f"  - 模板文件: {len(classification_results['template'])} 个")
         print(f"  - 补充表格: {len(classification_results['supplement']['表格'])} 个")
         print(f"  - 补充文档: {len(classification_results['supplement']['文档'])} 个")
         print(f"  - 无关文件: {len(classification_results['irrelevant'])} 个")
+        print(f"  - 成功处理: {len(processed_files)} 个文件")
         
         if not processed_files and not classification_results["irrelevant"]:
             print("⚠️ 没有找到可处理的文件")
@@ -449,6 +485,8 @@ class ProcessUserInputAgent:
         print("=" * 50)
         print("Debug: Start to process_supplement")
         
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         # Load existing data.json with better error handling
         data_json_path = Path("agents/data.json")
         try:
@@ -481,8 +519,8 @@ class ProcessUserInputAgent:
         # Collect new messages instead of directly modifying state
         new_messages = []
         
-        # Process table files
-        for table_file in table_files:
+        def process_table_file(table_file: str) -> tuple[str, str, dict]:
+            """Process a single table file and return (file_path, file_type, result_data)"""
             try:
                 source_path = Path(table_file)
                 print(f"🔍 正在处理表格文件: {source_path.name}")
@@ -511,7 +549,6 @@ class ProcessUserInputAgent:
   }}
 }}'''.format(file_name=file_name)
 
-
                 system_prompt = f"""你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
 
 1. 提取表格的多级表头结构；
@@ -534,46 +571,43 @@ class ProcessUserInputAgent:
                 print("📤 正在调用LLM进行表格分析...")
                 
                 try:
-                    # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                     analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
                     print("📥 表格分析响应接收成功")
-                    new_messages.append(AIMessage(content=analysis_response))
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
-                    # Create fallback response
-                    analysis_response = type('Response', (), {
-                        'content': f"表格文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
-                    })()
+                    # Create fallback response  
+                    analysis_response = f"表格文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
                 
-                # Store in data.json (this should happen for BOTH success and failure)
-                file_key = source_path.name
-                new_entry = {
-                    "summary": analysis_response,
-                    "file_path": str(table_file),
-                    "timestamp": datetime.now().isoformat(),
-                    "file_size": source_path.stat().st_size
+                # Create result data
+                result_data = {
+                    "file_key": source_path.name,
+                    "new_entry": {
+                        "summary": analysis_response,
+                        "file_path": str(table_file),
+                        "timestamp": datetime.now().isoformat(),
+                        "file_size": source_path.stat().st_size
+                    },
+                    "analysis_response": analysis_response
                 }
                 
-                # Check if this file was already processed
-                if file_key in data["表格"]:
-                    print(f"⚠️ 文件 {file_key} 已存在，将更新其内容")
-                    # Preserve any additional fields that might exist
-                    existing_entry = data["表格"][file_key]
-                    for key, value in existing_entry.items():
-                        if key not in new_entry:
-                            new_entry[key] = value
-                else:
-                    print(f"📝 添加新的表格文件: {file_key}")
-                
-                data["表格"][file_key] = new_entry
-                
                 print(f"✅ 表格文件已分析: {source_path.name}")
+                return table_file, "table", result_data
                 
             except Exception as e:
                 print(f"❌ 处理表格文件出错 {table_file}: {e}")
+                return table_file, "table", {
+                    "file_key": Path(table_file).name,
+                    "new_entry": {
+                        "summary": f"表格文件处理失败: {str(e)}",
+                        "file_path": str(table_file),
+                        "timestamp": datetime.now().isoformat(),
+                        "file_size": 0
+                    },
+                    "analysis_response": f"表格文件处理失败: {str(e)}"
+                }
 
-        # Process document files
-        for document_file in document_files:
+        def process_document_file(document_file: str) -> tuple[str, str, dict]:
+            """Process a single document file and return (file_path, file_type, result_data)"""
             try:
                 source_path = Path(document_file)
                 print(f"🔍 正在处理文档文件: {source_path.name}")
@@ -607,50 +641,110 @@ class ProcessUserInputAgent:
 {file_content}
 """.format(file_name=file_name, file_content=file_content)
 
-                                
-                    
                 print("📤 正在调用LLM进行文档分析...")
                 
                 try:
-                    # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                     analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
                     print("📥 文档分析响应接收成功")
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
                     # Create fallback response
-                    analysis_response = type('Response', (), {
-                        'content': f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
-                    })()
+                    analysis_response = f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
 
-                # Collect the message instead of directly modifying state
-                new_messages.append(AIMessage(content=analysis_response))
-                
-                # Store in data.json (this should happen for BOTH success and failure)
-                file_key = source_path.name
-                new_entry = {
-                    "summary": analysis_response,
-                    "file_path": str(document_file),
-                    "timestamp": datetime.now().isoformat(),
-                    "file_size": source_path.stat().st_size
+                # Create result data
+                result_data = {
+                    "file_key": source_path.name,
+                    "new_entry": {
+                        "summary": analysis_response,
+                        "file_path": str(document_file),
+                        "timestamp": datetime.now().isoformat(),
+                        "file_size": source_path.stat().st_size
+                    },
+                    "analysis_response": analysis_response
                 }
                 
-                # Check if this file was already processed
-                if file_key in data["文档"]:
-                    print(f"⚠️ 文件 {file_key} 已存在，将更新其内容")
-                    # Preserve any additional fields that might exist
-                    existing_entry = data["文档"][file_key]
-                    for key, value in existing_entry.items():
-                        if key not in new_entry:
-                            new_entry[key] = value
-                else:
-                    print(f"📝 添加新的文档文件: {file_key}")
-                
-                data["文档"][file_key] = new_entry
-                
                 print(f"✅ 文档文件已分析: {source_path.name}")
+                return document_file, "document", result_data
                 
             except Exception as e:
                 print(f"❌ 处理文档文件出错 {document_file}: {e}")
+                return document_file, "document", {
+                    "file_key": Path(document_file).name,
+                    "new_entry": {
+                        "summary": f"文档文件处理失败: {str(e)}",
+                        "file_path": str(document_file),
+                        "timestamp": datetime.now().isoformat(),
+                        "file_size": 0
+                    },
+                    "analysis_response": f"文档文件处理失败: {str(e)}"
+                }
+
+        # Use ThreadPoolExecutor for parallel processing
+        all_files = [(file, "table") for file in table_files] + [(file, "document") for file in document_files]
+        total_files = len(all_files)
+        
+        if total_files == 0:
+            print("⚠️ 没有文件需要处理")
+            print("✅ _process_supplement 执行完成")
+            print("=" * 50)
+            return {"process_user_input_messages": new_messages}
+        
+        max_workers = min(total_files, 4)  # Limit to 4 concurrent requests for supplement processing
+        print(f"🚀 开始并行处理补充文件，使用 {max_workers} 个工作线程")
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all file processing tasks
+            future_to_file = {}
+            for file_path, file_type in all_files:
+                if file_type == "table":
+                    future = executor.submit(process_table_file, file_path)
+                else:  # document
+                    future = executor.submit(process_document_file, file_path)
+                future_to_file[future] = (file_path, file_type)
+            
+            # Process completed tasks as they finish
+            for future in as_completed(future_to_file):
+                file_path, file_type = future_to_file[future]
+                try:
+                    processed_file_path, processed_file_type, result_data = future.result()
+                    
+                    # Add to new_messages
+                    new_messages.append(AIMessage(content=result_data["analysis_response"]))
+                    
+                    # Update data.json structure
+                    file_key = result_data["file_key"]
+                    new_entry = result_data["new_entry"]
+                    
+                    if processed_file_type == "table":
+                        if file_key in data["表格"]:
+                            print(f"⚠️ 表格文件 {file_key} 已存在，将更新其内容")
+                            # Preserve any additional fields that might exist
+                            existing_entry = data["表格"][file_key]
+                            for key, value in existing_entry.items():
+                                if key not in new_entry:
+                                    new_entry[key] = value
+                        else:
+                            print(f"📝 添加新的表格文件: {file_key}")
+                        data["表格"][file_key] = new_entry
+                    else:  # document
+                        if file_key in data["文档"]:
+                            print(f"⚠️ 文档文件 {file_key} 已存在，将更新其内容")
+                            # Preserve any additional fields that might exist
+                            existing_entry = data["文档"][file_key]
+                            for key, value in existing_entry.items():
+                                if key not in new_entry:
+                                    new_entry[key] = value
+                        else:
+                            print(f"📝 添加新的文档文件: {file_key}")
+                        data["文档"][file_key] = new_entry
+                    
+                except Exception as e:
+                    print(f"❌ 并行处理文件任务失败 {file_path}: {e}")
+                    # Create fallback entry
+                    fallback_response = f"文件处理失败: {str(e)}"
+                    new_messages.append(AIMessage(content=fallback_response))
+        
+        print(f"🎉 并行文件处理完成，共处理 {total_files} 个文件")
         
         # Save updated data.json with atomic write
         try:
