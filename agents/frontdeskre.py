@@ -218,66 +218,37 @@ class FrontdeskAgent:
         print("\n🔀 开始执行: _route_after_collect_user_input")
         print("=" * 50)
         
-        # Check where the tool execution came from
-        previous_node = state.get("previous_node", "")
-        print(f"📋 上一个节点: {previous_node}")
-        
-        # Check if the latest message is a tool message (result of tool execution)
         latest_message = state["messages"][-1]
-        print(f"📋 最新消息类型: {type(latest_message)}")
         
-        if isinstance(latest_message, ToolMessage):
-            # This is a tool execution result
-            tool_result = latest_message.content
-            print(f"🔧 工具执行结果: {tool_result}")
+        # This is a regular message, try to parse as JSON for routing
+        summary_message_str = latest_message.content
+        print(f"📋 原始内容: {summary_message_str}")
+        
+        try:
+            summary_message_json = json.loads(summary_message_str)
+            summary_message = json.loads(summary_message_json[0])
+            state["template_file_path"] = summary_message_json[1]
+            print(f"📊 summary_message测试: {summary_message}")
+            next_node = summary_message.get("next_node", "previous_node")
+            print(f"🔄 路由决定: {next_node}")
             
-            # Route back to the node that called the tool
-            if previous_node == "chat_with_user_to_determine_template":
-                print("🔄 路由回到 chat_with_user_to_determine_template 处理工具结果")
-                print("✅ _route_after_collect_user_input 执行完成")
-                print("=" * 50)
-                return "chat_with_user_to_determine_template"
-            elif previous_node == "simple_template_handle":
-                print("🔄 路由回到 simple_template_handle 处理工具结果")
-                print("✅ _route_after_collect_user_input 执行完成")
-                print("=" * 50)
+            print("✅ _route_after_collect_user_input 执行完成")
+            print("=" * 50)
+                
+            if next_node == "complex_template":
+                return "complex_template_handle"
+            elif next_node == "simple_template":
                 return "simple_template_handle"
             else:
-                # Default fallback
-                print("🔄 未知来源，路由到 chat_with_user_to_determine_template")
-                print("✅ _route_after_collect_user_input 执行完成")
-                print("=" * 50)
-                return "chat_with_user_to_determine_template"
-        else:
-            # This is a regular message, try to parse as JSON for routing
-            summary_message_str = latest_message.content
-            print(f"📋 原始内容: {summary_message_str}")
-            
-            try:
-                summary_message_json = json.loads(summary_message_str)
-                summary_message = json.loads(summary_message_json[0])
-                state["template_file_path"] = summary_message_json[1]
-                print(f"📊 summary_message测试: {summary_message}")
-                next_node = summary_message.get("next_node", "previous_node")
-                print(f"🔄 路由决定: {next_node}")
+                return state.get("previous_node", "entry")  # Fallback to previous node
                 
-                print("✅ _route_after_collect_user_input 执行完成")
-                print("=" * 50)
-                    
-                if next_node == "complex_template":
-                    return "complex_template_handle"
-                elif next_node == "simple_template":
-                    return "simple_template_handle"
-                else:
-                    return state.get("previous_node", "entry")  # Fallback to previous node
-                    
-            except json.JSONDecodeError:
-                # Content is plain text error message, not JSON
-                print("❌ 内容不是有效的JSON，可能是错误消息")
-                print("🔄 路由到 chat_with_user_to_determine_template 重新开始")
-                print("✅ _route_after_collect_user_input 执行完成")
-                print("=" * 50)
-                return "chat_with_user_to_determine_template"
+        except json.JSONDecodeError:
+            # Content is plain text error message, not JSON
+            print("❌ 内容不是有效的JSON，可能是错误消息")
+            print("🔄 路由到 chat_with_user_to_determine_template 重新开始")
+            print("✅ _route_after_collect_user_input 执行完成")
+            print("=" * 50)
+            return "chat_with_user_to_determine_template"
             
 
 
