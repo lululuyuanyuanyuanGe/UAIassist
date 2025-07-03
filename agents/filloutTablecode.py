@@ -51,7 +51,6 @@ class FilloutTableState(TypedDict):
     file_process_code: str
     code_with_line: str
     final_table: str
-    styled_html_table: str
     error_message: str
     error_message_summary: str
     execution_successful: bool
@@ -236,29 +235,7 @@ class FilloutTableAgent:
         }
     
 
-    def _clean_html_content(self, html_content: str) -> str:
-        """Clean up excessive whitespace and non-breaking spaces from HTML content"""
-        try:
-            # Replace multiple consecutive &nbsp; with a maximum of 3
-            import re
-            
-            # Replace 4+ consecutive &nbsp; with just 3
-            html_content = re.sub(r'(&nbsp;){4,}', r'&nbsp;&nbsp;&nbsp;', html_content)
-            
-            # Replace excessive whitespace
-            html_content = re.sub(r'\s{4,}', ' ', html_content)
-            
-            # Remove extra newlines
-            html_content = re.sub(r'\n\s*\n', '\n', html_content)
-            
-            print(f"✅ HTML内容已清理，长度: {len(html_content)} 字符")
-            
-            return html_content
-            
-        except Exception as e:
-            print(f"⚠️ HTML清理失败: {e}")
-            return html_content
-
+    
     def _execute_code_from_LLM(self, state: FilloutTableState) -> FilloutTableState:
         """We will run the code from the model, and get the result. use exec() to execute the code in memroy"""
         code = state["file_process_code"]
@@ -320,47 +297,15 @@ class FilloutTableAgent:
                 
                 return {
                     "final_table": output,
+
                     "execution_successful": False,
                     "error_message": f"Generated code internal error: {output}"
                 }
             else:
                 print("✅ 代码执行成功")
                 
-                # If output from stdout is empty or minimal, try to find the HTML file
-                html_content = output.strip()
-                
-                if not html_content or len(html_content) < 100:
-                    # Look for common HTML output file patterns
-                    potential_files = [
-                        "agents/output/老党员补贴_结果.html",
-                        "老党员补贴_结果.html",
-                        "output.html",
-                        "result.html",
-                        "table.html"
-                    ]
-                    
-                    for file_path in potential_files:
-                        if Path(file_path).exists():
-                            try:
-                                html_content = read_txt_file(file_path)
-                                print(f"✅ 找到HTML文件: {file_path}")
-                                break
-                            except Exception as e:
-                                print(f"⚠️ 无法读取文件 {file_path}: {e}")
-                    
-                    # If still no HTML content, check if there's any HTML in the output
-                    if not html_content or len(html_content) < 100:
-                        if "<html>" in output or "<table>" in output:
-                            html_content = output
-                        else:
-                            print("⚠️ 未找到HTML内容，使用原始输出")
-                            html_content = output or "No HTML content generated"
-                
-                # Clean up the HTML content to prevent token limit issues
-                html_content = self._clean_html_content(html_content)
-                
                 return {
-                    "final_table": html_content,
+                    "final_table": output,
                     "execution_successful": True,
                     "error_message": "",
                     "code_with_line": code_with_line
@@ -444,14 +389,6 @@ class FilloutTableAgent:
             else:
                 html_table_content = final_table
             
-            # Clean up the HTML content before validation
-            html_table_content = self._clean_html_content(html_table_content)
-            
-            # Truncate content if too long to prevent token limit issues
-            if len(html_table_content) > 8000:
-                html_table_content = html_table_content[:8000] + "...[内容已截断]"
-                print(f"⚠️ 验证内容过长，已截断至8000字符")
-            
             system_prompt = f"""
             你需要根据用户提供的模板表格，数据表格和文档来判断模型生成的html表格是否符合要求，并提出修改意见，
             所有文件都是由html构建的，你需要根据html的结构和内容来判断模型生成的html表格是否符合要求，表头结构是否符合模板表头，
@@ -461,7 +398,7 @@ class FilloutTableAgent:
             {html_table_content}
 
             下面是用户提供的模板，数据表格和文档
-            {state["combined_data"][:5000]}
+            {state["combined_data"]}
 
             如果需要修改请直接返回修改后的html表格，否则返回[No]
             """
@@ -475,9 +412,8 @@ class FilloutTableAgent:
                 return {}
             else:
                 print("🔄 表格验证发现问题，已修改")
-                # Clean the modified HTML table as well
-                cleaned_response = self._clean_html_content(response)
-                return {"final_table": cleaned_response}
+                # Return the modified HTML table
+                return {"final_table": response}
                 
         except Exception as e:
             print(f"❌ 验证过程中发生错误: {e}")
@@ -501,14 +437,6 @@ class FilloutTableAgent:
             else:
                 html_content = final_table
             
-            # Clean up the HTML content before styling
-            html_content = self._clean_html_content(html_content)
-            
-            # Truncate content if too long to prevent token limit issues
-            if len(html_content) > 8000:
-                html_content = html_content[:8000] + "...[内容已截断]"
-                print(f"⚠️ 样式调整内容过长，已截断至8000字符")
-            
             system_prompt = f"""你是一位擅长美化 HTML 表格的专业样式设计专家。接下来我将提供一份由 Excel 转换而来的 HTML 表格文件。  
             你的任务是：  
             1. 对表格的整体样式进行美化，使其更加美观、清晰、专业；  
@@ -519,14 +447,13 @@ class FilloutTableAgent:
             以下是当前的 HTML 表格文件内容：
             {html_content}
             """
+
             
             print("🎨 正在美化HTML表格样式...")
             response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
             
             print("✅ 表格样式美化完成")
-            # Clean the styled HTML as well
-            cleaned_response = self._clean_html_content(response)
-            return {"styled_html_table": cleaned_response}
+            return {"styled_html_table": response}
             
         except Exception as e:
             print(f"❌ 样式调整过程中发生错误: {e}")

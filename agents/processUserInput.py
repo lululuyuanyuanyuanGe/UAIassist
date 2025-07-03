@@ -319,7 +319,7 @@ class ProcessUserInputAgent:
                 
                 # Get LLM analysis for this file
                 print("📤 正在调用LLM进行文件分类...")
-                analysis_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
+                analysis_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
 
                 # Parse JSON response for this file
                 try:
@@ -644,7 +644,7 @@ class ProcessUserInputAgent:
                 print("📤 正在调用LLM进行文档分析...")
                 
                 try:
-                    analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
+                    analysis_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
                     print("📥 文档分析响应接收成功")
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
@@ -984,7 +984,7 @@ class ProcessUserInputAgent:
         try:
             print("📤 正在调用LLM进行文本输入验证...")
             # Get LLM validation
-            validation_response = invoke_model(model_name="Qwen/Qwen3-8B", messages=[SystemMessage(content=system_prompt)])
+            validation_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
             # validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
             
             print(f"📥 验证响应: {validation_response}")

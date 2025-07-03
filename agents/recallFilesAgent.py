@@ -43,8 +43,21 @@ def request_user_clarification(question: str) -> str:
     参数：question: 你的问题
     返回：用户回答
     """
-    process_user_input_agent = ProcessUserInputAgent()
-    response = process_user_input_agent.run_process_user_input_agent(previous_AI_messages = AIMessage(content = question))
+    try:
+        process_user_input_agent = ProcessUserInputAgent()
+        response = process_user_input_agent.run_process_user_input_agent(previous_AI_messages=AIMessage(content=question))
+        
+        # Extract the response content if it's a message object
+        if hasattr(response, 'content'):
+            return response.content
+        elif isinstance(response, str):
+            return response
+        else:
+            return str(response)
+            
+    except Exception as e:
+        print(f"❌ 用户澄清请求失败: {e}")
+        return f"无法获取用户回复: {str(e)}"
 
 
 
@@ -73,7 +86,7 @@ class RecallFilesAgent:
         graph.add_edge("recall_relative_files", "request_user_clarification")
         graph.add_edge("request_user_clarification", "recall_relative_files")
         graph.add_edge("determine_the_mapping_of_headers", END)
-        return graph.compile()
+        return graph.compile(checkpointer = MemorySaver())
 
     def _create_initial_state(self) -> RecallFilesState:
         return {
