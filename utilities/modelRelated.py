@@ -3,7 +3,29 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage
 import os
 import time
+import threading
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
+
+# Cross-platform timeout context manager using threading
+@contextmanager
+def execution_timeout(seconds):
+    """Context manager to enforce total execution timeout (Windows compatible)"""
+    timeout_occurred = threading.Event()
+    
+    def timeout_handler():
+        timeout_occurred.set()
+    
+    # Start a timer that will set the timeout flag after specified seconds
+    timer = threading.Timer(seconds, timeout_handler)
+    timer.start()
+    
+    try:
+        yield timeout_occurred
+    finally:
+        # Cancel the timer
+        timer.cancel()
 
 
 def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
@@ -17,7 +39,7 @@ def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
         base_url="https://api.siliconflow.cn/v1",
         streaming=True,
         temperature=0.2,
-        request_timeout=60  # 60秒超时
+        request_timeout=30  # 30 seconds network timeout
     )
 
     full_response = ""
@@ -25,17 +47,23 @@ def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
     try:
         total_tokens_used = {"input": 0, "output": 0, "total": 0}
         
-        for chunk in llm.stream(messages):
-            chunk_content = chunk.content
-            print(chunk_content, end="", flush=True)
-            full_response += chunk_content
-            
-            # Extract token usage if available in chunk
-            if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
-                usage = chunk.usage_metadata
-                total_tokens_used["input"] = usage.get('input_tokens', 0)
-                total_tokens_used["output"] = usage.get('output_tokens', 0)
-                total_tokens_used["total"] = usage.get('total_tokens', 0)
+        # Use execution timeout context manager for total time control
+        with execution_timeout(100) as timeout_flag:  # 100 seconds total execution limit
+            for chunk in llm.stream(messages):
+                # Check if timeout occurred
+                if timeout_flag.is_set():
+                    raise TimeoutError(f"LLM execution exceeded 100 seconds")
+                
+                chunk_content = chunk.content
+                print(chunk_content, end="", flush=True)
+                full_response += chunk_content
+                
+                # Extract token usage if available in chunk
+                if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
+                    usage = chunk.usage_metadata
+                    total_tokens_used["input"] = usage.get('input_tokens', 0)
+                    total_tokens_used["output"] = usage.get('output_tokens', 0)
+                    total_tokens_used["total"] = usage.get('total_tokens', 0)
             
         end_time = time.time()
         execution_time = end_time - start_time
@@ -45,6 +73,16 @@ def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
         if total_tokens_used["total"] > 0:
             print(f"📊 Token使用: 输入={total_tokens_used['input']:,} | 输出={total_tokens_used['output']:,} | 总计={total_tokens_used['total']:,}")
         
+    except TimeoutError as e:
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"\n⏰ LLM调用超时，耗时: {execution_time:.2f}秒，错误: {e}")
+        
+        # Print any token usage that was captured before timeout
+        if total_tokens_used["total"] > 0:
+            print(f"📊 超时前Token使用: 输入={total_tokens_used['input']:,} | 输出={total_tokens_used['output']:,} | 总计={total_tokens_used['total']:,}")
+        
+        raise
     except Exception as e:
         end_time = time.time()
         execution_time = end_time - start_time
@@ -70,7 +108,7 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
         base_url="https://api.siliconflow.cn/v1",
         streaming=False,  # Must be False for invoke() to work properly
         temperature=0.2,
-        request_timeout=60  # 60秒超时
+        request_timeout=30  # 30 seconds network timeout
     )
     
     try:
@@ -78,8 +116,20 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
         llm_with_tools = llm.bind_tools(tools)
         
         print("📤 正在调用LLM...")
-        # 调用模型并获取响应
-        response = llm_with_tools.invoke(messages)
+        
+        # Use ThreadPoolExecutor for better timeout handling of blocking invoke() call
+        def call_llm():
+            return llm_with_tools.invoke(messages)
+        
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(call_llm)
+            try:
+                response = future.result(timeout=100)  # 100 seconds timeout
+            except FuturesTimeoutError:
+                # Cancel the future if it's still running
+                future.cancel()
+                raise TimeoutError(f"LLM execution exceeded 100 seconds")
+        
         print("📥 LLM响应接收完成")
         
         # 打印响应内容（如果有）
@@ -147,6 +197,20 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
         # 返回完整响应以便调用者处理
         return response
         
+    except TimeoutError as e:
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"\n⏰ LLM调用超时，耗时: {execution_time:.2f}秒，错误: {e}")
+        
+        # Try to extract token usage even from timed out requests
+        if 'response' in locals() and hasattr(response, 'usage_metadata') and response.usage_metadata:
+            usage = response.usage_metadata
+            input_tokens = usage.get('input_tokens', 0)
+            output_tokens = usage.get('output_tokens', 0)
+            total_tokens = usage.get('total_tokens', 0)
+            print(f"📊 超时前Token使用: 输入={input_tokens:,} | 输出={output_tokens:,} | 总计={total_tokens:,}")
+        
+        raise
     except Exception as e:
         end_time = time.time()
         execution_time = end_time - start_time

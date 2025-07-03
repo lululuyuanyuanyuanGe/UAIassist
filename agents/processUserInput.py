@@ -278,7 +278,7 @@ class ProcessUserInputAgent:
                 # Read file content for analysis
                 file_content = source_path.read_text(encoding='utf-8')
                 # Truncate content for analysis (to avoid token limits)
-                analysis_content = file_content[:1000] if len(file_content) > 2000 else file_content
+                analysis_content = file_content[:5000] if len(file_content) > 2000 else file_content
                 
                 # Create individual analysis prompt for this file
                 system_prompt = f"""你是一个表格生成智能体，需要分析用户上传的文件内容并进行分类。共有四种类型：
@@ -288,6 +288,7 @@ class ProcessUserInputAgent:
                 3. **补充文档 (supplement-文档)**: 包含重要信息的文本文件，如法律条文、政策信息等
                 4. **无关文件 (irrelevant)**: 与表格填写无关的文件
 
+                仔细检查不要把补充文件错误划分为模板文件反之亦然，补充文件里面是有数据的，模板文件里面是空的，或者只有一两个例子数据
                 注意：所有文件已转换为txt格式，表格以HTML代码形式呈现，请根据内容而非文件名或后缀判断。
 
                 用户输入: {state.get("user_input", "")}
@@ -448,12 +449,27 @@ class ProcessUserInputAgent:
         print("=" * 50)
         print("Debug: Start to process_supplement")
         
-        # Load existing data.json
+        # Load existing data.json with better error handling
         data_json_path = Path("agents/data.json")
         try:
             with open(data_json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
+                # Ensure the structure exists
+                if "表格" not in data:
+                    data["表格"] = {}
+                if "文档" not in data:
+                    data["文档"] = {}
+        except FileNotFoundError:
+            print("📝 data.json不存在，创建新的数据结构")
+            data = {"表格": {}, "文档": {}}
+        except json.JSONDecodeError as e:
+            print(f"⚠️ data.json格式错误: {e}")
+            print("📝 备份原文件并创建新的数据结构")
+            # Backup the corrupted file
+            backup_path = data_json_path.with_suffix('.json.backup')
+            if data_json_path.exists():
+                data_json_path.rename(backup_path)
+                print(f"📦 原文件已备份到: {backup_path}")
             data = {"表格": {}, "文档": {}}
         
         table_files = state["supplement_files_path"]["表格"]
@@ -530,12 +546,26 @@ class ProcessUserInputAgent:
                     })()
                 
                 # Store in data.json (this should happen for BOTH success and failure)
-                data["表格"][source_path.name] = {
+                file_key = source_path.name
+                new_entry = {
                     "summary": analysis_response,
                     "file_path": str(table_file),
                     "timestamp": datetime.now().isoformat(),
                     "file_size": source_path.stat().st_size
                 }
+                
+                # Check if this file was already processed
+                if file_key in data["表格"]:
+                    print(f"⚠️ 文件 {file_key} 已存在，将更新其内容")
+                    # Preserve any additional fields that might exist
+                    existing_entry = data["表格"][file_key]
+                    for key, value in existing_entry.items():
+                        if key not in new_entry:
+                            new_entry[key] = value
+                else:
+                    print(f"📝 添加新的表格文件: {file_key}")
+                
+                data["表格"][file_key] = new_entry
                 
                 print(f"✅ 表格文件已分析: {source_path.name}")
                 
@@ -596,25 +626,59 @@ class ProcessUserInputAgent:
                 new_messages.append(AIMessage(content=analysis_response))
                 
                 # Store in data.json (this should happen for BOTH success and failure)
-                data["文档"][source_path.name] = {
+                file_key = source_path.name
+                new_entry = {
                     "summary": analysis_response,
                     "file_path": str(document_file),
                     "timestamp": datetime.now().isoformat(),
                     "file_size": source_path.stat().st_size
                 }
                 
+                # Check if this file was already processed
+                if file_key in data["文档"]:
+                    print(f"⚠️ 文件 {file_key} 已存在，将更新其内容")
+                    # Preserve any additional fields that might exist
+                    existing_entry = data["文档"][file_key]
+                    for key, value in existing_entry.items():
+                        if key not in new_entry:
+                            new_entry[key] = value
+                else:
+                    print(f"📝 添加新的文档文件: {file_key}")
+                
+                data["文档"][file_key] = new_entry
+                
                 print(f"✅ 文档文件已分析: {source_path.name}")
                 
             except Exception as e:
                 print(f"❌ 处理文档文件出错 {document_file}: {e}")
         
-        # Save updated data.json
+        # Save updated data.json with atomic write
         try:
-            with open(data_json_path, 'w', encoding='utf-8') as f:
+            # Write to a temporary file first to prevent corruption
+            temp_path = data_json_path.with_suffix('.json.tmp')
+            with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
+            
+            # Atomic rename to replace the original file
+            temp_path.replace(data_json_path)
             print(f"✅ 已更新 data.json，表格文件 {len(data['表格'])} 个，文档文件 {len(data['文档'])} 个")
+            
+            # Log the files that were processed in this batch
+            if table_files:
+                print(f"📊 本批次处理的表格文件: {[Path(f).name for f in table_files]}")
+            if document_files:
+                print(f"📄 本批次处理的文档文件: {[Path(f).name for f in document_files]}")
+                
         except Exception as e:
             print(f"❌ 保存 data.json 时出错: {e}")
+            # Clean up temp file if it exists
+            temp_path = data_json_path.with_suffix('.json.tmp')
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                    print("🗑️ 临时文件已清理")
+                except Exception as cleanup_error:
+                    print(f"⚠️ 清理临时文件失败: {cleanup_error}")
         
         print("✅ _process_supplement 执行完成")
         print("=" * 50)
