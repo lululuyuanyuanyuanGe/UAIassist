@@ -462,6 +462,9 @@ class ProcessUserInputAgent:
         print(f"📊 需要处理的表格文件: {len(table_files)} 个")
         print(f"📄 需要处理的文档文件: {len(document_files)} 个")
         
+        # Collect new messages instead of directly modifying state
+        new_messages = []
+        
         # Process table files
         for table_file in table_files:
             try:
@@ -518,7 +521,7 @@ class ProcessUserInputAgent:
                     # analysis_response = self.llm_c.invoke([SystemMessage(content=system_prompt)])
                     analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
                     print("📥 表格分析响应接收成功")
-                    state["process_user_input_messages"].append(AIMessage(content=analysis_response))
+                    new_messages.append(AIMessage(content=analysis_response))
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
                     # Create fallback response
@@ -589,8 +592,8 @@ class ProcessUserInputAgent:
                         'content': f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
                     })()
 
-                # Update state with analysis response
-                state["process_user_input_messages"].append(AIMessage(content=analysis_response))
+                # Collect the message instead of directly modifying state
+                new_messages.append(AIMessage(content=analysis_response))
                 
                 # Store in data.json (this should happen for BOTH success and failure)
                 data["文档"][source_path.name] = {
@@ -615,7 +618,9 @@ class ProcessUserInputAgent:
         
         print("✅ _process_supplement 执行完成")
         print("=" * 50)
-        return state
+        
+        # Return the collected messages for proper state update
+        return {"process_user_input_messages": new_messages}
         
         
     def _process_irrelevant(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -650,7 +655,7 @@ class ProcessUserInputAgent:
         print("✅ _process_irrelevant 执行完成")
         print("=" * 50)
         
-        return state
+        return {}  # Return empty dict since this node doesn't need to update any state keys
 
     
     def _process_template(self, state: ProcessUserInputState) -> ProcessUserInputState:
@@ -929,13 +934,38 @@ class ProcessUserInputAgent:
             response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
             print(f"📥 LLM总结响应长度: {len(response)} 字符")
             
-            # Clean the response to handle malformed JSON
+            # Clean the response to handle markdown code blocks and malformed JSON
             cleaned_response = response.strip()
+            
+            # Remove markdown code blocks if present
+            if '```json' in cleaned_response:
+                print("🔍 检测到markdown代码块，正在清理...")
+                # Extract content between ```json and ```
+                start_marker = '```json'
+                end_marker = '```'
+                start_index = cleaned_response.find(start_marker)
+                if start_index != -1:
+                    start_index += len(start_marker)
+                    end_index = cleaned_response.find(end_marker, start_index)
+                    if end_index != -1:
+                        cleaned_response = cleaned_response[start_index:end_index].strip()
+                    else:
+                        # If no closing ```, take everything after ```json
+                        cleaned_response = cleaned_response[start_index:].strip()
+            elif '```' in cleaned_response:
+                print("🔍 检测到通用代码块，正在清理...")
+                # Handle generic ``` blocks
+                parts = cleaned_response.split('```')
+                if len(parts) >= 3:
+                    # Take the middle part (index 1)
+                    cleaned_response = parts[1].strip()
             
             # If there are multiple JSON objects, take the first valid one
             if '}{' in cleaned_response:
                 print("⚠️ 检测到多个JSON对象，取第一个")
                 cleaned_response = cleaned_response.split('}{')[0] + '}'
+            
+            print(f"🔍 清理后的响应: {cleaned_response}")
             
             response_json = json.loads(cleaned_response)
             response_json["next_node"] = route_decision
@@ -978,25 +1008,19 @@ class ProcessUserInputAgent:
         
         try:
             # Use invoke instead of stream for simpler execution
-            final_state = self.graph.invoke(initial_state, config=config)
-            
-            print("\n🎉 ProcessUserInputAgent 执行完成！")
-            print("=" * 60)
-            
-            # Extract results from final state
-            summary_message = final_state.get("summary_message", "")
-            uploaded_template_files_path = final_state.get("uploaded_template_files_path", [])
-            
-            print("📊 最终结果:")
-            print(f"- 总结消息: {'已生成' if summary_message else '未生成'}")
-            print(f"- 模板文件数量: {len(uploaded_template_files_path)}")
-            if uploaded_template_files_path:
-                for i, file_path in enumerate(uploaded_template_files_path, 1):
-                    print(f"  {i}. {Path(file_path).name}")
-            
-            return_list = [summary_message, uploaded_template_files_path]
-            print(f"🔄 返回结果: {len(return_list)} 项")
-            return return_list
+            while True:
+                final_state = self.graph.invoke(initial_state, config=config)
+                if "__interrupt__" in final_state:
+                    interrupt_value = final_state["__interrupt__"][0].value
+                    print(f"💬 智能体: {interrupt_value}")
+                    user_response = input("👤 请输入您的回复: ")
+                    initial_state = Command(resume=user_response)
+                    continue
+
+                print("🎉执行完毕")
+                summary_message = final_state.get("summary_message", "")
+                template_file = final_state.get("uploaded_template_files_path", [])
+                return [summary_message, template_file]
             
         except Exception as e:
             print(f"❌ 执行过程中发生错误: {e}")

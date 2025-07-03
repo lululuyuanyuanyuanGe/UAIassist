@@ -130,7 +130,6 @@ class FilloutTableAgent:
         }
         
 
-    
 
     def _generate_file_process_code_from_LLM(self, state: FilloutTableState) -> FilloutTableState:
         """We will feed the combined data to the model, and ask it to generate the code to that is used to fill out the table for 
@@ -331,7 +330,8 @@ class FilloutTableAgent:
                 "execution_successful": False,
                 "error_message": full_traceback
             }
-
+    def _summary_error_message(self, state: FilloutTableState) -> FilloutTableState:
+        """这个节点用于整理总结代码执行中的错误，并返回给智能体重新生成"""
 
     def _route_after_execute_code(self, state: FilloutTableState) -> str:
         """This node will route back to the generate_code node, and ask the model to fix the error if error occurs"""
