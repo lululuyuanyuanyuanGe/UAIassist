@@ -43,48 +43,23 @@ def append_strings(left: list[str], right: Union[list[str], str]) -> list[str]:
     
 
 @tool
-def _collect_user_input(session_id: str, previous_AI_messages: Union[BaseMessage, List[Dict[str, Any]]]) -> list[str]:
+def _collect_user_input(session_id: str, AI_question: str) -> str:
     """这是一个用来收集用户输入的工具，你需要调用这个工具来收集用户输入
     参数：
         session_id: 当前会话ID
-        previous_AI_messages: 之前的AI消息
+        AI_question: 大模型的问题
     返回：
         str: 总结后的用户输入信息
     """
 
     print(f"🔄 开始收集用户输入，当前会话ID: {session_id}")
+    print(f"💬 AI问题: {AI_question}")
     
-    # Create an instance of the ProcessUserInputAgent
-    process_user_input_agent = ProcessUserInputAgent()
-    print("testtest111111")
-    
-    # Handle both BaseMessage (manual calls) and List[Dict] (LLM calls)
-    if isinstance(previous_AI_messages, list):
-        # LLM tool call - convert dictionaries to BaseMessage
-        converted_messages = []
-        for msg_dict in previous_AI_messages:
-            if isinstance(msg_dict, dict):
-                if msg_dict.get('type') == 'ai':
-                    converted_messages.append(AIMessage(content=msg_dict.get('content', '')))
-                else:
-                    converted_messages.append(HumanMessage(content=msg_dict.get('content', '')))
-        last_message = converted_messages[-1] if converted_messages else AIMessage(content="")
-    else:
-        # Manual call - use BaseMessage directly (your intentional design)
-        last_message = previous_AI_messages
-    
-    summary_messages = process_user_input_agent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = last_message)
-
-    print("testtest")
-    
-    # Extract the final result
-    try:
-        print(f"🔄 提取最终结果，summary_message类型: {type(summary_messages)}")
-        return summary_messages
-            
-    except Exception as e:
-        print(f"❌ 提取结果时出错: {type(e).__name__}: {e}")
-        return f"提取结果时出错: {e}"
+    processUserInputAgent = ProcessUserInputAgent()
+    ai_message = AIMessage(content=AI_question)
+    response = processUserInputAgent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = ai_message)
+    print(f"🔄 返回响应: {response[:100]}...")
+    return response
     
 
 class FrontdeskState(TypedDict):
@@ -243,34 +218,66 @@ class FrontdeskAgent:
         print("\n🔀 开始执行: _route_after_collect_user_input")
         print("=" * 50)
         
-        summary_message_str = state["messages"][-1].content
-        print(f"📋 原始内容: {summary_message_str}")
+        # Check where the tool execution came from
+        previous_node = state.get("previous_node", "")
+        print(f"📋 上一个节点: {previous_node}")
         
-        try:
-            summary_message_json = json.loads(summary_message_str)
-            summary_message = json.loads(summary_message_json[0])
-            state["template_file_path"] = summary_message_json[1]
-            print(f"📊 summary_message测试: {summary_message}")
-            next_node = summary_message.get("next_node", "previous_node")
-            print(f"🔄 路由决定: {next_node}")
+        # Check if the latest message is a tool message (result of tool execution)
+        latest_message = state["messages"][-1]
+        print(f"📋 最新消息类型: {type(latest_message)}")
+        
+        if isinstance(latest_message, ToolMessage):
+            # This is a tool execution result
+            tool_result = latest_message.content
+            print(f"🔧 工具执行结果: {tool_result}")
             
-            print("✅ _route_after_collect_user_input 执行完成")
-            print("=" * 50)
-                
-            if next_node == "complex_template":
-                return "complex_template_handle"
-            elif next_node == "simple_template":
+            # Route back to the node that called the tool
+            if previous_node == "chat_with_user_to_determine_template":
+                print("🔄 路由回到 chat_with_user_to_determine_template 处理工具结果")
+                print("✅ _route_after_collect_user_input 执行完成")
+                print("=" * 50)
+                return "chat_with_user_to_determine_template"
+            elif previous_node == "simple_template_handle":
+                print("🔄 路由回到 simple_template_handle 处理工具结果")
+                print("✅ _route_after_collect_user_input 执行完成")
+                print("=" * 50)
                 return "simple_template_handle"
             else:
-                return state.get("previous_node", "entry")  # Fallback to previous node
+                # Default fallback
+                print("🔄 未知来源，路由到 chat_with_user_to_determine_template")
+                print("✅ _route_after_collect_user_input 执行完成")
+                print("=" * 50)
+                return "chat_with_user_to_determine_template"
+        else:
+            # This is a regular message, try to parse as JSON for routing
+            summary_message_str = latest_message.content
+            print(f"📋 原始内容: {summary_message_str}")
+            
+            try:
+                summary_message_json = json.loads(summary_message_str)
+                summary_message = json.loads(summary_message_json[0])
+                state["template_file_path"] = summary_message_json[1]
+                print(f"📊 summary_message测试: {summary_message}")
+                next_node = summary_message.get("next_node", "previous_node")
+                print(f"🔄 路由决定: {next_node}")
                 
-        except json.JSONDecodeError:
-            # Content is plain text error message, not JSON
-            print("❌ 内容不是有效的JSON，可能是错误消息")
-            print("🔄 路由到 chat_with_user_to_determine_template 重新开始")
-            print("✅ _route_after_collect_user_input 执行完成")
-            print("=" * 50)
-            return "chat_with_user_to_determine_template"
+                print("✅ _route_after_collect_user_input 执行完成")
+                print("=" * 50)
+                    
+                if next_node == "complex_template":
+                    return "complex_template_handle"
+                elif next_node == "simple_template":
+                    return "simple_template_handle"
+                else:
+                    return state.get("previous_node", "entry")  # Fallback to previous node
+                    
+            except json.JSONDecodeError:
+                # Content is plain text error message, not JSON
+                print("❌ 内容不是有效的JSON，可能是错误消息")
+                print("🔄 路由到 chat_with_user_to_determine_template 重新开始")
+                print("✅ _route_after_collect_user_input 执行完成")
+                print("=" * 50)
+                return "chat_with_user_to_determine_template"
             
 
 
@@ -289,8 +296,21 @@ class FrontdeskAgent:
         print("\n💬 开始执行: _chat_with_user_to_determine_template")
         print("=" * 50)
         
-        # Use chat_history instead of the confusing JSON blob in messages
-        user_context = state["chat_history"][-1] if state.get("chat_history") else "用户需要确定表格结构"
+        # Check if we have tool results from previous interaction
+        if state.get("messages") and len(state["messages"]) > 0:
+            latest_message = state["messages"][-1]
+            if isinstance(latest_message, ToolMessage):
+                # Process tool result
+                tool_result = latest_message.content
+                print(f"🔧 处理工具结果: {tool_result}")
+                
+                # Use tool result to build context for the next interaction
+                user_context = f"用户提供的信息: {tool_result}"
+            else:
+                user_context = state["chat_history"][-1] if state.get("chat_history") else "用户需要确定表格结构"
+        else:
+            user_context = "用户需要确定表格结构"
+            
         print(f"📋 用户上下文: {user_context}")
 
         system_prompt = f"""你是一个智能 Excel 表格生成助手，现在你需要和用户进行对话，来确认用户想要生成的表格结构内容。
@@ -320,15 +340,13 @@ class FrontdeskAgent:
 
 请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
 
-你也可以调用工具来收集用户输入，来帮助你分析表格结构，有任何不确定的地方一定要询问用户，直到你完全明确表格结构为止。
+如果用户信息不够详细，你可以调用工具来收集更多用户输入。如果用户信息已经足够详细，请直接返回表格结构JSON，不要再调用工具。
 
 当前情况: {user_context}
 """
 
         print("📤 正在调用LLM进行表格结构确定...")
         response = invoke_model_with_tools(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
-        print("📥 LLM响应接收成功")
-        print(f"📊 完整响应: {response.content}")
         
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:

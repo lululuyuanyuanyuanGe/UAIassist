@@ -71,12 +71,19 @@ class FilloutTableAgent:
         graph.add_node("combine_data", self._combine_data)
         graph.add_node("generate_code", self._generate_file_process_code_from_LLM)
         graph.add_node("execute_code", self._execute_code_from_LLM)
+        graph.add_node("summary_error_message", self._summary_error_message)
+        graph.add_node("style_html_table", self._style_html_table)
+        graph.add_node("convert_html_to_excel", self._convert_html_to_excel)
         
         # Define the workflow
         graph.add_edge(START, "combine_data")
         graph.add_edge("combine_data", "generate_code")
         graph.add_edge("generate_code", "execute_code")
-        graph.add_conditional_edges("execute_code", self._route_after_execute_code, {"generate_code": "generate_code", "END": END})
+        graph.add_conditional_edges("execute_code", self._route_after_execute_code)
+        graph.add_edge("summary_error_message", "generate_code")
+        graph.add_edge("style_html_table", "convert_html_to_excel")
+        graph.add_edge("convert_html_to_excel", "END")
+
         
         # Compile the graph
         return graph.compile()
@@ -330,18 +337,33 @@ class FilloutTableAgent:
                 "execution_successful": False,
                 "error_message": full_traceback
             }
+        
+
     def _summary_error_message(self, state: FilloutTableState) -> FilloutTableState:
         """这个节点用于整理总结代码执行中的错误，并返回给智能体重新生成"""
+        system_prompt = f"""你的任务是根据报错信息和上一次的代码，总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码，
+        下面是报错信息:
+        {state["error_message"]}
+        下面是上一次的代码:
+        {state["file_process_code"]}
+        
+        """
 
     def _route_after_execute_code(self, state: FilloutTableState) -> str:
         """This node will route back to the generate_code node, and ask the model to fix the error if error occurs"""
         if state["execution_successful"]:
-            return "END"
+            return "style_html_table"
         else:
             print("🔄 代码执行失败，返回重新生成代码...")
-            return "generate_code"
+            return "summary_error_message"
     
+    def _style_html_table(self, state: FilloutTableState) -> FilloutTableState:
+        """这个节点用于把通过代码构建的html表格进行样式调整，使其符合用户的需求"""
+        pass
 
+    def _convert_html_to_excel(self, state: FilloutTableState) -> FilloutTableState:
+        """把通过代码构建的html表格通过libreoffice转换为excel表格"""
+        pass
 
     def run_fillout_table_agent(self, user_input: str, session_id: str = "1") -> None:
         """This function will run the fillout table agent"""
