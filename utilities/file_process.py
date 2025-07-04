@@ -424,7 +424,7 @@ def extract_filename(file_path: str) -> str:
     return filename
 
 
-def fetch_related_files_content(related_files: List[str], base_path: str = "D:/asianInfo/ExcelAssist/conversations/1/user_uploaded_files") -> Dict[str, str]:
+def fetch_related_files_content(related_files: List[str], base_path: str = "D:/asianInfo/ExcelAssist/conversations/files/user_uploaded_files") -> Dict[str, str]:
         """
         Fetch the content of related files from the specified directory
         

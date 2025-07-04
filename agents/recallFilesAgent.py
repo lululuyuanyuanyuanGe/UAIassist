@@ -6,30 +6,21 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 
-from typing import Dict, List, Optional, Any, TypedDict, Annotated
-from datetime import datetime
+from typing import Dict, TypedDict, Annotated
 from utilities.file_process import fetch_related_files_content
-from utilities.modelRelated import invoke_model
+from utilities.modelRelated import invoke_model, invoke_model_with_tools
 
-import uuid
 import json
-import os
-from pathlib import Path
 # Create an interactive chatbox using gradio
-import gradio as gr
-from dotenv import load_dotenv
 import re
 
 from langgraph.graph import StateGraph, END, START
-from langgraph.constants import Send
 from langgraph.graph.message import add_messages
 # from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import Command, interrupt
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, HumanMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 
 from agents.processUserInput import ProcessUserInputAgent
 
@@ -44,6 +35,7 @@ def request_user_clarification(question: str) -> str:
     返回：用户回答
     """
     try:
+        print("request_user_clarification 被调用=========================================\n", question)
         process_user_input_agent = ProcessUserInputAgent()
         response = process_user_input_agent.run_process_user_input_agent(previous_AI_messages=AIMessage(content=question))
         
@@ -63,7 +55,7 @@ def request_user_clarification(question: str) -> str:
 
 
 class RecallFilesState(TypedDict):
-    messages: list[BaseMessage]
+    messages: Annotated[list[BaseMessage], add_messages]
     related_files: list[str]
     headers_mapping: dict[str, str]
     template_structure: str
@@ -71,25 +63,21 @@ class RecallFilesState(TypedDict):
 
 class RecallFilesAgent:
     def __init__(self):
-        self.memory = MemorySaver()
         self.graph = self._build_graph()
-       
 
+    tools = [request_user_clarification]
 
     def _build_graph(self):
         graph = StateGraph(RecallFilesState)
         graph.add_node("recall_relative_files", self._recall_relative_files)
         graph.add_node("determine_the_mapping_of_headers", self._determine_the_mapping_of_headers)
-        graph.add_node("request_user_clarification", ToolNode([request_user_clarification]))
+        graph.add_node("request_user_clarification", ToolNode(self.tools))
+
         graph.add_edge(START, "recall_relative_files")
-        graph.add_edge("recall_relative_files", "determine_the_mapping_of_headers")
-        graph.add_edge("determine_the_mapping_of_headers", "request_user_clarification")
-        graph.add_edge("request_user_clarification", "determine_the_mapping_of_headers")
-        graph.add_edge("recall_relative_files", "request_user_clarification")
+        graph.add_conditional_edges("recall_relative_files", self._route_after_recall_relative_files)
         graph.add_edge("request_user_clarification", "recall_relative_files")
         graph.add_edge("determine_the_mapping_of_headers", END)
-
-        return graph.compile(checkpointer=self.memory)
+        return graph.compile(checkpointer = MemorySaver())
 
     def _create_initial_state(self) -> RecallFilesState:
         return {
@@ -100,10 +88,6 @@ class RecallFilesAgent:
             "headers_mapping_": {}
         }
     
-    def set_template_structure(self, template_structure: str):
-        """Set the template structure for the agent"""
-        self.template_structure = template_structure
-    
 
     def _recall_relative_files(self, state: RecallFilesState) -> RecallFilesState:
         """根据要生成的表格模板，从向量库中召回相关文件"""
@@ -113,24 +97,66 @@ class RecallFilesAgent:
         with open(r'agents\data.json', 'r', encoding = 'utf-8') as f:
             file_content = f.read()
         
-        system_promt = f"""
-        你是一个专业的文件分析专家，你的任务是根据用户提供的表格模板，里面的表头，总结，文件名等 从向量库中召回相关文件
-        相关的文件可能是带有数据的表格，或者其他补充文件用于辅助填表，你需要根据向量库里面文件总结，表头内容等判断
-        模板表格内容:
-        {state["template_structure"]}
-        文件库内容:
-        {file_content}
-        返回严格为一个数组，包含所有相关文件的全名，不要有任何其他内容
-        """
+        system_prompt = f"""
+你是一位专业的文件分析专家，擅长根据表格模板内容，从用户提供的文件摘要中识别与其高度相关的参考文件。
+
+【任务背景】
+用户提供了一个表格模板，其内容包括表头结构、摘要信息、文件名等；
+同时还提供了一份文件摘要列表，其中每条记录包含一个文件的完整文件名及其简要说明。
+
+你的任务是：
+1. 根据模板表格的结构和内容（特别是表头结构和摘要信息）；
+2. 从提供的文件摘要中筛选出所有可能用于填写该模板的相关文件；
+3. 返回这些相关文件的完整文件名组成的数组。
+
+【重要要求】
+- **如果是第一次召回相关文件，必须调用工具向用户确认这些文件是否合适**，确认后才可继续后续流程；
+- 如果不是第一次（用户已确认），则可直接返回最终文件列表；
+- 当和用户确认后，请确保返回结果严格为一个字符串数组，内容为文件的完整文件名，不包含其他文字、标点或注释。例如：
+  ["2024年党员数据.xlsx", "补贴规则说明.docx"]
+
+【文件摘要列表】：
+{file_content}
+"""
+
+
+        if state["messages"]:
+            previous_AI_summary = state["messages"][-1].content
+        else:
+            previous_AI_summary = ""
 
         print("📤 正在调用LLM进行文件召回...")
-        response = invoke_model(model_name = "Qwen/Qwen3-32B", messages = [SystemMessage(content = system_promt)])
-        print(f"📥 LLM响应: {response}")
-        
+
+        user_input = "表格模板内容：" + state["template_structure"] + "\n文件摘要列表："
+
+        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content = system_prompt), HumanMessage(content = user_input), HumanMessage(content = previous_AI_summary)], tools=self.tools)
+
+        # 创建AIMessage时需要保留tool_calls信息
+        # if hasattr(response, 'tool_calls') and response.tool_calls:
+        #     # 如果有工具调用，创建包含tool_calls的AIMessage
+        #     ai_message = AIMessage(content=response.content or "", tool_calls=response.tool_calls)
+        #     print("🔧 检测到工具调用")
+        #     return {
+        #         "messages": [ai_message],
+        #         "related_files": ""
+        #     
+        # else:
+        # 如果没有工具调用，只包含内容
+        AI_message = AIMessage(content=response) if isinstance(response, str) else response
+        response = response if isinstance(response, str) else response.content
+        related_files = self._extract_file_from_recall(response)
+        print("✅ _recall_relative_files 执行完成")
+        print("=" * 50)
+        return {
+            "messages": [AI_message],
+            "related_files": related_files
+        }
+
+    def _extract_file_from_recall(self, response: str) -> str:
         # Parse the response to extract the file list
         try:
             # Try to parse as JSON array
-            related_files = json.loads(response)
+            related_files = json.loads(response.content if hasattr(response, 'content') else response)
             if not isinstance(related_files, list):
                 # If not a list, try to extract from string
                 # Look for patterns like ["file1", "file2"] or ['file1', 'file2']
@@ -145,16 +171,26 @@ class RecallFilesAgent:
             related_files = [line.strip().strip('"\'') for line in response.split('\n') if line.strip() and not line.strip().startswith('#')]
         
         print(f"📁 解析出的相关文件: {related_files}")
-        print("✅ _recall_relative_files 执行完成")
-        print("=" * 50)
-        
-        return {
-            "messages": [AIMessage(content = response)],
-            "related_files": related_files
-        }
-    
+        return related_files
 
-    
+    def _route_after_recall_relative_files(self, state: RecallFilesState) -> str:
+        """This node will route the agent to the next node based on the user's input"""
+        print("\n🔀 开始执行: _route_after_recall_relative_files")
+        print("=" * 50)
+
+        latest_message = state["messages"][-1]
+        if hasattr(latest_message, "tool_calls") and latest_message.tool_calls:
+            print("🔧 检测到工具调用，路由到 request_user_clarification")
+            print("✅ _route_after_recall_relative_files 执行完成")
+            print("=" * 50)
+            return "request_user_clarification"
+        else:
+            print("✅ 无工具调用，路由到 determine_the_mapping_of_headers")
+            print("✅ _route_after_recall_relative_files 执行完成")
+            print("=" * 50)
+            return "determine_the_mapping_of_headers"
+
+
 
     def _determine_the_mapping_of_headers(self, state: RecallFilesState) -> RecallFilesState:
         """确认模板表头和数据文件表头的映射关系"""
@@ -231,13 +267,13 @@ class RecallFilesAgent:
             "headers_mapping": response
         }
     
-    def run_recall_files_agent(self, template_structure: str = None, session_id: str = 1) -> Dict:
+    def run_recall_files_agent(self, template_structure: str, session_id: str = "1") -> Dict:
         """运行召回文件代理，使用invoke方法而不是stream"""
         print("\n🚀 开始运行 RecallFilesAgent")
         print("=" * 60)
-        
-        initial_state = self._create_initial_state()
+
         config = {"configurable": {"thread_id": session_id}}
+        initial_state = self._create_initial_state()
         
         # Set the template structure if provided
         if template_structure:
@@ -252,7 +288,6 @@ class RecallFilesAgent:
         print("🔄 正在执行图形工作流...")
         
         try:
-
             # Use invoke instead of stream
             final_state = self.graph.invoke(initial_state, config=config)
             

@@ -124,8 +124,22 @@ class ProcessUserInputAgent:
 
 
 
-    def create_initial_state(self, previous_AI_messages: list[BaseMessage] = None) -> ProcessUserInputState:
+    def create_initial_state(self, previous_AI_messages = None) -> ProcessUserInputState:
         """This function initializes the state of the process user input agent"""
+        
+        # Handle both single BaseMessage and list[BaseMessage] input
+        processed_messages = None
+        if previous_AI_messages is not None:
+            if isinstance(previous_AI_messages, list):
+                processed_messages = previous_AI_messages
+                print(f"🔍 初始化: 接收到消息列表，包含 {len(previous_AI_messages)} 条消息")
+            else:
+                # It's a single message, convert to list
+                processed_messages = [previous_AI_messages]
+                print(f"🔍 初始化: 接收到单条消息，已转换为列表")
+        else:
+            print(f"🔍 初始化: 没有接收到previous_AI_messages")
+        
         return {
             "process_user_input_messages": [],
             "user_input": "",
@@ -137,7 +151,7 @@ class ProcessUserInputAgent:
             "irrelevant_files_path": [],
             "all_files_irrelevant": False,
             "text_input_validation": None,
-            "previous_AI_messages": previous_AI_messages,
+            "previous_AI_messages": processed_messages,
             "summary_message": "",
             "template_complexity": ""
         }
@@ -953,16 +967,39 @@ class ProcessUserInputAgent:
         # Create validation prompt for text input safety check
         # Get the previous AI message content safely
         previous_ai_content = ""
-        if state.get("previous_AI_messages") and len(state["previous_AI_messages"]) > 0:
-            latest_ai_msg = state["previous_AI_messages"][-1]
-            if hasattr(latest_ai_msg, 'content'):
-                previous_ai_content = latest_ai_msg.content
-        
+        try:
+            if state.get("previous_AI_messages"):
+                previous_ai_messages = state["previous_AI_messages"]
+                print(f"🔍 previous_AI_messages 类型: {type(previous_ai_messages)}")
+                
+                # Handle both single message and list of messages
+                if isinstance(previous_ai_messages, list):
+                    if len(previous_ai_messages) > 0:
+                        latest_message = previous_ai_messages[-1]
+                        if hasattr(latest_message, 'content'):
+                            previous_ai_content = latest_message.content
+                        else:
+                            previous_ai_content = str(latest_message)
+                        print(f"📝 从消息列表提取内容，长度: {len(previous_ai_content)}")
+                    else:
+                        print("⚠️ 消息列表为空")
+                else:
+                    # It's a single message object
+                    if hasattr(previous_ai_messages, 'content'):
+                        previous_ai_content = previous_ai_messages.content
+                    else:
+                        previous_ai_content = str(previous_ai_messages)
+                    print(f"📝 从单个消息提取内容，长度: {len(previous_ai_content)}")
+            else:
+                print("⚠️ 没有找到previous_AI_messages")
+                
+        except Exception as e:
+            print(f"❌ 提取previous_AI_messages内容时出错: {e}")
+            previous_ai_content = ""
+            
+        print(f"上一轮ai输入内容：=========================================\n{previous_ai_content}")
         system_prompt = f"""你是一个输入验证专家，需要判断用户的文本输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容，你的判断需要根据上下文，
         我会提供上一个AI的回复，以及用户输入，你需要根据上下文，判断用户输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容。
-        
-        上一个AI的回复: {previous_ai_content}
-        用户输入: {user_input}
 
         验证标准：
         1. **有效输入 [Valid]**:
@@ -970,6 +1007,7 @@ class ProcessUserInputAgent:
            - 包含具体的表格要求、数据描述、字段信息
            - 询问表格模板、表格格式相关问题
            - 提供了表格相关的数据或信息
+           - 是在回复上一轮AI的回复
 
         2. **无效输入 [Invalid]**:
            - 完全与表格/Excel无关的内容
@@ -984,7 +1022,8 @@ class ProcessUserInputAgent:
         try:
             print("📤 正在调用LLM进行文本输入验证...")
             # Get LLM validation
-            validation_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
+            user_input = "上一轮AI的回复：" + previous_ai_content + "\n用户输入：" + user_input
+            validation_response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
             # validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
             
             print(f"📥 验证响应: {validation_response}")
