@@ -137,7 +137,7 @@ class ProcessUserInputAgent:
             "irrelevant_files_path": [],
             "all_files_irrelevant": False,
             "text_input_validation": None,
-            "previous_AI_messages": [],
+            "previous_AI_messages": previous_AI_messages,
             "summary_message": "",
             "template_complexity": ""
         }

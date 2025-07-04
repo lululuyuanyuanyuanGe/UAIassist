@@ -71,14 +71,16 @@ class RecallFilesState(TypedDict):
 
 class RecallFilesAgent:
     def __init__(self):
+        self.memory = MemorySaver()
         self.graph = self._build_graph()
+       
 
 
     def _build_graph(self):
         graph = StateGraph(RecallFilesState)
         graph.add_node("recall_relative_files", self._recall_relative_files)
         graph.add_node("determine_the_mapping_of_headers", self._determine_the_mapping_of_headers)
-        graph.add_node("request_user_clarification", ToolNode(request_user_clarification))
+        graph.add_node("request_user_clarification", ToolNode([request_user_clarification]))
         graph.add_edge(START, "recall_relative_files")
         graph.add_edge("recall_relative_files", "determine_the_mapping_of_headers")
         graph.add_edge("determine_the_mapping_of_headers", "request_user_clarification")
@@ -86,7 +88,8 @@ class RecallFilesAgent:
         graph.add_edge("recall_relative_files", "request_user_clarification")
         graph.add_edge("request_user_clarification", "recall_relative_files")
         graph.add_edge("determine_the_mapping_of_headers", END)
-        return graph.compile(checkpointer = MemorySaver())
+
+        return graph.compile(checkpointer=self.memory)
 
     def _create_initial_state(self) -> RecallFilesState:
         return {
@@ -228,12 +231,13 @@ class RecallFilesAgent:
             "headers_mapping": response
         }
     
-    def run_recall_files_agent(self, template_structure: str = None) -> Dict:
+    def run_recall_files_agent(self, template_structure: str = None, session_id: str = 1) -> Dict:
         """运行召回文件代理，使用invoke方法而不是stream"""
         print("\n🚀 开始运行 RecallFilesAgent")
         print("=" * 60)
         
         initial_state = self._create_initial_state()
+        config = {"configurable": {"thread_id": session_id}}
         
         # Set the template structure if provided
         if template_structure:
@@ -248,8 +252,9 @@ class RecallFilesAgent:
         print("🔄 正在执行图形工作流...")
         
         try:
+
             # Use invoke instead of stream
-            final_state = self.graph.invoke(initial_state)
+            final_state = self.graph.invoke(initial_state, config=config)
             
             print("\n🎉 RecallFilesAgent 执行完成！")
             print("=" * 60)
