@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 from utilities.message_process import build_BaseMessage_type, filter_out_system_messages
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, read_txt_file
+from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, read_txt_file, convert_2_markdown
 from utilities.modelRelated import invoke_model
 
 import uuid
@@ -46,11 +46,13 @@ class FilloutTableState(TypedDict):
     data_file_path: list[str]
     supplement_files_path: list[str]
     template_file: str
+    template_file_completion_code: str
     rules: str
     combined_data: str
     final_table: str
     styled_html_table: str
     error_message: str
+    error_message_summary: str
     execution_successful: bool
     retry: int
 
@@ -69,18 +71,28 @@ class FilloutTableAgent:
         
         # Add nodes
         graph.add_node("combine_data", self._combine_data)
-        graph.add_node("generate_html_table", self._generate_html_table)
+        graph.add_node("generate_html_table_completion_code", self._generate_html_table_completion_code)
+        graph.add_node("execute_template_completion_code_from_LLM", self._execute_template_completion_code_from_LLM)
+        graph.add_node("summary_error_message", self._summary_error_message)
         graph.add_node("validate_html_table", self._validate_html_table)
         graph.add_node("style_html_table", self._style_html_table)
         graph.add_node("convert_html_to_excel", self._convert_html_to_excel)
         
         # Define the workflow
         graph.add_edge(START, "combine_data")
-        graph.add_edge("combine_data", "generate_html_table")
-        graph.add_edge("generate_html_table", "validate_html_table")
-        graph.add_edge("validate_html_table", "style_html_table")
-        graph.add_edge("style_html_table", "convert_html_to_excel")
-        graph.add_edge("convert_html_to_excel", END)
+        graph.add_edge("combine_data", "generate_html_table_completion_code")
+        graph.add_edge("generate_html_table_completion_code", "execute_template_completion_code_from_LLM")
+        
+        # Fix: Use add_conditional_edges instead of add_edge for routing
+        graph.add_conditional_edges(
+            "execute_code_from_LLM", 
+            self._route_after_execute_code
+        )
+        
+        graph.add_edge("summary_error_message", "generate_html_table_completion_code")
+        # graph.add_edge("validate_html_table", "style_html_table")
+        # graph.add_edge("style_html_table", "convert_html_to_excel")
+        # graph.add_edge("convert_html_to_excel", END)
 
         
         # Compile the graph
@@ -94,11 +106,13 @@ class FilloutTableAgent:
             "data_file_path": data_file_path,
             "supplement_files_path": supplement_files_path,
             "template_file": template_file,
+            "template_file_completion_code": "",
             "rules": rules,
             "combined_data": "",
             "final_table": "",
             "styled_html_table": "",
             "error_message": "",
+            "error_message_summary": "",
             "execution_successful": True,
             "retry": 0,
         }
@@ -134,6 +148,14 @@ class FilloutTableAgent:
         return {
             "combined_data": combined_data
         }
+    
+    def _combine_data_split_into_chunks(self, state: FilloutTableState) -> list[str]:
+        """整合所有需要用到的数据，并生将其分批，用于分批生成表格"""
+        file_name_dic = {}
+        for file in state["data_file_path"]:
+            content = read_txt_file(file)
+            file_name_dic[file] = content
+        
         
 
 
@@ -160,82 +182,312 @@ class FilloutTableAgent:
             return html_content
 
 
-    def _generate_html_table(self, state: FilloutTableState) -> FilloutTableState:
-        """直接生成完整的HTML表格，无需代码执行"""
+    def _generate_html_table_completion_code(self, state: FilloutTableState) -> FilloutTableState:
+        """生成完整的模板表格，生成python代码，但无需执行"""
 
-        system_prompt = f"""你是一位专业的智能表格填写专家，擅长分析结构化数据并自动生成完整的HTML表格。
+        system_prompt = f"""你是一位专业的 HTML 表格处理和样式优化专家，擅长通过 Python 代码实现表格的动态扩展和美化。
 
 【核心任务】
-根据提供的数据文件、模板表格和补充规则，直接生成一个完整填写好的HTML表格。
+根据用户提供的 HTML 表格模板，生成一段完整可执行的 Python 代码，实现以下功能：
 
-【输入材料分析】
-1. **模板表格**：包含表头结构和格式要求
-2. **数据文件**：包含需要填入的原始数据
-3. **补充规则**：包含计算公式、筛选条件、填写规范等
+1. **表格数据行扩展**：
+   - 你需要识别出表格中哪些是“数据行”，这些行通常满足：
+     - 包含“序号”列；
+     - 且“序号”单元格中是连续的数字（如 1、2、3…）；
+   - 使用这些数据行中第一个有效的 `<tr>` 作为模板进行扩展；
+   - 自动忽略或删除非数据行，如包含“审核人”、“制表人”字段的表尾行，或空白行。
 
-【处理要求】
+2. **样式美化**：
+   - 使用内嵌 `<style>` 标签添加 CSS 样式；
+   - 样式包括：边框、对齐方式、字体、表头背景、隔行换色等；
+   - 美化后表格应简洁、清晰、正式。
 
-**数据提取与映射：**
-- 仔细分析模板表格的表头结构，识别每个字段的含义
-- 从数据文件中提取对应的信息，建立字段映射关系
-- 对于找不到直接对应的字段，根据补充规则进行推理计算
+3. **结构保持**：
+   - 保留表格原有的 `<colgroup>` 区块；
+   - 保留表头 `<tr>`；
+   - 非数据部分结构不应被破坏。
 
-**计算逻辑处理：**
-- 党龄计算：根据转正时间计算到2024年12月31日的年限
-- 补贴金额：严格按照补充文件中的标准进行计算
-- 年龄计算：根据身份证号或出生日期计算实际年龄
-- 其他计算字段：根据规则文档进行相应计算
+【技术要求】
+- 使用 BeautifulSoup 解析 HTML；
+- 使用 copy.deepcopy() 或 soup.new_tag() 方法复制模板行；
+- 遍历 <tr> 判断数据行；
+- 使用标准 Python 文件读写操作；
+- 插入数据行时保证序号递增，并清空其余单元格内容；
+- 最终 HTML 结构必须符合标准并可直接在浏览器打开。
 
-**数据完整性：**
-- 确保所有数据行都被正确处理，不遗漏任何记录
-- 对于缺失数据，根据上下文和规则进行合理填充
-- 删除模板中的空白行，只保留有效数据
+【输出要求】
+- 仅输出完整、可直接执行的 Python 代码（不要添加 markdown 格式或解释性文字）；
+- Python 脚本需从 D:\\asianInfo\\ExcelAssist\\agents\\input\\老党员补贴.txt 读取 HTML 模板；
+- 结果输出为 D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html；
+- 编码为 UTF-8，路径必须可写。
 
-**HTML格式要求：**
-- 保持与原模板完全一致的表格结构
-- 保留原有的HTML标签、属性和样式
-- 确保生成的HTML代码规范、完整、可解析
+【错误修复机制】
+如遇到执行错误，请重点检查并修复以下问题：
+- 是否错误地复制了非数据行；
+- 是否误删或误保留了尾部备注行；
+- 是否遗漏 HTML 的结构闭合或 CSS 插入；
+- 是否缺失必要依赖（如 copy, BeautifulSoup）；
+- 文件路径是否正确、可读写。
 
-【输出格式】
-请直接返回完整的HTML表格代码，包含：
-1. 完整的HTML文档结构（如果原模板有）
-2. 所有表头和数据行
-3. 正确的HTML标签闭合
-4. 与模板一致的格式和样式
+【参考示例】
+以下是符合要求的 Python 参考模板：
 
-【质量标准】
-✓ 数据准确性：所有计算结果必须正确
-✓ 完整性：不遗漏任何数据记录
-✓ 格式一致性：与模板表格格式完全一致
-✓ HTML规范性：生成的代码符合HTML标准
+from bs4 import BeautifulSoup
+import copy
 
-【注意事项】
-- 严格按照补充文件中的计算规则执行
-- 注意日期格式的统一处理
-- 确保数值计算的精确性
-- 保持表格的专业性和可读性
+input_path = ""
+output_path = ""
+num_rows_to_generate = 100
 
----
+with open(input_path, 'r', encoding='utf-8') as f:
+    soup = BeautifulSoup(f, 'html.parser')
 
-【数据文件和补充规则】
-{state["combined_data"]}
+table = soup.find('table')
+all_rows = table.find_all('tr')
 
-【模板表格结构】
-{state.get("template_file", "未提供模板文件")}
+data_row_template = None
+for row in all_rows:
+    cells = row.find_all('td')
+    if len(cells) == 11 and cells[0].text.strip().isdigit():
+        data_row_template = copy.deepcopy(row)
+        break
 
-请基于以上材料，直接生成完整填写好的HTML表格："""
+footer_row = None
+# 具体表格具体分析
+for row in reversed(all_rows):
+    if '审核人' in row.text or '制表人' in row.text:
+        footer_row = row
+        break
 
-        print("🤖 正在生成HTML表格...")
-        response = invoke_model(model_name="baidu/ERNIE-4.5-300B-A47B", messages=[SystemMessage(content=system_prompt)])
-        print("✅ HTML表格生成完成")
+if footer_row:
+    footer_row.extract()
+
+for row in all_rows:
+    cells = row.find_all('td')
+    if len(cells) == 11 and cells[0].text.strip().isdigit():
+        row.extract()
+
+for i in range(1, num_rows_to_generate + 1):
+    new_row = copy.deepcopy(data_row_template)
+    cells = new_row.find_all('td')
+    cells[0].string = str(i)
+    for j in range(1, len(cells)):
+        cells[j].string = ''
+    table.append(new_row)
+
+if footer_row:
+    table.append(footer_row)
+
+style_tag = soup.new_tag('style')
+style_tag.string = \"\"\"
+table {{
+    border-collapse: collapse;
+    width: 100%;
+    font-family: 'Arial', sans-serif;
+    font-size: 14px;
+}}
+td {{
+    border: 1px solid #333;
+    padding: 6px;
+    text-align: center;
+}}
+td[colspan="11"] {{
+    font-weight: bold;
+    background-color: #f2f2f2;
+}}
+tr:nth-child(even) {{
+    background-color: #f9f9f9;
+}}
+\"\"\"
+soup.html.insert(0, style_tag)
+
+with open(output_path, 'w', encoding='utf-8') as f:
+    f.write(str(soup))
+"""
+
+
+        file_path = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\燕云村残疾人补贴申领登记.txt"
+        template_file_content = read_txt_file(file_path)
+        number_of_rows = "需要生成100行数据行"
+        base_input = f"HTML模板地址: {file_path}\n HTML模板内容:\n{template_file_content}\n \n需求:\n{number_of_rows}"
+
+        # Fix: Check if execution was NOT successful to use error recovery
+        if not state["execution_successful"]:
+            previous_code = state["template_file_completion_code"]
+            error_message = state.get("error_message_summary", state.get("error_message", ""))
+            error_input = f"上一次生成的代码:\n{previous_code}\n\n错误信息:\n{error_message}\n\n请根据错误信息修复代码。"
+            full_input = f"{base_input}\n\n{error_input}"
+            print("🤖 正在基于错误信息重新生成Python代码...")
+            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=full_input)])
+        else:
+            print("🤖 正在生成Python代码...")
+            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=base_input)])
+
+        print("✅ Python代码生成完成")
         
-        # 清理生成的HTML内容
-        cleaned_response = self._clean_html_content(response)
+        # Extract Python code if wrapped in markdown
+        code_content = response.strip()
+        if code_content.startswith('```python'):
+            code_content = code_content[9:]
+        elif code_content.startswith('```'):
+            code_content = code_content[3:]
+        if code_content.endswith('```'):
+            code_content = code_content[:-3]
+        code_content = code_content.strip()
         
         return {
-            "final_table": cleaned_response,
-            "messages": [AIMessage(content="HTML表格已生成完成")]
+            "template_file_completion_code": code_content,
         }
+    
+
+
+    def _execute_template_completion_code_from_LLM(self, state: FilloutTableState) -> FilloutTableState:
+        """执行从LLM生成的Python代码"""
+        code = state["template_file_completion_code"]
+        output_buffer = io.StringIO()
+        error_buffer = io.StringIO()
+
+        print("🚀 正在执行生成的代码...")
+        
+        # Print the code for debugging (first 10 lines)
+        print("📝 生成的代码片段:")
+        lines = code.split('\n')
+        for i, line in enumerate(lines[:10], 1):
+            print(f"{i:2d}: {line}")
+        if len(lines) > 10:
+            print(f"... (共 {len(lines)} 行代码)")
+        print("-" * 50)
+        
+        # Prepare execution environment with all necessary imports
+        global_vars = {
+            "pd": pd, 
+            "BeautifulSoup": BeautifulSoup,
+            "Path": Path,
+            "json": json,
+            "re": re,
+            "datetime": datetime,
+            "copy": __import__('copy'),
+            "os": __import__('os'),
+            "sys": __import__('sys'),
+        }
+        
+        try:
+            # Execute the code
+            with contextlib.redirect_stdout(output_buffer):
+                with contextlib.redirect_stderr(error_buffer):
+                    exec(code, global_vars)
+            
+            output = output_buffer.getvalue()
+            errors = error_buffer.getvalue()
+            
+            # Check for execution errors
+            if errors:
+                print(f"❌ 代码执行失败:")
+                print(errors)
+                return {
+                    "execution_successful": False,
+                    "error_message": f"代码执行错误: {errors}",
+                    "final_table": ""
+                }
+            
+            # Check if output contains error indicators
+            error_indicators = [
+                "error", "Error", "ERROR", "exception", "Exception", 
+                "traceback", "Traceback", "failed", "Failed"
+            ]
+            
+            if any(indicator in output.lower() for indicator in error_indicators):
+                print(f"❌ 代码执行包含错误信息:")
+                print(output)
+                return {
+                    "execution_successful": False,
+                    "error_message": f"代码执行输出包含错误: {output}",
+                    "final_table": ""
+                }
+            
+            # Try to find generated HTML file
+            output_paths = [
+                "D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html",
+                "agents\\output\\老党员补贴_结果.html",
+                "老党员补贴_结果.html"
+            ]
+            
+            html_content = ""
+            for path in output_paths:
+                if Path(path).exists():
+                    try:
+                        html_content = read_txt_file(path)
+                        print(f"✅ 找到生成的HTML文件: {path}")
+                        break
+                    except Exception as e:
+                        print(f"⚠️ 读取文件失败 {path}: {e}")
+            
+            # If no file found, use output content
+            if not html_content and output:
+                html_content = output
+                print("✅ 使用代码输出作为HTML内容")
+            elif not html_content:
+                print("⚠️ 未找到生成的HTML内容，但代码执行成功")
+                html_content = "<html><body><p>代码执行成功，但未生成HTML内容</p></body></html>"
+            
+            print("✅ 代码执行成功")
+            return {
+                "execution_successful": True,
+                "error_message": "",
+                "final_table": html_content
+            }
+            
+        except SyntaxError as e:
+            error_msg = f"语法错误 (第{e.lineno}行): {str(e)}"
+            print(f"❌ {error_msg}")
+            if e.lineno and e.lineno <= len(lines):
+                print(f"问题代码: {lines[e.lineno-1]}")
+            
+            return {
+                "execution_successful": False,
+                "error_message": error_msg,
+                "final_table": ""
+            }
+            
+        except Exception as e:
+            import traceback
+            full_traceback = traceback.format_exc()
+            error_msg = f"运行时错误: {str(e)}"
+            
+            print(f"❌ {error_msg}")
+            print("完整错误信息:")
+            print(full_traceback)
+            
+            return {
+                "execution_successful": False,
+                "error_message": full_traceback,
+                "final_table": ""
+            }
+
+    def _route_after_execute_code(self, state: FilloutTableState) -> str:
+        """This node will route back to the generate_code node, and ask the model to fix the error if error occurs"""
+        if state["execution_successful"]:
+            return END
+        else:
+            print("🔄 代码执行失败，返回重新生成代码...")
+            return "summary_error_message"
+        
+
+    def _summary_error_message(self, state: FilloutTableState) -> FilloutTableState:
+        """这个节点用于整理总结代码执行中的错误，并返回给智能体重新生成"""
+        system_prompt = f"""你的任务是根据报错信息和上一次的代码，总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码
+        你不需要生成改进的代码，你只需要总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
+        """
+
+        previous_code = "上一次的代码:\n" + state["template_file_completion_code"]
+        error_message = "报错信息:\n" + state["error_message"]
+        input_2_LLM = previous_code + "\n\n" + error_message
+
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=input_2_LLM)])
+        return {
+            "error_message_summary": response
+        }
+
 
     def _validate_html_table(self, state: FilloutTableState) -> FilloutTableState:
         """这个节点用于验证模型生成的html表格是否符合要求，并提出修改意见"""
@@ -429,7 +681,7 @@ class FilloutTableAgent:
             print(f"❌ 转换过程中发生错误: {e}")
             return {"error_message": f"转换失败: {str(e)}"}
 
-    def run_fillout_table_agent(self, user_input: str, session_id: str = "1") -> None:
+    def run_fillout_table_agent(self, session_id: str = "1") -> None:
         """This function will run the fillout table agent"""
         initial_state = self.create_initialize_state(template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\老党员补贴.txt", 
                                                         rules = """党员补助列需要你智能计算，规则如下，党龄需要根据党员名册中的转正时间计算，（1）党龄40—49年的，补助标准为：100元/月；
@@ -469,13 +721,11 @@ class FilloutTableAgent:
         except Exception as e:
             print(f"❌ 处理用户输入时出错: {e}")
     
-agent = FilloutTableAgent()
-agent_graph = agent._build_graph()
+
 
 if __name__ == "__main__":
-    fillout_table_agent = FilloutTableAgent()
-    fillout_table_agent.run_fillout_table_agent(user_input = "请根据模板和数据文件，填写表格。", session_id = "1")
-
-
-
-
+    # fillout_table_agent = FilloutTableAgent()
+    # fillout_table_agent.run_fillout_table_agent( session_id = "1")
+    # file_content = retrieve_file_content(session_id= "1", file_paths = [r"D:\asianInfo\ExcelAssist\燕云村测试样例\燕云村残疾人补贴\待填表\燕云村残疾人补贴申领登记.xlsx"])
+    file_content = convert_2_markdown(r"D:\asianInfo\ExcelAssist\燕云村测试样例\种植险投保登记表\编造文件\2024年农作物登记.xlsx")
+    print(file_content)

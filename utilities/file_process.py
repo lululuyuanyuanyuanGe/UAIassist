@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import chardet
 from typing import Union, List, Dict
+import pandas as pd
 
 def detect_and_process_file_paths(user_input: str) -> list:
     """检测用户输入中的文件路径并验证文件是否存在，返回结果为用户上传的文件路径组成的数列"""
@@ -55,6 +56,32 @@ def _log_existence(path: str, container: list):
         print(f"✅ 检测到文件: {path}")
     else:
         print(f"⚠️ 文件路径无效或文件不存在: {path}")
+
+
+def convert_2_markdown(file_path: str) -> str:
+    """将Excel文件转换为Markdown格式并保存为.md文件"""
+
+    # 读取Excel文件
+    df = pd.read_excel(file_path)
+    markdown_content = df.to_markdown(index=False)
+
+    # 构造新的Markdown文件名
+    original_name = Path(file_path).stem  # 不带扩展名
+    markdown_file_name = f"{original_name}.md"
+
+    # 目标保存目录
+    markdown_folder = Path(r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_md")
+    markdown_folder.mkdir(parents=True, exist_ok=True)  # 如果不存在就创建
+
+    # 完整路径
+    markdown_file_path = markdown_folder / markdown_file_name
+
+    # 写入文件
+    with open(markdown_file_path, "w", encoding="utf-8") as f:
+        f.write(markdown_content)
+
+    return str(markdown_file_path)  # 返回保存路径以便后续使用
+    
 
 
 def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
