@@ -28,6 +28,7 @@ import re
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
+from langgraph.constants import Send
 # from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
@@ -48,16 +49,19 @@ class FilloutTableState(TypedDict):
     supplement_files_summary: str
     template_file: str
     template_file_completion_code: str
+    fill_CSV_2_template_code: str
     rules: str
     combined_data: str
     final_table: str
     styled_html_table: str
     error_message: str
     error_message_summary: str
-    execution_successful: bool
+    template_completion_code_template_completion_code_execution_successful: bool
+    CSV2Teplate_template_completion_code_execution_successful: bool
     retry: int
     combined_data_array: list[str]
     headers_mapping: str
+    CSV_data: list[str]
 
 
 
@@ -74,29 +78,41 @@ class FilloutTableAgent:
         
         # Add nodes
         graph.add_node("combine_data_split_into_chunks", self._combine_data_split_into_chunks)
+        graph.add_node("generate_CSV_based_on_combined_data", self._generate_CSV_based_on_combined_data)
         graph.add_node("generate_html_table_completion_code", self._generate_html_table_completion_code)
         graph.add_node("execute_template_completion_code_from_LLM", self._execute_template_completion_code_from_LLM)
-        graph.add_node("summary_error_message", self._summary_error_message)
+        graph.add_node("summary_error_message_template_completion_code", self._summary_error_message_template_completion_code)
+        graph.add_node("generate_code_fill_CSV_2_template", self._generate_code_fill_CSV_2_template)
+        graph.add_node("execute_fill_CSV_2_template_code", self._execute_fill_CSV_2_template_code)
+        graph.add_node("summary_error_message_CSV2Template", self._summary_error_message_CSV2Template)
         graph.add_node("validate_html_table", self._validate_html_table)
         graph.add_node("style_html_table", self._style_html_table)
         graph.add_node("convert_html_to_excel", self._convert_html_to_excel)
         
         # Define the workflow
         graph.add_edge(START, "combine_data_split_into_chunks")
-        graph.add_edge("combine_data_split_into_chunks", "generate_html_table_completion_code")
+        graph.add_conditional_edges("combine_data_split_into_chunks", self._route_after_combine_data_split_into_chunks)
+
         graph.add_edge("generate_html_table_completion_code", "execute_template_completion_code_from_LLM")
+        graph.add_conditional_edges("execute_template_completion_code_from_LLM", self._route_after_execute_template_completion_code_from_LLM)
+        graph.add_edge("summary_error_message_template_completion_code", "generate_html_table_completion_code")
+
+        graph.add_edge("generate_CSV_based_on_combined_data", "generate_code_fill_CSV_2_template")
+        graph.add_edge("generate_code_fill_CSV_2_template", "execute_fill_CSV_2_template_code")
+        graph.add_conditional_edges("execute_fill_CSV_2_template_code", self._route_after_execute_fill_CSV_2_template_code)
+        graph.add_edge("summary_error_message_CSV2Template", "generate_code_fill_CSV_2_template")
+
+        graph.add_edge("validate_html_table", "style_html_table")
+        graph.add_edge("style_html_table", "convert_html_to_excel")
         
         # Fix: Use add_conditional_edges instead of add_edge for routing
         graph.add_conditional_edges(
             "execute_template_completion_code_from_LLM", 
-            self._route_after_execute_code,
-            {
-                "END": END,
-                "summary_error_message": "summary_error_message"
-            }
+            self._route_after_execute_template_completion_code_from_LLM
         )
         
-        graph.add_edge("summary_error_message", "generate_html_table_completion_code")
+        graph.add_edge("summary_error_message_template_completion_code", "generate_html_table_completion_code")
+        
         # graph.add_edge("validate_html_table", "style_html_table")
         # graph.add_edge("style_html_table", "convert_html_to_excel")
         # graph.add_edge("convert_html_to_excel", END)
@@ -115,16 +131,19 @@ class FilloutTableAgent:
             "template_file": template_file,
             "supplement_files_summary": "",
             "template_file_completion_code": "",
+            "fill_CSV_2_template_code": "",
             "rules": rules,
             "combined_data": "",
             "final_table": "",
             "styled_html_table": "",
             "error_message": "",
             "error_message_summary": "",
-            "execution_successful": True,
+            "template_completion_code_execution_successful": False,
+            "CSV2Teplate_template_completion_code_execution_successful": False,
             "retry": 0,
             "combined_data_array": [],
-            "headers_mapping": ""
+            "headers_mapping": "",
+            "CSV_data": []
         }
     
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
@@ -172,6 +191,12 @@ class FilloutTableAgent:
                 "combined_data_array": []
             }
 
+    def _route_after_combine_data_split_into_chunks(self, state: FilloutTableState) -> str:
+        """并行执行模板代码的生成和CSV数据的合成"""
+        sends = []
+        sends.append(Send("generate_CSV_based_on_combined_data", state))
+        sends.append(Send("generate_html_table_completion_code", state))
+        return sends
     
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
@@ -220,7 +245,7 @@ class FilloutTableAgent:
         
         if not chunks_with_indices:
             print("⚠️ No chunks to process")
-            return {"combined_data_array": []}
+            return {"CSV_data": []}
         
         print(f"🚀 Starting concurrent processing of {len(chunks_with_indices)} chunks...")
         
@@ -228,7 +253,7 @@ class FilloutTableAgent:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         results = {}
-        with ThreadPoolExecutor(max_workers=3) as executor:  # Limit to 3 concurrent requests
+        with ThreadPoolExecutor(max_workers=5) as executor:  # Limit to 3 concurrent requests
             # Submit all tasks
             future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                               for chunk_data in chunks_with_indices}
@@ -249,8 +274,181 @@ class FilloutTableAgent:
         print(f"🎉 Successfully processed {len(sorted_results)} chunks concurrently")
         
         return {
-            "combined_data_array": sorted_results
+            "CSV_data": sorted_results
         }
+    
+
+    def _generate_code_fill_CSV_2_template(self, state: FilloutTableState) -> FilloutTableState:
+        """这个节点会把生成出的CSV数据填到模板表格中"""
+        system_prompt = """那你是一个python专家, 另外如果代码没有执行正确的话, 请根据错误信息修复代码"""
+        template = state["final_table"]
+        CSV_data = state["CSV_data"]
+        user_input = f"需要填的模板表格:\n{template}\n需要填的CSV数据:\n{CSV_data}"
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
+        
+        
+        return {
+            "fill_CSV_2_template_code": response
+        }
+        
+    def _execute_fill_CSV_2_template_code(self, state: FilloutTableState) -> FilloutTableState:
+        """执行填CSV到模板表格的代码"""
+        code = state["fill_CSV_2_template_code"]
+        output_buffer = io.StringIO()
+        error_buffer = io.StringIO()
+
+        print("🚀 正在执行CSV填充代码...")
+        
+        # Print the code for debugging (first 10 lines)
+        print("📝 生成的CSV填充代码片段:")
+        lines = code.split('\n')
+        for i, line in enumerate(lines[:10], 1):
+            print(f"{i:2d}: {line}")
+        if len(lines) > 10:
+            print(f"... (共 {len(lines)} 行代码)")
+        print("-" * 50)
+        
+        # Prepare execution environment with all necessary imports
+        global_vars = {
+            "pd": pd, 
+            "BeautifulSoup": BeautifulSoup,
+            "Path": Path,
+            "json": json,
+            "re": re,
+            "datetime": datetime,
+            "copy": __import__('copy'),
+            "os": __import__('os'),
+            "sys": __import__('sys'),
+            "csv": __import__('csv'),
+        }
+        
+        try:
+            # Execute the code
+            with contextlib.redirect_stdout(output_buffer):
+                with contextlib.redirect_stderr(error_buffer):
+                    exec(code, global_vars)
+            
+            output = output_buffer.getvalue()
+            errors = error_buffer.getvalue()
+            
+            # Check for execution errors
+            if errors:
+                print(f"❌ CSV填充代码执行失败:")
+                print(errors)
+                return {
+                    "CSV2Teplate_template_completion_code_execution_successful": False,
+                    "error_message": f"CSV填充代码执行错误: {errors}",
+                    "final_table": ""
+                }
+            
+            # Check if output contains error indicators
+            error_indicators = [
+                "error", "Error", "ERROR", "exception", "Exception", 
+                "traceback", "Traceback", "failed", "Failed"
+            ]
+            
+            if any(indicator in output.lower() for indicator in error_indicators):
+                print(f"❌ CSV填充代码执行包含错误信息:")
+                print(output)
+                return {
+                    "CSV2Teplate_template_completion_code_execution_successful": False,
+                    "error_message": f"CSV填充代码执行输出包含错误: {output}",
+                    "final_table": ""
+                }
+            
+            # Try to find generated HTML file
+            output_paths = [
+                "D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html",
+                "agents\\output\\老党员补贴_结果.html",
+                "老党员补贴_结果.html"
+            ]
+            
+            html_content = ""
+            for path in output_paths:
+                if Path(path).exists():
+                    try:
+                        html_content = read_txt_file(path)
+                        print(f"✅ 找到填充后的HTML文件: {path}")
+                        break
+                    except Exception as e:
+                        print(f"⚠️ 读取文件失败 {path}: {e}")
+            
+            # If no file found, use output content
+            if not html_content and output:
+                html_content = output
+                print("✅ 使用代码输出作为HTML内容")
+            elif not html_content:
+                print("⚠️ 未找到填充后的HTML内容，但代码执行成功")
+                html_content = "<html><body><p>CSV填充代码执行成功，但未生成HTML内容</p></body></html>"
+            
+            print("✅ CSV填充代码执行成功")
+            return {
+                "CSV2Teplate_template_completion_code_execution_successful": True,
+                "error_message": "",
+                "final_table": html_content
+            }
+            
+        except SyntaxError as e:
+            error_msg = f"CSV填充代码语法错误 (第{e.lineno}行): {str(e)}"
+            print(f"❌ {error_msg}")
+            if e.lineno and e.lineno <= len(lines):
+                print(f"问题代码: {lines[e.lineno-1]}")
+            
+            return {
+                "CSV2Teplate_template_completion_code_execution_successful": False,
+                "error_message": error_msg,
+                "final_table": ""
+            }
+            
+        except Exception as e:
+            import traceback
+            full_traceback = traceback.format_exc()
+            error_msg = f"CSV填充代码运行时错误: {str(e)}"
+            
+            print(f"❌ {error_msg}")
+            print("完整错误信息:")
+            print(full_traceback)
+            
+            return {
+                "CSV2Teplate_template_completion_code_execution_successful": False,
+                "error_message": full_traceback,
+                "final_table": ""
+            }
+
+    def _route_after_execute_fill_CSV_2_template_code(self, state: FilloutTableState) -> str:
+        """根据执行结果路由到错误总结，或者执行成功"""
+        if state["CSV2Teplate_template_completion_code_execution_successful"]:
+            print("✅ CSV填充代码执行成功，继续后续流程")
+            return "validate_html_table"
+        else:
+            print("🔄 CSV填充代码执行失败，返回重新生成代码...")
+            return "summary_error_message_CSV2Template"
+
+    def _summary_error_message_CSV2Template(self, state: FilloutTableState) -> FilloutTableState:
+        """总结CSV填充代码的报错信息"""
+        system_prompt = f"""你的任务是根据CSV填充代码的报错信息和上一次的代码，总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
+
+你需要特别关注以下几个方面：
+1. CSV数据格式是否正确
+2. 模板表格结构解析是否正确
+3. 数据填充逻辑是否有问题
+4. 文件路径和读写权限是否正确
+5. 数据类型转换是否正确
+
+你不需要生成改进的代码，你只需要总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
+"""
+
+        previous_code = "上一次的CSV填充代码:\n" + state["fill_CSV_2_template_code"]
+        error_message = "报错信息:\n" + state["error_message"]
+        csv_data_preview = f"CSV数据预览:\n{str(state['CSV_data'])[:500]}..." if state.get("CSV_data") else ""
+        
+        input_2_LLM = previous_code + "\n\n" + error_message + "\n\n" + csv_data_preview
+
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=input_2_LLM)])
+        return {
+            "error_message_summary": response
+        }
+    
 
     def _clean_html_content(self, html_content: str) -> str:
         """清理HTML内容中的过多空白字符和非断行空格"""
@@ -405,7 +603,7 @@ with open(output_path, 'w', encoding='utf-8') as f:
         base_input = f"HTML模板地址: {file_path}\n HTML模板内容:\n{template_file_content}\n \n需求:\n{number_of_rows}"
 
         # Fix: Check if execution was NOT successful to use error recovery
-        if not state["execution_successful"]:
+        if not state["template_completion_code_execution_successful"]:
             previous_code = state["template_file_completion_code"]
             error_message = state.get("error_message_summary", state.get("error_message", ""))
             error_input = f"上一次生成的代码:\n{previous_code}\n\n错误信息:\n{error_message}\n\n请根据错误信息修复代码。"
@@ -478,7 +676,7 @@ with open(output_path, 'w', encoding='utf-8') as f:
                 print(f"❌ 代码执行失败:")
                 print(errors)
                 return {
-                    "execution_successful": False,
+                    "template_completion_code_execution_successful": False,
                     "error_message": f"代码执行错误: {errors}",
                     "final_table": ""
                 }
@@ -493,7 +691,7 @@ with open(output_path, 'w', encoding='utf-8') as f:
                 print(f"❌ 代码执行包含错误信息:")
                 print(output)
                 return {
-                    "execution_successful": False,
+                    "template_completion_code_execution_successful": False,
                     "error_message": f"代码执行输出包含错误: {output}",
                     "final_table": ""
                 }
@@ -525,7 +723,7 @@ with open(output_path, 'w', encoding='utf-8') as f:
             
             print("✅ 代码执行成功")
             return {
-                "execution_successful": True,
+                "template_completion_code_execution_successful": True,
                 "error_message": "",
                 "final_table": html_content
             }
@@ -537,7 +735,7 @@ with open(output_path, 'w', encoding='utf-8') as f:
                 print(f"问题代码: {lines[e.lineno-1]}")
             
             return {
-                "execution_successful": False,
+                "template_completion_code_execution_successful": False,
                 "error_message": error_msg,
                 "final_table": ""
             }
@@ -552,21 +750,21 @@ with open(output_path, 'w', encoding='utf-8') as f:
             print(full_traceback)
             
             return {
-                "execution_successful": False,
+                "template_completion_code_execution_successful": False,
                 "error_message": full_traceback,
                 "final_table": ""
             }
 
-    def _route_after_execute_code(self, state: FilloutTableState) -> str:
+    def _route_after_execute_template_completion_code_from_LLM(self, state: FilloutTableState) -> str:
         """This node will route back to the generate_code node, and ask the model to fix the error if error occurs"""
-        if state["execution_successful"]:
-            return END
+        if state["template_completion_code_execution_successful"]:
+            return "execute_fill_CSV_2_template_code"
         else:
             print("🔄 代码执行失败，返回重新生成代码...")
-            return "summary_error_message"
+            return "summary_error_message_template_completion_code"
         
 
-    def _summary_error_message(self, state: FilloutTableState) -> FilloutTableState:
+    def _summary_error_message_template_completion_code(self, state: FilloutTableState) -> FilloutTableState:
         """这个节点用于整理总结代码执行中的错误，并返回给智能体重新生成"""
         system_prompt = f"""你的任务是根据报错信息和上一次的代码，总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码
         你不需要生成改进的代码，你只需要总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
@@ -582,197 +780,94 @@ with open(output_path, 'w', encoding='utf-8') as f:
         }
 
 
-    def _validate_html_table(self, state: FilloutTableState) -> FilloutTableState:
-        """这个节点用于验证模型生成的html表格是否符合要求，并提出修改意见"""
-        try:
-            # Get the final table content
-            final_table = state.get("final_table", "")
-            
-            if not final_table:
-                print("❌ 没有找到最终表格内容")
-                return {"error_message": "没有找到最终表格内容"}
-            
-            # If final_table is a file path, read the content
-            if isinstance(final_table, str) and Path(final_table).exists():
-                html_table_content = read_txt_file(final_table)
-            else:
-                html_table_content = final_table
-            
-            # Clean up the HTML content before validation
-            html_table_content = self._clean_html_content(html_table_content)
-            
-            # Truncate content if too long to prevent token limit issues
-            if len(html_table_content) > 8000:
-                html_table_content = html_table_content[:8000] + "...[内容已截断]"
-                print(f"⚠️ 验证内容过长，已截断至8000字符")
-            
-            system_prompt = f"""
-            你需要根据用户提供的模板表格，数据表格和文档来判断模型生成的html表格是否符合要求，并提出修改意见，
-            所有文件都是由html构建的，你需要根据html的结构和内容来判断模型生成的html表格是否符合要求，表头结构是否符合模板表头，
-            数据是否正确，是否完整，数据计算是否正确
 
-            下面是当前生成的html表格
-            {html_table_content}
-
-            下面是用户提供的模板，数据表格和文档
-            {state["combined_data"][:5000]}
-
-            如果需要修改请直接返回修改后的html表格，否则返回[No]
-            """
+    # def _convert_html_to_excel(self, state: FilloutTableState) -> FilloutTableState:
+    #     """把通过代码构建的html表格通过libreoffice转换为excel表格"""
+    #     try:
+    #         import subprocess
+    #         import tempfile
+    #         import os
             
-            print("🔍 正在验证生成的HTML表格...")
-            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
+    #         # Get the HTML content from state
+    #         html_content = state.get("styled_html_table", state.get("final_table", ""))
             
-            if response.strip() == "[No]":
-                print("✅ 表格验证通过，无需修改")
-                # Return current state unchanged - this is crucial!
-                return {}
-            else:
-                print("🔄 表格验证发现问题，已修改")
-                # Clean the modified HTML table as well
-                cleaned_response = self._clean_html_content(response)
-                return {"final_table": cleaned_response}
+    #         if not html_content:
+    #             print("❌ 没有找到HTML表格内容")
+    #             return {"error_message": "没有找到HTML表格内容"}
+            
+    #         # If final_table is a file path, read the content
+    #         if isinstance(html_content, str) and Path(html_content).exists():
+    #             html_content = read_txt_file(html_content)
+            
+    #         # Create temporary HTML file
+    #         with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_html:
+    #             temp_html.write(html_content)
+    #             temp_html_path = temp_html.name
+            
+    #         # Output paths
+    #         output_dir = Path("agents/output")
+    #         output_dir.mkdir(exist_ok=True)
+            
+    #         html_output_path = output_dir / "老党员补贴_结果.html"
+    #         excel_output_path = output_dir / "老党员补贴_结果.xlsx"
+            
+    #         # Save the final HTML file
+    #         try:
+    #             with open(html_output_path, 'w', encoding='utf-8') as f:
+    #                 f.write(html_content)
+    #             print(f"✅ HTML文件已保存: {html_output_path}")
+    #         except Exception as e:
+    #             print(f"❌ 保存HTML文件失败: {e}")
+            
+    #         # Convert to Excel using LibreOffice
+    #         try:
+    #             # Use the specified LibreOffice path
+    #             libreoffice_path = r"D:\LibreOffice\program\soffice.exe"
                 
-        except Exception as e:
-            print(f"❌ 验证过程中发生错误: {e}")
-            return {"error_message": f"验证失败: {str(e)}"}
-
-
-
-    def _style_html_table(self, state: FilloutTableState) -> FilloutTableState:
-        """这个节点用于把通过代码构建的html表格进行样式调整，使其符合用户的需求"""
-        try:
-            # Get the final table content
-            final_table = state.get("final_table", "")
-            
-            if not final_table:
-                print("❌ 没有找到HTML表格内容")
-                return {"error_message": "没有找到HTML表格内容"}
-            
-            # If final_table is a file path, read the content
-            if isinstance(final_table, str) and Path(final_table).exists():
-                html_content = read_txt_file(final_table)
-            else:
-                html_content = final_table
-            
-            # Clean up the HTML content before styling
-            html_content = self._clean_html_content(html_content)
-            
-            # Truncate content if too long to prevent token limit issues
-            if len(html_content) > 8000:
-                html_content = html_content[:8000] + "...[内容已截断]"
-                print(f"⚠️ 样式调整内容过长，已截断至8000字符")
-            
-            system_prompt = f"""你是一位擅长美化 HTML 表格的专业样式设计专家。接下来我将提供一份由 Excel 转换而来的 HTML 表格文件。  
-            你的任务是：  
-            1. 对表格的整体样式进行美化，使其更加美观、清晰、专业；  
-            2. 所有样式需直接以 CSS 的形式嵌入到 HTML 文件中（可使用 `<style>` 标签），避免依赖外部样式文件；  
-            3. 保持原始表格结构和内容不变，仅对其外观进行优化调整；  
-            4. 输出结果请直接返回完整的 HTML 文件代码（包括样式和表格内容）。
-
-            以下是当前的 HTML 表格文件内容：
-            {html_content}
-            """
-            
-            print("🎨 正在美化HTML表格样式...")
-            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
-            
-            print("✅ 表格样式美化完成")
-            # Clean the styled HTML as well
-            cleaned_response = self._clean_html_content(response)
-            return {"styled_html_table": cleaned_response}
-            
-        except Exception as e:
-            print(f"❌ 样式调整过程中发生错误: {e}")
-            return {"error_message": f"样式调整失败: {str(e)}"}
-
-    def _convert_html_to_excel(self, state: FilloutTableState) -> FilloutTableState:
-        """把通过代码构建的html表格通过libreoffice转换为excel表格"""
-        try:
-            import subprocess
-            import tempfile
-            import os
-            
-            # Get the HTML content from state
-            html_content = state.get("styled_html_table", state.get("final_table", ""))
-            
-            if not html_content:
-                print("❌ 没有找到HTML表格内容")
-                return {"error_message": "没有找到HTML表格内容"}
-            
-            # If final_table is a file path, read the content
-            if isinstance(html_content, str) and Path(html_content).exists():
-                html_content = read_txt_file(html_content)
-            
-            # Create temporary HTML file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_html:
-                temp_html.write(html_content)
-                temp_html_path = temp_html.name
-            
-            # Output paths
-            output_dir = Path("agents/output")
-            output_dir.mkdir(exist_ok=True)
-            
-            html_output_path = output_dir / "老党员补贴_结果.html"
-            excel_output_path = output_dir / "老党员补贴_结果.xlsx"
-            
-            # Save the final HTML file
-            try:
-                with open(html_output_path, 'w', encoding='utf-8') as f:
-                    f.write(html_content)
-                print(f"✅ HTML文件已保存: {html_output_path}")
-            except Exception as e:
-                print(f"❌ 保存HTML文件失败: {e}")
-            
-            # Convert to Excel using LibreOffice
-            try:
-                # Use the specified LibreOffice path
-                libreoffice_path = r"D:\LibreOffice\program\soffice.exe"
+    #             # Check if LibreOffice exists
+    #             if not os.path.exists(libreoffice_path):
+    #                 print(f"❌ 未找到LibreOffice: {libreoffice_path}")
+    #                 return {"error_message": f"LibreOffice not found at {libreoffice_path}"}
                 
-                # Check if LibreOffice exists
-                if not os.path.exists(libreoffice_path):
-                    print(f"❌ 未找到LibreOffice: {libreoffice_path}")
-                    return {"error_message": f"LibreOffice not found at {libreoffice_path}"}
+    #             # Convert HTML to Excel using LibreOffice
+    #             cmd = [
+    #                 libreoffice_path,
+    #                 '--headless',
+    #                 '--convert-to', 'xlsx',
+    #                 '--outdir', str(output_dir),
+    #                 temp_html_path
+    #             ]
                 
-                # Convert HTML to Excel using LibreOffice
-                cmd = [
-                    libreoffice_path,
-                    '--headless',
-                    '--convert-to', 'xlsx',
-                    '--outdir', str(output_dir),
-                    temp_html_path
-                ]
+    #             print(f"🔄 正在转换HTML到Excel...")
+    #             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
                 
-                print(f"🔄 正在转换HTML到Excel...")
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-                
-                if result.returncode == 0:
-                    print(f"✅ Excel文件已生成: {excel_output_path}")
-                else:
-                    print(f"❌ LibreOffice转换失败: {result.stderr}")
-                    return {"error_message": f"LibreOffice conversion failed: {result.stderr}"}
+    #             if result.returncode == 0:
+    #                 print(f"✅ Excel文件已生成: {excel_output_path}")
+    #             else:
+    #                 print(f"❌ LibreOffice转换失败: {result.stderr}")
+    #                 return {"error_message": f"LibreOffice conversion failed: {result.stderr}"}
                     
-            except subprocess.TimeoutExpired:
-                print("❌ LibreOffice转换超时")
-                return {"error_message": "LibreOffice conversion timeout"}
-            except Exception as e:
-                print(f"❌ Excel转换失败: {e}")
-                return {"error_message": f"Excel conversion failed: {str(e)}"}
+    #         except subprocess.TimeoutExpired:
+    #             print("❌ LibreOffice转换超时")
+    #             return {"error_message": "LibreOffice conversion timeout"}
+    #         except Exception as e:
+    #             print(f"❌ Excel转换失败: {e}")
+    #             return {"error_message": f"Excel conversion failed: {str(e)}"}
             
-            # Clean up temporary file
-            try:
-                os.unlink(temp_html_path)
-            except Exception as e:
-                print(f"⚠️ 清理临时文件失败: {e}")
+    #         # Clean up temporary file
+    #         try:
+    #             os.unlink(temp_html_path)
+    #         except Exception as e:
+    #             print(f"⚠️ 清理临时文件失败: {e}")
             
-            return {
-                "final_table": str(html_output_path),
-                "messages": [AIMessage(content=f"表格填写完成！\n- HTML文件: {html_output_path}\n- Excel文件: {excel_output_path}")]
-            }
+    #         return {
+    #             "final_table": str(html_output_path),
+    #             "messages": [AIMessage(content=f"表格填写完成！\n- HTML文件: {html_output_path}\n- Excel文件: {excel_output_path}")]
+    #         }
             
-        except Exception as e:
-            print(f"❌ 转换过程中发生错误: {e}")
-            return {"error_message": f"转换失败: {str(e)}"}
+    #     except Exception as e:
+    #         print(f"❌ 转换过程中发生错误: {e}")
+    #         return {"error_message": f"转换失败: {str(e)}"}
 
     def run_fillout_table_agent(self, session_id: str = "1") -> None:
         """This function will run the fillout table agent"""

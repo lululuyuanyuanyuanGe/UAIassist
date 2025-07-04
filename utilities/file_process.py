@@ -652,3 +652,138 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     
     print(f"🎉 Successfully created {len(combined_chunks)} combined chunks")
     return combined_chunks
+
+
+def clean_and_pretty_print_csv(csv_data_list: list[str], output_file: str = None) -> None:
+    """
+    Clean and pretty print CSV data from concurrent processing results
+    
+    Args:
+        csv_data_list: List of CSV strings from concurrent processing
+        output_file: Optional file path to save the cleaned CSV
+    """
+    import pandas as pd
+    from io import StringIO
+    
+    print("🧹 Cleaning and formatting CSV data...")
+    
+    all_rows = []
+    seen_rows = set()  # To track duplicates
+    
+    # Define expected columns for validation
+    expected_columns = ['序号', '姓名', '性别', '民族', '身份证号码', '出生时间', 
+                       '所在党支部', '成为正式党员时间', '党龄（年）', '生活补贴标准（元／月）', '备注']
+    
+    for i, csv_chunk in enumerate(csv_data_list):
+        print(f"📝 Processing chunk {i+1}/{len(csv_data_list)}...")
+        
+        # Split into lines and clean each line
+        lines = csv_chunk.strip().split('\n')
+        
+        for line_num, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Split by comma and clean
+            parts = [part.strip() for part in line.split(',')]
+            
+            # Basic validation: should have 11 parts for this table
+            if len(parts) != 11:
+                print(f"  ⚠️ Skipping invalid row (wrong column count): {line[:50]}...")
+                continue
+            
+            # Check for corrupted data (like partial entries)
+            if any(len(part) < 1 for part in parts[:3]):  # First 3 columns should not be empty
+                print(f"  ⚠️ Skipping corrupted row: {line[:50]}...")
+                continue
+            
+            # Create a tuple for duplicate detection
+            row_key = tuple(parts)
+            if row_key in seen_rows:
+                print(f"  🔄 Skipping duplicate row: {parts[1]} (序号: {parts[0]})")
+                continue
+                
+            seen_rows.add(row_key)
+            all_rows.append(parts)
+    
+    if not all_rows:
+        print("❌ No valid rows found!")
+        return
+    
+    # Create DataFrame for better formatting
+    df = pd.DataFrame(all_rows, columns=expected_columns)
+    
+    # Sort by 序号 if possible
+    try:
+        df['序号_int'] = pd.to_numeric(df['序号'], errors='coerce')
+        df = df.sort_values('序号_int').drop('序号_int', axis=1)
+    except:
+        print("⚠️ Could not sort by 序号")
+    
+    print(f"\n✅ Cleaned data summary:")
+    print(f"📊 Total valid rows: {len(df)}")
+    print(f"👥 Unique people: {len(df['姓名'].unique())}")
+    print(f"🏛️ Party branches: {len(df['所在党支部'].unique())}")
+    
+    # Pretty print the first 10 rows
+    print(f"\n📋 Sample data (first 10 rows):")
+    print("="*150)
+    
+    # Create a nice table format
+    def print_table_row(row_data, widths):
+        formatted_row = ""
+        for i, (data, width) in enumerate(zip(row_data, widths)):
+            formatted_row += f"{str(data):<{width}} | "
+        return formatted_row
+    
+    # Calculate column widths
+    widths = []
+    for col in expected_columns:
+        max_width = max(len(col), df[col].astype(str).str.len().max())
+        widths.append(min(max_width, 20))  # Limit width to 20 chars
+    
+    # Print header
+    header_row = print_table_row(expected_columns, widths)
+    print(header_row)
+    print("-" * len(header_row))
+    
+    # Print first 10 data rows
+    for idx, (_, row) in enumerate(df.head(10).iterrows()):
+        row_data = [str(row[col])[:18] + ".." if len(str(row[col])) > 20 else str(row[col]) 
+                   for col in expected_columns]
+        print(print_table_row(row_data, widths))
+    
+    if len(df) > 10:
+        print(f"... and {len(df) - 10} more rows")
+    
+    # Save to file if requested
+    if output_file:
+        df.to_csv(output_file, index=False, encoding='utf-8')
+        print(f"\n💾 Saved cleaned data to: {output_file}")
+    
+    # Show statistics
+    print(f"\n📊 Data Statistics:")
+    print(f"  🎂 Age range: {df['出生时间'].min()} to {df['出生时间'].max()}")
+    
+    # Party age statistics
+    try:
+        party_ages = pd.to_numeric(df['党龄（年）'], errors='coerce').dropna()
+        if len(party_ages) > 0:
+            print(f"  🏛️ Party age range: {party_ages.min():.0f} to {party_ages.max():.0f} years")
+            print(f"  📈 Average party age: {party_ages.mean():.1f} years")
+    except:
+        pass
+    
+    # Subsidy statistics  
+    try:
+        subsidies = pd.to_numeric(df['生活补贴标准（元／月）'], errors='coerce').dropna()
+        if len(subsidies) > 0:
+            subsidy_counts = df['生活补贴标准（元／月）'].value_counts()
+            print(f"  💰 Subsidy distribution:")
+            for subsidy, count in subsidy_counts.head(5).items():
+                print(f"    {subsidy}元/月: {count} people")
+    except:
+        pass
+    
+    return df
