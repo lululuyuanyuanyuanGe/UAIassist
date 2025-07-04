@@ -51,6 +51,7 @@ class FilloutTableState(TypedDict):
     file_process_code: str
     code_with_line: str
     final_table: str
+    styled_html_table: str
     error_message: str
     error_message_summary: str
     execution_successful: bool
@@ -123,9 +124,10 @@ class FilloutTableAgent:
             file_content.append(f"=== Data File: {Path(file).name} ===\n{content}\n")
         
         # Combine supplement files
-        # for file in state["supplement_files_path"]:
-        #     content = file + "\n" + read_txt_file(file)
-        #     file_content.append(f"=== Supplement File: {Path(file).name} ===\n{content}\n")
+        if state.get("supplement_files_path"):
+            for file in state["supplement_files_path"]:
+                content = file + "\n" + read_txt_file(file)
+                file_content.append(f"=== Supplement File: {Path(file).name} ===\n{content}\n")
         
         # Add template file
         if state["template_file"]:
