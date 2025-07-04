@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 import re
 import os
+import json
 from pathlib import Path
 import subprocess
 import chardet
@@ -398,8 +399,8 @@ def extract_filename(file_path: str) -> str:
         str: The filename with extension
         
     Examples:
-        >>> extract_filename(r"d:\asianInfo\ExcelAssist\燕云村case\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc")
-        '[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc'
+        >>> extract_filename(r"d:\asianInfo\ExcelAssist\燕云村case\正文稿关于印发通知.doc")
+        '正文稿关于印发通知.doc'
         >>> extract_filename("/home/user/document.pdf")
         'document.pdf'
         >>> extract_filename("https://example.com/files/image.jpg")
@@ -455,3 +456,199 @@ def fetch_related_files_content(related_files: List[str], base_path: str = "D:/a
                 files_content[filename] = ""
         
         return files_content
+
+
+def excel_to_csv(excel_file, csv_file, sheet_name="Sheet1"):
+    """Simple Excel to CSV conversion using pandas"""
+    # Read Excel file
+    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+    
+    # Convert to CSV
+    df.to_csv(csv_file, index=False, encoding='utf-8')
+
+
+def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", data_json_path: str = "agents/data.json") -> list[str]:
+    """
+    Process Excel files by finding the one with most rows, converting to CSV,
+    adding detailed structure information, chunking the largest file, and combining everything.
+    
+    Args:
+        excel_file_paths: List of Excel file paths
+        supplement_files_summary: String containing supplement file content (not a list)
+        data_json_path: Path to data.json file containing structure information
+    
+    Returns:
+        List of 5 strings, each containing combined content of one chunk with other files
+    """
+    print(f"🔄 Processing {len(excel_file_paths)} Excel files...")
+    if supplement_files_summary:
+        print(f"📄 Also processing supplement files content")
+    
+    # Step 1: Count data rows in each Excel file to find the largest
+    file_row_counts = {}
+    for file_path in excel_file_paths:
+        try:
+            df = pd.read_excel(file_path)
+            # Count actual data rows (excluding header)
+            data_rows = len(df.dropna(how='all'))  # Remove completely empty rows
+            file_row_counts[file_path] = data_rows
+            print(f"📊 {Path(file_path).name}: {data_rows} data rows")
+        except Exception as e:
+            print(f"❌ Error reading {file_path}: {e}")
+            file_row_counts[file_path] = 0
+    
+    # Find file with most rows
+    largest_file = max(file_row_counts, key=file_row_counts.get)
+    largest_row_count = file_row_counts[largest_file]
+    print(f"🎯 Largest file: {Path(largest_file).name} with {largest_row_count} rows")
+    
+    # Step 2: Load structure information from data.json
+    try:
+        with open(data_json_path, 'r', encoding='utf-8') as f:
+            data_json = json.load(f)
+        table_structure_info = data_json.get("表格", {})
+        print(f"📋 Loaded structure info: {len(table_structure_info)} tables")
+    except Exception as e:
+        print(f"❌ Error loading data.json: {e}")
+        table_structure_info = {}
+    
+    # Step 3: Convert all Excel files to CSV and add detailed structure info
+    file_contents = {}  # {file_path: content}
+    
+    for file_path in excel_file_paths:
+        try:
+            # Create CSV file path
+            csv_folder = Path(r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_csv")
+            csv_folder.mkdir(parents=True, exist_ok=True)
+            csv_file_path = csv_folder / f"{Path(file_path).stem}.csv"
+            
+            # Convert Excel to CSV using the simple function
+            excel_to_csv(file_path, str(csv_file_path))
+            
+            # Read CSV content
+            with open(csv_file_path, 'r', encoding='utf-8') as f:
+                csv_content = f.read()
+            
+            # Get detailed structure information from table section
+            file_name = Path(file_path).stem + ".txt"
+            structure_info = ""
+            
+            if file_name in table_structure_info:
+                file_structure = table_structure_info[file_name]
+                
+                # Try to parse the JSON structure from the summary field
+                try:
+                    summary_content = file_structure.get("summary", "")
+                    if summary_content:
+                        # Clean up the summary content and try to parse as JSON
+                        summary_content = summary_content.strip()
+                        
+                        # Sometimes the JSON is wrapped in text, try to extract it
+                        if summary_content.startswith('{') and summary_content.endswith('}'):
+                            parsed_summary = json.loads(summary_content)
+                            
+                            # Check if it's the expected format
+                            if file_name in parsed_summary:
+                                file_data = parsed_summary[file_name]
+                                
+                                # Extract 表格结构 (detailed column structure)
+                                table_structure = file_data.get("表格结构", {})
+                                if table_structure:
+                                    structure_info += "=== 表格结构 ===\n"
+                                    structure_info += json.dumps(table_structure, ensure_ascii=False, indent=2) + "\n\n"
+                                
+                                # Extract 表格总结 (summary)
+                                table_summary = file_data.get("表格总结", "")
+                                if table_summary:
+                                    structure_info += "=== 表格总结 ===\n"
+                                    structure_info += table_summary + "\n\n"
+                        else:
+                            # If not proper JSON format, use the raw summary
+                            structure_info += "=== 文件分析 ===\n"
+                            structure_info += summary_content + "\n\n"
+                            
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, use the raw summary
+                    structure_info += "=== 文件分析 ===\n"
+                    structure_info += file_structure.get("summary", "") + "\n\n"
+                
+                # Also include the full summary if available and different from structured data
+                if "summary" in file_structure and not structure_info:
+                    structure_info += "=== 完整分析 ===\n"
+                    structure_info += file_structure["summary"] + "\n\n"
+            
+            # Combine structure + CSV content
+            combined_content = f"=== File Structure: {Path(file_path).name} ===\n{structure_info}\n=== CSV Data Content ===\n{csv_content}"
+            
+            file_contents[file_path] = combined_content
+            print(f"✅ Processed Excel: {Path(file_path).name}")
+            
+        except Exception as e:
+            print(f"❌ Error processing {file_path}: {e}")
+            file_contents[file_path] = f"Error processing file: {e}"
+    
+    # Step 4: Handle the largest file - divide into 5 chunks
+    largest_file_content = file_contents[largest_file]
+    other_files_content = [content for path, content in file_contents.items() if path != largest_file]
+    
+    # Split the largest file content into structure and data parts
+    largest_file_lines = largest_file_content.split('\n')
+    structure_end_index = -1
+    for i, line in enumerate(largest_file_lines):
+        if line.startswith("=== CSV Data Content ==="):
+            structure_end_index = i
+            break
+    
+    if structure_end_index == -1:
+        print("⚠️ Could not find CSV data content separator, using full content")
+        largest_structure = ""
+        largest_data_lines = largest_file_lines
+    else:
+        largest_structure = '\n'.join(largest_file_lines[:structure_end_index + 1])
+        largest_data_lines = largest_file_lines[structure_end_index + 1:]
+    
+    # Remove empty lines at the beginning of data
+    while largest_data_lines and not largest_data_lines[0].strip():
+        largest_data_lines.pop(0)
+    
+    # Calculate chunk size (equal number of rows)
+    chunk_size = max(1, len(largest_data_lines) // 5)
+    print(f"📏 Dividing {len(largest_data_lines)} data lines into chunks of ~{chunk_size} lines each")
+    
+    # Step 5: Create 5 chunks and combine with other files and supplements
+    combined_chunks = []
+    
+    for chunk_index in range(5):
+        start_idx = chunk_index * chunk_size
+        if chunk_index == 4:  # Last chunk gets remaining lines
+            end_idx = len(largest_data_lines)
+        else:
+            end_idx = start_idx + chunk_size
+        
+        chunk_data_lines = largest_data_lines[start_idx:end_idx]
+        
+        # Recreate chunk with structure
+        chunk_content = f"{largest_structure}\n\n" + '\n'.join(chunk_data_lines)
+        
+        # Combine chunk with all other files and supplements
+        chunk_combined = []
+        
+        # Add all other Excel files first
+        for other_content in other_files_content:
+            chunk_combined.append(other_content)
+        
+        # Add supplement files content (string, not list)
+        if supplement_files_summary:
+            chunk_combined.append(f"=== Supplement Files Content ===\n{supplement_files_summary}")
+        
+        # Add the chunk from largest file
+        chunk_combined.append(f"=== Chunk {chunk_index + 1}/5 of {Path(largest_file).name} ===\n{chunk_content}")
+        
+        # Join all parts
+        final_combined = "\n\n" + "="*80 + "\n\n".join(chunk_combined)
+        combined_chunks.append(final_combined)
+        
+        print(f"✅ Created chunk {chunk_index + 1}/5 with {len(chunk_data_lines)} data lines")
+    
+    print(f"🎉 Successfully created {len(combined_chunks)} combined chunks")
+    return combined_chunks

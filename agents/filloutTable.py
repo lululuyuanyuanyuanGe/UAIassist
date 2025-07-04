@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 from utilities.message_process import build_BaseMessage_type, filter_out_system_messages
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, read_txt_file, convert_2_markdown
+from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, read_txt_file, process_excel_files_with_chunking
 from utilities.modelRelated import invoke_model
 
 import uuid
@@ -45,6 +45,7 @@ class FilloutTableState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     data_file_path: list[str]
     supplement_files_path: list[str]
+    supplement_files_summary: str
     template_file: str
     template_file_completion_code: str
     rules: str
@@ -55,6 +56,8 @@ class FilloutTableState(TypedDict):
     error_message_summary: str
     execution_successful: bool
     retry: int
+    combined_data_array: list[str]
+    headers_mapping: str
 
 
 
@@ -70,7 +73,7 @@ class FilloutTableAgent:
         graph = StateGraph(FilloutTableState)
         
         # Add nodes
-        graph.add_node("combine_data", self._combine_data)
+        graph.add_node("combine_data_split_into_chunks", self._combine_data_split_into_chunks)
         graph.add_node("generate_html_table_completion_code", self._generate_html_table_completion_code)
         graph.add_node("execute_template_completion_code_from_LLM", self._execute_template_completion_code_from_LLM)
         graph.add_node("summary_error_message", self._summary_error_message)
@@ -79,14 +82,18 @@ class FilloutTableAgent:
         graph.add_node("convert_html_to_excel", self._convert_html_to_excel)
         
         # Define the workflow
-        graph.add_edge(START, "combine_data")
-        graph.add_edge("combine_data", "generate_html_table_completion_code")
+        graph.add_edge(START, "combine_data_split_into_chunks")
+        graph.add_edge("combine_data_split_into_chunks", "generate_html_table_completion_code")
         graph.add_edge("generate_html_table_completion_code", "execute_template_completion_code_from_LLM")
         
         # Fix: Use add_conditional_edges instead of add_edge for routing
         graph.add_conditional_edges(
-            "execute_code_from_LLM", 
-            self._route_after_execute_code
+            "execute_template_completion_code_from_LLM", 
+            self._route_after_execute_code,
+            {
+                "END": END,
+                "summary_error_message": "summary_error_message"
+            }
         )
         
         graph.add_edge("summary_error_message", "generate_html_table_completion_code")
@@ -106,6 +113,7 @@ class FilloutTableAgent:
             "data_file_path": data_file_path,
             "supplement_files_path": supplement_files_path,
             "template_file": template_file,
+            "supplement_files_summary": "",
             "template_file_completion_code": "",
             "rules": rules,
             "combined_data": "",
@@ -115,49 +123,134 @@ class FilloutTableAgent:
             "error_message_summary": "",
             "execution_successful": True,
             "retry": 0,
-        }
-
-    def _combine_data(self, state: FilloutTableState) -> FilloutTableState:
-        """This node will combined all the required files into a single text file.
-        and that is ready to feed to the model"""
-        file_content = []
-        
-        # Combine data files
-        for file in state["data_file_path"]:
-            content = file + "\n" + read_txt_file(file)
-            file_content.append(f"=== Data File: {Path(file).name} ===\n{content}\n")
-        
-        # Combine supplement files
-        if state.get("supplement_files_path"):
-            for file in state["supplement_files_path"]:
-                content = file + "\n" + read_txt_file(file)
-                file_content.append(f"=== Supplement File: {Path(file).name} ===\n{content}\n")
-        
-        # Add template file
-        if state["template_file"]:
-            content = state["template_file"] + "\n" + read_txt_file(state["template_file"])
-            file_content.append(f"=== Template File: {Path(state['template_file']).name} ===\n{content}\n")
-
-        # Add rules
-        if state["rules"]:
-            file_content.append(f"=== Rules ===\n{state['rules']}\n")
-        
-        combined_data = "\n".join(file_content)
-        print(f"📋 Combined data from {len(file_content)} sources")
-        combined_data = self._clean_html_content(combined_data)
-        return {
-            "combined_data": combined_data
+            "combined_data_array": [],
+            "headers_mapping": ""
         }
     
-    def _combine_data_split_into_chunks(self, state: FilloutTableState) -> list[str]:
+    def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
         """整合所有需要用到的数据，并生将其分批，用于分批生成表格"""
-        file_name_dic = {}
-        for file in state["data_file_path"]:
-            content = read_txt_file(file)
-            file_name_dic[file] = content
-        
-        
+        try:
+            # Get Excel file paths from state
+            excel_file_paths = []
+            
+            # Convert data files to Excel paths if they're not already
+            for file_path in state["data_file_path"]:
+                if file_path.endswith('.txt'):
+                    # Try to find corresponding Excel file
+                    excel_path = file_path.replace('.txt', '.xlsx')
+                    if Path(excel_path).exists():
+                        excel_file_paths.append(excel_path)
+                    else:
+                        # Try .xls extension
+                        excel_path = file_path.replace('.txt', '.xls')
+                        if Path(excel_path).exists():
+                            excel_file_paths.append(excel_path)
+                elif file_path.endswith(('.xlsx', '.xls', '.xlsm')):
+                    excel_file_paths.append(file_path)
+            
+            if not excel_file_paths:
+                print("⚠️ No Excel files found for chunking")
+                return []
+            
+            print(f"📊 Processing {len(excel_file_paths)} Excel files for chunking")
+            
+            # Use the helper function to process and chunk files
+            # Convert word_file_list to string for supplement content
+            supplement_content = ""
+            if state["supplement_files_summary"]:
+                supplement_content = "补充文件内容\n" + state["supplement_files_summary"]
+            
+            chunked_data = process_excel_files_with_chunking(excel_file_paths, supplement_content)
 
+            return {
+                "combined_data_array": chunked_data
+            }
+            
+        except Exception as e:
+            print(f"❌ Error in _combine_data_split_into_chunks: {e}")
+            return {
+                "combined_data_array": []
+            }
+
+    
+    def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
+        """根据整合的数据，映射关系，模板生成新的数据"""
+        system_prompt = f"""
+你是一位精通表格数据解析与填报的专家助手。用户将提供一个包含多个 CSV 格式的 Excel 数据文件的数据集合。
+
+这些文件存在以下特点与辅助信息：
+1. 由于 CSV 格式无法完整表达复杂的表头结构，系统将提供一份由字典构成的表头结构说明，以帮助你准确理解每个文件的表格布局；
+2. 同时还会提供一份"字段映射关系表"，明确指出模板表格中的每一列数据应如何从原始数据文件中提取，包括：
+   - 直接对应某一列；
+   - 由多列组合计算得到；
+   - 或需依据补充规则进行逻辑推理或条件判断得出。
+
+你的任务是根据提供的数据集、表头结构说明与字段映射规则，自动生成用于填写模板表格的数据内容。
+
+最终输出格式要求：
+- 输出为严格遵循 CSV 格式的纯文本；
+- 每一行代表模板表格中的一条记录；
+- 不包含多余信息或注释，仅保留数据本身。
+
+请确保你完整解析每个字段规则，正确处理计算与推理逻辑，生成结构准确、内容完整的表格数据。
+"""
+        
+        def process_single_chunk(chunk_data):
+            """处理单个chunk的函数"""
+            chunk, index = chunk_data
+            try:
+                user_input = f"""
+{chunk}
+
+{state["headers_mapping"]}
+"""
+                print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
+                response = invoke_model(
+                    model_name="deepseek-ai/DeepSeek-V3", 
+                    messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)]
+                )
+                print(f"✅ Completed chunk {index + 1}")
+                return (index, response)
+            except Exception as e:
+                print(f"❌ Error processing chunk {index + 1}: {e}")
+                return (index, f"Error processing chunk {index + 1}: {e}")
+        
+        # Prepare chunk data with indices
+        chunks_with_indices = [(chunk, i) for i, chunk in enumerate(state["combined_data_array"])]
+        
+        if not chunks_with_indices:
+            print("⚠️ No chunks to process")
+            return {"combined_data_array": []}
+        
+        print(f"🚀 Starting concurrent processing of {len(chunks_with_indices)} chunks...")
+        
+        # Use ThreadPoolExecutor for concurrent processing
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        results = {}
+        with ThreadPoolExecutor(max_workers=3) as executor:  # Limit to 3 concurrent requests
+            # Submit all tasks
+            future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
+                              for chunk_data in chunks_with_indices}
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_index):
+                try:
+                    index, response = future.result()
+                    results[index] = response
+                except Exception as e:
+                    index = future_to_index[future]
+                    print(f"❌ Exception in chunk {index + 1}: {e}")
+                    results[index] = f"Exception in chunk {index + 1}: {e}"
+        
+        # Sort results by index to maintain order
+        sorted_results = [results[i] for i in sorted(results.keys())]
+        
+        print(f"🎉 Successfully processed {len(sorted_results)} chunks concurrently")
+        
+        return {
+            "combined_data_array": sorted_results
+        }
 
     def _clean_html_content(self, html_content: str) -> str:
         """清理HTML内容中的过多空白字符和非断行空格"""
@@ -191,11 +284,11 @@ class FilloutTableAgent:
 根据用户提供的 HTML 表格模板，生成一段完整可执行的 Python 代码，实现以下功能：
 
 1. **表格数据行扩展**：
-   - 你需要识别出表格中哪些是“数据行”，这些行通常满足：
-     - 包含“序号”列；
-     - 且“序号”单元格中是连续的数字（如 1、2、3…）；
+   - 你需要识别出表格中哪些是"数据行"，这些行通常满足：
+     - 包含"序号"列；
+     - 且"序号"单元格中是连续的数字（如 1、2、3…）；
    - 使用这些数据行中第一个有效的 `<tr>` 作为模板进行扩展；
-   - 自动忽略或删除非数据行，如包含“审核人”、“制表人”字段的表尾行，或空白行。
+   - 自动忽略或删除非数据行，如包含"审核人"、"制表人"字段的表尾行，或空白行。
 
 2. **样式美化**：
    - 使用内嵌 `<style>` 标签添加 CSS 样式；
@@ -727,5 +820,8 @@ if __name__ == "__main__":
     # fillout_table_agent = FilloutTableAgent()
     # fillout_table_agent.run_fillout_table_agent( session_id = "1")
     # file_content = retrieve_file_content(session_id= "1", file_paths = [r"D:\asianInfo\ExcelAssist\燕云村测试样例\燕云村残疾人补贴\待填表\燕云村残疾人补贴申领登记.xlsx"])
-    file_content = convert_2_markdown(r"D:\asianInfo\ExcelAssist\燕云村测试样例\种植险投保登记表\编造文件\2024年农作物登记.xlsx")
-    print(file_content)
+
+    file_list = [r"D:\asianInfo\数据\新槐村\7.2接龙镇附件4.xlsx", r"D:\asianInfo\数据\新槐村\10.24接龙镇附件4：脱贫人口小额贷款贴息发放明细表.xlsx", r"D:\asianInfo\数据\新槐村\12.3附件4：脱贫人口小额贷款贴息申报汇总表.xlsx"]
+    fillout_table_agent = FilloutTableAgent()
+    combined_data = fillout_table_agent._combine_data_split_into_chunks(file_list)
+    print(combined_data)
