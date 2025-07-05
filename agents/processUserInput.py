@@ -82,7 +82,7 @@ class ProcessUserInputAgent:
         graph.add_node("process_supplement", self._process_supplement)
         graph.add_node("process_irrelevant", self._process_irrelevant)
         graph.add_node("analyze_text_input", self._analyze_text_input)
-        graph.add_node("clarification_tool_node", ToolNode(self.tools))
+        graph.add_node("clarification_tool_node", ToolNode(self.tools, messages_key = "process_user_input_messages"))
         graph.add_node("summary_user_input", self._summary_user_input)
         
         graph.add_edge(START, "collect_user_input")

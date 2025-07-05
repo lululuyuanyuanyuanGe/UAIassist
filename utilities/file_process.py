@@ -787,3 +787,47 @@ def clean_and_pretty_print_csv(csv_data_list: list[str], output_file: str = None
         pass
     
     return df
+
+
+def extract_file_from_recall(self, response: str) -> list:
+    """返回文件名数组"""
+
+    # Parse the response to extract the file list
+    print(f"🔍 开始解析响应内容: {response[:200]}...")
+    
+    try:
+        # Try to parse as JSON array first
+        related_files = json.loads(response)
+        if isinstance(related_files, list):
+            print(f"✅ 成功解析JSON数组: {related_files}")
+            return related_files
+    except:
+        print("❌ JSON解析失败，尝试其他方法")
+        pass
+    
+    try:
+        # Look for patterns like ["file1", "file2"] or ['file1', 'file2']
+        match = re.search(r'\[.*?\]', response)
+        if match:
+            related_files = json.loads(match.group())
+            print(f"✅ 正则匹配成功: {related_files}")
+            return related_files
+    except:
+        print("❌ 正则表达式匹配失败")
+        pass
+    
+    # Check if response contains file names with .txt, .xlsx, .docx extensions
+    file_pattern = r'["""]([^"""]*?\.(txt|xlsx|docx|csv|pdf))["""]'
+    file_matches = re.findall(file_pattern, response)
+    if file_matches:
+        related_files = [match[0] for match in file_matches]
+        print(f"✅ 文件名模式匹配成功: {related_files}")
+        return related_files
+    
+    # Final fallback: split by lines and filter
+    related_files = [line.strip().strip('"\'') for line in response.split('\n') 
+                    if line.strip() and not line.strip().startswith('#') and 
+                    any(ext in line.lower() for ext in ['.txt', '.xlsx', '.docx', '.csv', '.pdf'])]
+    
+    print(f"📁 解析出的相关文件: {related_files}")
+    return related_files

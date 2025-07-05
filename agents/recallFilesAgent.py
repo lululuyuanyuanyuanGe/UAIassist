@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 from typing import Dict, TypedDict, Annotated
-from utilities.file_process import fetch_related_files_content
+from utilities.file_process import fetch_related_files_content, extract_file_from_recall
 from utilities.modelRelated import invoke_model, invoke_model_with_tools
 
 import json
@@ -39,13 +39,11 @@ def request_user_clarification(question: str) -> str:
         process_user_input_agent = ProcessUserInputAgent()
         response = process_user_input_agent.run_process_user_input_agent(previous_AI_messages=AIMessage(content=question))
         
-        # Extract the response content if it's a message object
-        if hasattr(response, 'content'):
-            return response.content
-        elif isinstance(response, str):
-            return response
-        else:
-            return str(response)
+        # Extract the summary message from response
+        summary_message = response[0]
+        return summary_message
+
+
             
     except Exception as e:
         print(f"❌ 用户澄清请求失败: {e}")
@@ -56,10 +54,12 @@ def request_user_clarification(question: str) -> str:
 
 class RecallFilesState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    related_files_str: str
     related_files: list[str]
     headers_mapping: dict[str, str]
     template_structure: str
     headers_mapping_: dict[any, any]
+    file_content: str
 
 class RecallFilesAgent:
     def __init__(self):
@@ -80,12 +80,15 @@ class RecallFilesAgent:
         return graph.compile(checkpointer = MemorySaver())
 
     def _create_initial_state(self) -> RecallFilesState:
+        with open(r'agents\data.json', 'r', encoding = 'utf-8') as f:
+            file_content = f.read()
         return {
             "messages": [],
             "related_files": [],
             "headers_mapping": {},
             "template_structure": "",
-            "headers_mapping_": {}
+            "headers_mapping_": {},
+            "file_content": file_content
         }
     
 
@@ -94,8 +97,13 @@ class RecallFilesAgent:
         print("\n🔍 开始执行: _recall_relative_files")
         print("=" * 50)
         
-        with open(r'agents\data.json', 'r', encoding = 'utf-8') as f:
-            file_content = f.read()
+        previous_AI_summary = ""
+        for message in state["messages"]:
+            previous_AI_summary += message.content
+
+        print("=========历史对话记录==========")
+        print(previous_AI_summary)
+        print("=========历史对话记录==========")
         
         system_prompt = f"""
 你是一位专业的文件分析专家，擅长根据表格模板内容，从用户提供的文件摘要中识别与其高度相关的参考文件。
@@ -116,62 +124,46 @@ class RecallFilesAgent:
   ["2024年党员数据.xlsx", "补贴规则说明.docx"]
 
 【文件摘要列表】：
-{file_content}
+{state["file_content"]}
+
+ 【历史对话记录】
+ {previous_AI_summary}
 """
+        
 
 
-        if state["messages"]:
-            previous_AI_summary = state["messages"][-1].content
+        template_structure = state["template_structure"]
+
+        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content = system_prompt), HumanMessage(content = template_structure)], tools=self.tools)
+
+        # Extract response content properly
+        if isinstance(response, str):
+            response_content = response
+            AI_message = AIMessage(content=response)
+            print(f"📥 LLM响应(字符串): {response_content}")
         else:
-            previous_AI_summary = ""
-
-        print("📤 正在调用LLM进行文件召回...")
-
-        user_input = "表格模板内容：" + state["template_structure"] + "\n文件摘要列表："
-
-        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content = system_prompt), HumanMessage(content = user_input), HumanMessage(content = previous_AI_summary)], tools=self.tools)
-
-        # 创建AIMessage时需要保留tool_calls信息
-        # if hasattr(response, 'tool_calls') and response.tool_calls:
-        #     # 如果有工具调用，创建包含tool_calls的AIMessage
-        #     ai_message = AIMessage(content=response.content or "", tool_calls=response.tool_calls)
-        #     print("🔧 检测到工具调用")
-        #     return {
-        #         "messages": [ai_message],
-        #         "related_files": ""
-        #     
-        # else:
-        # 如果没有工具调用，只包含内容
-        AI_message = AIMessage(content=response) if isinstance(response, str) else response
-        response = response if isinstance(response, str) else response.content
-        related_files = self._extract_file_from_recall(response)
+            response_content = response.content if hasattr(response, 'content') else str(response)
+            AI_message = response
+            print(f"📥 LLM响应(对象): {response_content}")
+        
+        # Always print the response content for debugging
+        print("💬 智能体回复内容:")
+        print(response_content)
+        
+        # Check for tool calls
+        has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
+        if has_tool_calls:
+            print("🔧 检测到工具调用")
+        else:
+            print("ℹ️ 无工具调用")
+        
         print("✅ _recall_relative_files 执行完成")
         print("=" * 50)
         return {
             "messages": [AI_message],
-            "related_files": related_files
+            "related_files_str": response_content
         }
 
-    def _extract_file_from_recall(self, response: str) -> str:
-        # Parse the response to extract the file list
-        try:
-            # Try to parse as JSON array
-            related_files = json.loads(response.content if hasattr(response, 'content') else response)
-            if not isinstance(related_files, list):
-                # If not a list, try to extract from string
-                # Look for patterns like ["file1", "file2"] or ['file1', 'file2']
-                match = re.search(r'\[.*?\]', response)
-                if match:
-                    related_files = json.loads(match.group())
-                else:
-                    # Fallback: split by lines and filter
-                    related_files = [line.strip().strip('"\'') for line in response.split('\n') if line.strip() and not line.strip().startswith('#')]
-        except:
-            # Fallback parsing if JSON fails
-            related_files = [line.strip().strip('"\'') for line in response.split('\n') if line.strip() and not line.strip().startswith('#')]
-        
-        print(f"📁 解析出的相关文件: {related_files}")
-        return related_files
 
     def _route_after_recall_relative_files(self, state: RecallFilesState) -> str:
         """This node will route the agent to the next node based on the user's input"""
@@ -197,8 +189,8 @@ class RecallFilesAgent:
         print("\n🔍 开始执行: _determine_the_mapping_of_headers")
         print("=" * 50)
         
-        # 读取文件内容，只读取表头即可
-        related_files = state["related_files"]
+        # Extract related files from response
+        related_files = extract_file_from_recall(state["related_files_str"])
         print(f"📋 需要处理的相关文件: {related_files}")
         
         # 获取所有相关文件的内容
@@ -264,7 +256,8 @@ class RecallFilesAgent:
         
         return {
             "messages": [AIMessage(content=response)],
-            "headers_mapping": response
+            "headers_mapping": response,
+            "related_files": related_files
         }
     
     def run_recall_files_agent(self, template_structure: str, session_id: str = "1") -> Dict:

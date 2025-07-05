@@ -549,7 +549,7 @@ class FilloutTableAgent:
             print(f"❌ 转换过程中发生错误: {e}")
             return {"error_message": f"转换失败: {str(e)}"}
 
-    def run_fillout_table_agent(self, user_input: str, session_id: str = "1") -> None:
+    def run_fillout_table_agent(self, session_id: str = "1") -> None:
         """This function will run the fillout table agent"""
         initial_state = self.create_initialize_state(template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\老党员补贴.txt", 
                                                         rules = """党员补助列需要你智能计算，规则如下，党龄需要根据党员名册中的转正时间计算，（1）党龄40—49年的，补助标准为：100元/月；
@@ -594,7 +594,7 @@ agent_graph = agent._build_graph()
 
 if __name__ == "__main__":
     fillout_table_agent = FilloutTableAgent()
-    fillout_table_agent.run_fillout_table_agent(user_input = "请根据模板和数据文件，填写表格。", session_id = "1")
+    fillout_table_agent.run_fillout_table_agent(session_id = "1")
 
 
 

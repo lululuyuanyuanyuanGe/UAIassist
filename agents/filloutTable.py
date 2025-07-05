@@ -85,9 +85,6 @@ class FilloutTableAgent:
         graph.add_node("generate_code_fill_CSV_2_template", self._generate_code_fill_CSV_2_template)
         graph.add_node("execute_fill_CSV_2_template_code", self._execute_fill_CSV_2_template_code)
         graph.add_node("summary_error_message_CSV2Template", self._summary_error_message_CSV2Template)
-        graph.add_node("validate_html_table", self._validate_html_table)
-        graph.add_node("style_html_table", self._style_html_table)
-        graph.add_node("convert_html_to_excel", self._convert_html_to_excel)
         
         # Define the workflow
         graph.add_edge(START, "combine_data_split_into_chunks")
@@ -101,28 +98,16 @@ class FilloutTableAgent:
         graph.add_edge("generate_code_fill_CSV_2_template", "execute_fill_CSV_2_template_code")
         graph.add_conditional_edges("execute_fill_CSV_2_template_code", self._route_after_execute_fill_CSV_2_template_code)
         graph.add_edge("summary_error_message_CSV2Template", "generate_code_fill_CSV_2_template")
-
-        graph.add_edge("validate_html_table", "style_html_table")
-        graph.add_edge("style_html_table", "convert_html_to_excel")
-        
-        # Fix: Use add_conditional_edges instead of add_edge for routing
-        graph.add_conditional_edges(
-            "execute_template_completion_code_from_LLM", 
-            self._route_after_execute_template_completion_code_from_LLM
-        )
-        
         graph.add_edge("summary_error_message_template_completion_code", "generate_html_table_completion_code")
         
-        # graph.add_edge("validate_html_table", "style_html_table")
-        # graph.add_edge("style_html_table", "convert_html_to_excel")
-        # graph.add_edge("convert_html_to_excel", END)
-
+        graph.add_edge("execute_fill_CSV_2_template_code", END)
         
         # Compile the graph
         return graph.compile()
 
     
-    def create_initialize_state(self, template_file: str = None, rules: str = None, data_file_path: list[str] = None, supplement_files_path: list[str] = None) -> FilloutTableState:
+    def create_initialize_state(self, template_file: str = None, rules: str = None, 
+                                 data_file_path: list[str] = None, supplement_files_path: list[str] = None) -> FilloutTableState:
         """This node will initialize the state of the graph"""
         return {
             "messages": [],
@@ -1078,7 +1063,9 @@ if __name__ == "__main__":
     # fillout_table_agent.run_fillout_table_agent( session_id = "1")
     # file_content = retrieve_file_content(session_id= "1", file_paths = [r"D:\asianInfo\ExcelAssist\燕云村测试样例\燕云村残疾人补贴\待填表\燕云村残疾人补贴申领登记.xlsx"])
 
-    file_list = [r"D:\asianInfo\数据\新槐村\7.2接龙镇附件4.xlsx", r"D:\asianInfo\数据\新槐村\10.24接龙镇附件4：脱贫人口小额贷款贴息发放明细表.xlsx", r"D:\asianInfo\数据\新槐村\12.3附件4：脱贫人口小额贷款贴息申报汇总表.xlsx"]
+    # file_list = [r"D:\asianInfo\数据\新槐村\7.2接龙镇附件4.xlsx", r"D:\asianInfo\数据\新槐村\10.24接龙镇附件4：脱贫人口小额贷款贴息发放明细表.xlsx", r"D:\asianInfo\数据\新槐村\12.3附件4：脱贫人口小额贷款贴息申报汇总表.xlsx"]
+    # fillout_table_agent = FilloutTableAgent()
+    # combined_data = fillout_table_agent._combine_data_split_into_chunks(file_list)
+    # print(combined_data)
     fillout_table_agent = FilloutTableAgent()
-    combined_data = fillout_table_agent._combine_data_split_into_chunks(file_list)
-    print(combined_data)
+    fillout_table_agent.run_fillout_table_agent(session_id = "1")
