@@ -272,7 +272,7 @@ class FilloutTableAgent:
                 response = invoke_model(
                     model_name="deepseek-ai/DeepSeek-V3", 
                     messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                    temperature=0.8
+                    temperature=0.5
                 )
                 print(f"✅ Completed chunk {index + 1}")
                 return (index, response)
@@ -342,108 +342,74 @@ class FilloutTableAgent:
         print("=" * 50)
         
         system_prompt = f"""
-你是一位专业的 HTML 表格处理与数据填充专家，擅长使用 Python 将结构化数据写入 HTML 模板中，生成格式标准、美观可用的表格文件。
+你是一位专业的 Python 表格处理工程师，擅长使用 BeautifulSoup 和 pandas 将结构化数据自动填入 HTML 表格模板中。
+
+【任务描述】
+请根据我提供的 HTML 表格结构（字符串形式）和 CSV 数据文件路径，编写一段完整可执行的 Python 脚本，实现以下功能：
 
 【任务目标】
-请根据用户提供的 HTML 表格模板文件和数据源 CSV 文件，生成一段**完整、可执行**的 Python 脚本，实现以下功能：
+1. 从 CSV 文件中读取数据；
+2. 自动分析 HTML 表格中的表头 `<tr>` 行，提取各列的标题（如“姓名”、“性别”等）；
+3. 自动将表头字段与 CSV 文件中的列名进行匹配，建立字段对应关系；
+4. 遍历 HTML 表格中的数据行 `<tr>`，根据匹配关系将 CSV 数据填入对应的 `<td>`；
+5. 如果某个单元格在 HTML 表格中已有值（非空），则保留原值，不进行覆盖；
+6. 序号列（如“序号”、“编号”等）可以自动递增或保留原值；
+7. 保证 HTML 表格结构完整，结果可直接在浏览器中打开。
+8. 请将CSV表格填写到D:\asianInfo\ExcelAssist\agents\output\老党员补贴_结果_filled.html中
 
-1. **数据填充**
-   - 使用 CSV 文件中的每一行数据填充 HTML 表格；
-   - 仅替换模板中的“数据行”部分（即有序号的行）；
-   - 清除原始模板中的示例数据行，使用 CSV 中的数据逐行追加；
-   - 字段顺序应严格按照 HTML 模板的列顺序排列；
-   - 第一列“序号”需自动从 1 开始递增，其他字段来自 CSV 数据。
+【输入说明】
+- HTML 表格结构我会提供完整源代码；
+- CSV 数据通过文件路径提供（你不要在代码中列出数据本身）；
+- 表格中已预置足够的空白行 `<tr>`，你只需填充对应数据；
+- 表头行字段顺序可能与 CSV 不一致，请动态匹配；
+- 表尾含有“审核人”、“制表人”等文字的备注行必须保留，不得修改；
 
-2. **结构保持**
-   - 保留 HTML 模板中原有的结构，包括：
-     - `<colgroup>` 列宽设定；
-     - `<thead>` 表头；
-     - 标题行（如合并单元格的表名）；
-     - 表尾备注（如含“审核人”、“制表人”的行）；
-   - 不得破坏 HTML 原有结构；
-   - 最终生成的 HTML 文件必须结构完整，浏览器可正常打开查看。
+【技术要求】
+- 使用 `pandas.read_csv(csv_path)` 读取 CSV；
+- 使用 `BeautifulSoup` 读取和修改 HTML；
+- 自动识别表头 `<tr>` 中的列标题，用于建立字段映射；
+- 数据填充时跳过已有内容的 `<td>`，仅填充空白 `<td>`；
+- 若 CSV 行数超过空行数，仅填前 N 行；
+- 若空行数多于 CSV 行数，仅填已存在数据，剩下保持空白；
+- 输出 HTML 文件编码为 UTF-8，结构闭合、浏览器可打开；
 
-3. **技术要求**
-   - 使用 `pandas` 读取 CSV 数据；
-   - 使用 `BeautifulSoup` 解析和修改 HTML 内容；
-   - 使用 `soup.new_tag()` 或 `copy.deepcopy()` 插入 `<tr>` 行；
-   - 所有字段以 `<td>` 标签形式添加；
-   - 文件读写使用 UTF-8 编码；
-   - 输入 HTML 路径：`D:\\asianInfo\\ExcelAssist\\agents\\input\\老党员补贴.txt`；
-   - 输入 CSV 路径：`D:\\path\\to\\processed_filled.csv`（可自定义）；
-   - 输出 HTML 路径：`D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_最终含李静.html`。
+【输出要求】
+- 请生成一段完整、可直接运行的 Python 脚本；
+- 脚本中应包含读取 HTML、读取 CSV、自动匹配字段、填充数据、保存 HTML；
+- 不要将 CSV 数据内容写入代码中；
+- 不要使用 ```python 或 ``` 包裹代码；
+- 代码中不要写注释；
 
-4. **输出要求**
-   - 你必须**只输出完整、可直接运行的 Python 脚本**；
-   - 不得输出 Markdown 格式、代码块标记（如```）、解释性文字或其他说明内容；
-   - 所有依赖（如 `pandas`, `bs4`）必须在脚本中导入；
-   - 结果 HTML 文件必须是结构闭合、浏览器可渲染的标准 HTML 表格。
+我将提供：
+- HTML 表格代码（或文件路径）；
+- CSV 文件路径（如 D:/data/党员信息.csv）；
+- 上一轮代码的错误信息（如有）；
 
-【示例代码结构（请据此生成完整脚本）】
-
-from bs4 import BeautifulSoup
-import pandas as pd
-
-# 路径设置
-input_html_path = "D:/asianInfo/ExcelAssist/agents/input/老党员补贴.txt"
-output_html_path = "D:/asianInfo/ExcelAssist/agents/output/老党员补贴_最终含李静.html"
-csv_path = "D:/path/to/processed_filled.csv"  # 请将此路径替换为实际 CSV 文件路径
-
-# 读取 HTML 模板
-with open(input_html_path, 'r', encoding='utf-8') as f:
-    soup = BeautifulSoup(f, 'html.parser')
-
-# 读取 CSV 数据
-df = pd.read_csv(csv_path)
-
-# 获取表格并分析行结构
-table = soup.find('table')
-all_rows = table.find_all('tr')
-
-# 查找数据行模板
-template_row = None
-for row in all_rows:
-    cells = row.find_all('td')
-    if cells and cells[0].text.strip().isdigit():
-        template_row = row
-        break
-
-# 删除原始数据行
-for row in all_rows:
-    cells = row.find_all('td')
-    if cells and cells[0].text.strip().isdigit():
-        row.extract()
-
-# 插入新的数据行
-for i, (_, record) in enumerate(df.iterrows(), start=1):
-    new_row = soup.new_tag("tr")
-    # 序号
-    td_serial = soup.new_tag("td")
-    td_serial.string = str(i)
-    new_row.append(td_serial)
-    # 其他字段
-    for value in record.values:
-        td = soup.new_tag("td")
-        td.string = str(value) if pd.notna(value) else ""
-        new_row.append(td)
-    table.append(new_row)
-
-# 输出 HTML 文件
-with open(output_html_path, 'w', encoding='utf-8') as f:
-    f.write(str(soup))
+请根据上述信息生成对应的 Python 脚本。
 """
 
-        template = state["final_table"]
-        CSV_data = state["CSV_data"]
-        
-        print(f"📄 模板表格内容长度: {len(template)} 字符")
-        print(f"📊 CSV数据块数量: {len(CSV_data)}")
-        
-        user_input = f"需要填的模板表格:\n{template}\n需要填的CSV数据:\n{CSV_data}"
+
+        # 上一轮代码的错误信息:
+        previous_code_error_message = state["error_message_summary"]
+
+        #获得模板文件HTML代码
+        file_path = state["template_file"]
+        template_file_content = read_txt_file(file_path)
+        #获得CSV数据示例(前3行)
+        csv_path = r"D:\asianInfo\ExcelAssist\agents\output\synthesized_table.csv"
+        CSV_data = pd.read_csv(csv_path, nrows=3)
+        CSV_data = CSV_data.to_string(index=False)
+
+        user_input = f"""上一轮代码的错误信息:\n{previous_code_error_message}\n
+                         需要填的模板表格(路径：D:\asianInfo\ExcelAssist\agents\output\老党员补贴_结果.html):\n{template_file_content}\n
+                         需要填入的CSV数据例子(路径：D:\asianInfo\ExcelAssist\agents\output\synthesized_table.csv):\n{CSV_data}"""
         print(f"📝 用户输入总长度: {len(user_input)} 字符")
-        
+        print(f"📝 用户输入: {user_input}")
         print("🤖 正在调用LLM生成CSV填充代码...")
-        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3",
+                                messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
+                                temperature=0.5
+                                )
         
         print("✅ CSV填充代码生成完成")
         print("✅ _generate_code_fill_CSV_2_template 执行完成")
