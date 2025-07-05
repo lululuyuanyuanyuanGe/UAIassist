@@ -171,13 +171,15 @@ class FilloutTableAgent:
             # Convert word_file_list to string for supplement content
             supplement_content = ""
             if state["supplement_files_summary"]:
-                supplement_content = "补充文件内容\n" + state["supplement_files_summary"]
+                supplement_content = "=== 补充文件内容 ===\n" + state["supplement_files_summary"]
                 print(f"📚 补充内容长度: {len(supplement_content)} 字符")
             
             print("🔄 正在调用process_excel_files_with_chunking函数...")
             chunked_data = process_excel_files_with_chunking(excel_file_paths, supplement_content)
             print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
-            
+            for chunk in chunked_data:
+                print(f"==================🔍 数据块 ==================:")
+                print(chunk)
             print("✅ _combine_data_split_into_chunks 执行完成")
             print("=" * 50)
             
