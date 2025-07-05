@@ -31,6 +31,7 @@ from langchain_core.tools import tool
 
 # import other agents
 from agents.processUserInput import ProcessUserInputAgent
+from agents.recallFilesAgent import RecallFilesAgent
 
 load_dotenv()
 
@@ -452,6 +453,18 @@ class FrontdeskAgent:
             print("=" * 50)
             return "END"
 
+    def _recall_files_agnet(self, state: FrontdeskState) -> FrontdeskState:
+        """This node will recall the files from the user"""
+        print("\n🔍 开始执行: _recall_files_agnet")
+        print("=" * 50)
+
+        recallFilesAgent = RecallFilesAgent()
+        # return the final state of the recallFilesAgent
+        recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(state["messages"])
+        print(f"🔍 召回文件响应: {recallFilesAgent_final_state}")
+
+
+        return 
     
     def run_frontdesk_agent(self, session_id: str = "1") -> None:
         """This function will run the frontdesk agent using stream method with interrupt handling"""
@@ -467,12 +480,12 @@ class FrontdeskAgent:
                 print(f"\n🔄 执行状态图，当前会话ID: {session_id}")
                 print("-" * 50)
                 
-                final_state = self.graph.invoke(initial_state, config = config)
+                final_state = self.graph.invoke(current_state, config = config)
                 if "__interrupt__" in final_state:
                     interrupt_value = final_state["__interrupt__"][0].value
                     print(f"💬 智能体: {interrupt_value}")
                     user_response = input("👤 请输入您的回复: ")
-                    initial_state = Command(resume=user_response)
+                    current_state = Command(resume=user_response)
                     continue
                 print("FrontdeskAgent执行完毕")
                 break

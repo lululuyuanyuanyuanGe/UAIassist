@@ -110,10 +110,10 @@ class FilloutTableAgent:
         """This node will initialize the state of the graph"""
         return {
             "messages": [],
-            "data_file_path": data_file_path,
+            "data_file_path": data_file_path, # excel files(xls) that has raw data
             "supplement_files_path": supplement_files_path,
-            "template_file": template_file,
-            "supplement_files_summary": "",
+            "template_file": template_file, # txt file of template file in html format
+            "supplement_files_summary": "党龄需要根据党员名册中的转正时间计算，（1）党龄40—49年的，补助标准为：100元/月；（2）党龄50—54年的，补助标准为：120元/月；（3）党龄55年及以上的，补助标准为：150元/月。以上补助从党员党龄达到相关年限的次月起按月发放。补助标准根据市里政策作相应调整。2.党组织关系在区、年满80周岁、党龄满55年的老党员：（1）年龄80—89周岁且党龄满55年的，补助标准为500元/年；（2）年龄90—99周岁且党龄满55年的，补助标准为1000元/年；（3）年龄100周岁及以上的，补助标准为3000元/年。以上补助年龄、党龄计算时间截至所在年份的12月31日。",
             "template_file_completion_code": "",
             "fill_CSV_2_template_code": "",
             "combined_data": "",
@@ -995,7 +995,9 @@ with open(output_path, 'w', encoding='utf-8') as f:
         print("=" * 60)
         
         initial_state = self.create_initialize_state(
-            template_file = r
+            template_file = r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_files\老党员补贴.txt",
+            data_file_path = [r"D:\asianInfo\ExcelAssist\燕云村case\燕云村2024年度党员名册.xlsx"]
+            
         )
         config = {"configurable": {"thread_id": session_id}}
         
