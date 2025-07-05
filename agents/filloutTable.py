@@ -247,10 +247,10 @@ class FilloutTableAgent:
 - 若某字段无数据但允许为空，请保持空值（两个逗号之间留空）。
 
 【禁止事项】
-- ❌ 禁止输出任何解释、总结、注释或标签；
-- ❌ 禁止输出非结构化内容；
-- ❌ 禁止跳过映射或计算逻辑；
-- ❌ 禁止输出表头或无关内容；
+- 禁止输出任何解释、总结、注释或标签；
+- 禁止输出非结构化内容；
+- 禁止跳过映射或计算逻辑；
+- 禁止输出表头或无关内容；
 
 请立即开始数据处理，并**只返回纯 CSV 格式的数据记录**，每一行为一条记录，**不包含字段名**。
 """
@@ -272,7 +272,7 @@ class FilloutTableAgent:
                 response = invoke_model(
                     model_name="deepseek-ai/DeepSeek-V3", 
                     messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                    temperature=0.5
+                    temperature=0.3
                 )
                 print(f"✅ Completed chunk {index + 1}")
                 return (index, response)
@@ -344,49 +344,71 @@ class FilloutTableAgent:
         system_prompt = f"""
 你是一位专业的 Python 表格处理工程师，擅长使用 BeautifulSoup 和 pandas 将结构化数据自动填入 HTML 表格模板中。
 
-【任务描述】
-请根据我提供的 HTML 表格结构（字符串形式）和 CSV 数据文件路径，编写一段完整可执行的 Python 脚本，实现以下功能：
-
 【任务目标】
-1. 从 CSV 文件中读取数据；
-2. 自动分析 HTML 表格中的表头 `<tr>` 行，提取各列的标题（如“姓名”、“性别”等）；
-3. 自动将表头字段与 CSV 文件中的列名进行匹配，建立字段对应关系；
-4. 遍历 HTML 表格中的数据行 `<tr>`，根据匹配关系将 CSV 数据填入对应的 `<td>`；
-5. 如果某个单元格在 HTML 表格中已有值（非空），则保留原值，不进行覆盖；
-6. 序号列（如“序号”、“编号”等）可以自动递增或保留原值；
-7. 保证 HTML 表格结构完整，结果可直接在浏览器中打开。
-8. 请将CSV表格填写到D:\asianInfo\ExcelAssist\agents\output\老党员补贴_结果_filled.html中
+请根据我提供的 HTML 表格代码（字符串或路径）和 CSV 数据路径，编写一段完整可执行的 Python 脚本，实现以下功能：
+
+1. 使用 `pandas.read_csv(csv_path, header=None)` 读取 CSV 文件，CSV 文件中不包含列名；
+2. 自动分析 HTML 表格中的 `<tr>` 表头行，提取每一列字段的名称；
+3. HTML 表头从左到右与 CSV 的列顺序严格一一对应（第一列对第一列，第二列对第二列……），不需要通过字段名模糊匹配；
+4. 在开始填充前，先判断 HTML 表格每一列是否已完整填写（即该列下所有数据单元格都非空），如果该列已填写，则整列跳过，不进行填充；
+5. 找到表格中预留的数据行 `<tr>`（例如：首列为数字，其他列为空的 `<td>`）；
+6. 按照表头列顺序，依次将 CSV 数据按列填入对应的 `<td>` 中，跳过已有值的 `<td>`；
+7. 若某个 `<td>` 已填写数据（不为空），则保留原值不覆盖；
+8. 如果数据不足，保留剩余空行；若数据多于预留行，仅填前 N 行；
+9. 表尾中包含“审核人”、“制表人”或带有 colspan 的备注行，必须原样保留；
+10. 最终结果应为结构闭合的 HTML 文件，UTF-8 编码，能在浏览器中打开查看；
 
 【输入说明】
-- HTML 表格结构我会提供完整源代码；
-- CSV 数据通过文件路径提供（你不要在代码中列出数据本身）；
-- 表格中已预置足够的空白行 `<tr>`，你只需填充对应数据；
-- 表头行字段顺序可能与 CSV 不一致，请动态匹配；
-- 表尾含有“审核人”、“制表人”等文字的备注行必须保留，不得修改；
+- HTML 表格源代码由我提供；
+- CSV 文件通过路径提供，内容无列名；
+- HTML 表格中可能包含 `<colgroup>` 或合并单元格，请完整保留原结构；
+- 最终结果保存到路径：`D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果_filled.html`。
 
 【技术要求】
-- 使用 `pandas.read_csv(csv_path)` 读取 CSV；
-- 使用 `BeautifulSoup` 读取和修改 HTML；
-- 自动识别表头 `<tr>` 中的列标题，用于建立字段映射；
-- 数据填充时跳过已有内容的 `<td>`，仅填充空白 `<td>`；
-- 若 CSV 行数超过空行数，仅填前 N 行；
-- 若空行数多于 CSV 行数，仅填已存在数据，剩下保持空白；
-- 输出 HTML 文件编码为 UTF-8，结构闭合、浏览器可打开；
+- 使用 pandas 读取 CSV；
+- 使用 BeautifulSoup 处理 HTML；
+- 不要硬编码 CSV 内容，只能通过路径读取；
+- 不要输出 Markdown 代码块（如 ```python），只输出纯代码；
+- 生成的代码必须在 Windows 系统下可独立运行，无需修改；
+- 不要添加注释或额外说明；
 
-【输出要求】
-- 请生成一段完整、可直接运行的 Python 脚本；
-- 脚本中应包含读取 HTML、读取 CSV、自动匹配字段、填充数据、保存 HTML；
-- 不要将 CSV 数据内容写入代码中；
-- 不要使用 ```python 或 ``` 包裹代码；
-- 代码中不要写注释；
+请根据上述信息生成一段完整、可运行的 Python 脚本。
+【代码结构示例】
+以下是你应当生成的代码结构（仅作参考，不必完全复制）：
 
-我将提供：
-- HTML 表格代码（或文件路径）；
-- CSV 文件路径（如 D:/data/党员信息.csv）；
-- 上一轮代码的错误信息（如有）；
+import pandas as pd
+from bs4 import BeautifulSoup
 
-请根据上述信息生成对应的 Python 脚本。
+def fill_html_table(html_path, csv_path, output_path):
+    # 读取 HTML
+    with open(html_path, 'r', encoding='utf-8') as f:
+        soup = BeautifulSoup(f, 'html.parser')
+    
+    # 读取 CSV（无列名）
+    df = pd.read_csv(csv_path, header=None)
+    
+    # 解析表头
+    table = soup.find('table')
+    header_row = table.find_all('tr')[2]
+    headers = [td.get_text(strip=True) for td in header_row.find_all('td')]
+
+    # 查找可填充数据行
+    data_rows = ...
+    
+    # 判断哪些列为空列
+    fillable_columns = ...
+    
+    # 按列顺序填充数据
+    for i, row in enumerate(data_rows):
+        ...
+    
+    # 保存新 HTML 文件
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(str(soup))
+
 """
+
+
 
 
         # 上一轮代码的错误信息:
