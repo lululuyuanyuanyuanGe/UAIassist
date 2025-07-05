@@ -831,3 +831,39 @@ def extract_file_from_recall(response: str) -> list:
     
     print(f"📁 解析出的相关文件: {related_files}")
     return related_files
+
+
+def save_csv_to_output(csv_data_list: list[str], filename_prefix: str = "generated_table") -> str:
+    """
+    Save CSV data to agents/output folder
+    
+    Args:
+        csv_data_list: List of CSV strings from concurrent processing
+        filename_prefix: Prefix for the output filename
+    
+    Returns:
+        str: Full path to the saved CSV file
+    """
+    import os
+    from datetime import datetime
+    from pathlib import Path
+    
+    # Create output directory
+    current_dir = Path(__file__).parent
+    output_dir = current_dir.parent / "agents" / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate filename with timestamp
+    actual_filename = "synthesized_table"
+    filename = f"{filename_prefix}_{actual_filename}.csv"
+    filepath = output_dir / filename
+    
+    # Combine all CSV data
+    combined_csv = '\n'.join(csv_data_list)
+    
+    # Write to file
+    with open(filepath, 'w', encoding='utf-8', newline='') as f:
+        f.write(combined_csv)
+    
+    print(f"💾 CSV数据已保存到: {filepath}")
+    return str(filepath)

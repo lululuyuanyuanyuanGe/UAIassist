@@ -54,7 +54,7 @@ class FilloutTableState(TypedDict):
     final_table: str
     error_message: str
     error_message_summary: str
-    template_completion_code_template_completion_code_execution_successful: bool
+    template_completion_code_execution_successful: bool
     CSV2Teplate_template_completion_code_execution_successful: bool
     retry: int
     combined_data_array: list[str]
@@ -219,24 +219,42 @@ class FilloutTableAgent:
         print("=" * 50)
         
         system_prompt = f"""
-你是一位精通表格数据解析与填报的专家助手。用户将提供一个包含多个 CSV 格式的 Excel 数据文件的数据集合。
+你是一位专业的结构化数据填报专家，任务是根据提供的数据集和模板表头映射，生成符合结构的纯 CSV 格式数据。
 
-这些文件存在以下特点与辅助信息：
-1. 由于 CSV 格式无法完整表达复杂的表头结构，系统将提供一份由字典构成的表头结构说明，以帮助你准确理解每个文件的表格布局；
-2. 同时还会提供一份"字段映射关系表"，明确指出模板表格中的每一列数据应如何从原始数据文件中提取，包括：
-   - 直接对应某一列；
-   - 由多列组合计算得到；
-   - 或需依据补充规则进行逻辑推理或条件判断得出。
+请严格遵循以下规范执行：
 
-你的任务是根据提供的数据集、表头结构说明与字段映射规则，自动生成用于填写模板表格的数据内容。
+【任务目标】
+1. 分析数据集与模板字段映射（字段对应、计算逻辑、推理要求等）；
+2. 对所有字段执行必要的数据转换、计算或推理操作；
+3. 生成符合模板结构要求的纯数据行，每一行代表一条完整记录；
+4. 输出结果必须严格为纯粹的 CSV 格式，不包含任何表头、注释或解释性文字。
 
-最终输出格式要求：
-- 输出为严格遵循 CSV 格式的纯文本；
-- 每一行代表模板表格中的一条记录；
-- 不包含多余信息或注释，仅保留数据本身。
+【输出格式】
+- 每一行是一条数据记录；
+- 所有列顺序必须严格按照模板定义；
+- 使用英文逗号 `,` 分隔字段；
+- 每行以换行符结尾；
+- **禁止输出表头（字段名）**；
+- 输出结果应可直接导入 Excel，无需额外处理。
 
-请确保你完整解析每个字段规则，正确处理计算与推理逻辑，生成结构准确、内容完整的表格数据。
+【字段处理要求】
+- 所有日期字段若带有时间部分（如 `00:00:00`），请仅保留日期（格式：`yyyy-mm-dd`）；
+- 清除无效或占位时间格式，如 `00.00.00.00`，直接替换为空；
+- 对于像“备注”等可能没有明确来源字段的列，可根据上下文推理填写（如“满足补贴条件”、“未满条件”等），不能留空；
+- 计算字段（如“党龄”、“补贴标准”）必须提供实际计算结果，不能省略；
+- 若某字段无数据但允许为空，请保持空值（两个逗号之间留空）。
+
+【禁止事项】
+- ❌ 禁止输出任何解释、总结、注释或标签；
+- ❌ 禁止输出非结构化内容；
+- ❌ 禁止跳过映射或计算逻辑；
+- ❌ 禁止输出表头或无关内容；
+- ❌ 禁止输出“00.00.00.00”格式；
+
+请立即开始数据处理，并**只返回纯 CSV 格式的数据记录**，每一行为一条记录，**不包含字段名**。
 """
+
+
         
         print("📋 系统提示准备完成")
         
@@ -298,9 +316,19 @@ class FilloutTableAgent:
         sorted_results = [results[i] for i in sorted(results.keys())]
         
         print(f"🎉 成功并发处理 {len(sorted_results)} 个数据块")
+        
+        # Save CSV data to output folder using helper function
+        try:
+            from utilities.file_process import save_csv_to_output
+            saved_file_path = save_csv_to_output(sorted_results, "generated_table")
+            print(f"✅ CSV数据已保存到输出文件夹: {saved_file_path}")
+        except Exception as e:
+            print(f"❌ 保存CSV文件时发生错误: {e}")
+            print("⚠️ 数据仍保存在内存中，可继续处理")
+        
         print("✅ _generate_CSV_based_on_combined_data 执行完成")
         print("=" * 50)
-        
+        print(f"🔍 生成的CSV数据: {sorted_results}")
         return {
             "CSV_data": sorted_results
         }
@@ -673,7 +701,7 @@ with open(output_path, 'w', encoding='utf-8') as f:
 """
 
 
-        file_path = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\燕云村残疾人补贴申领登记.txt"
+        file_path = state["template_file"]
         template_file_content = read_txt_file(file_path)
         number_of_rows = "需要生成100行数据行"
         base_input = f"HTML模板地址: {file_path}\n HTML模板内容:\n{template_file_content}\n \n需求:\n{number_of_rows}"
@@ -996,9 +1024,49 @@ with open(output_path, 'w', encoding='utf-8') as f:
         
         initial_state = self.create_initialize_state(
             template_file = r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_files\老党员补贴.txt",
-            data_file_path = [r"D:\asianInfo\ExcelAssist\燕云村case\燕云村2024年度党员名册.xlsx"]
-            
-        )
+            data_file_path = [r"D:\asianInfo\ExcelAssist\燕云村case\燕云村2024年度党员名册.xlsx"],
+            supplement_files_path = [r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_files\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.txt"],
+            headers_mapping={
+    "表格结构": {
+        "重庆市巴南区享受生活补贴老党员登记表": {
+            "基本信息": [
+                {
+                    "序号": "燕云村2024年度党员名册.txt: 序号"
+                },
+                {
+                    "姓名": "燕云村2024年度党员名册.txt: 姓名"
+                },
+                {
+                    "性别": "燕云村2024年度党员名册.txt: 性别"
+                },
+                {
+                    "民族": "燕云村2024年度党员名册.txt: 民族"
+                },
+                {
+                    "身份证号码": "燕云村2024年度党员名册.txt: 公民身份证号"
+                },
+                {
+                    "出生时间": "燕云村2024年度党员名册.txt: 出生日期"
+                },
+                {
+                    "所在党支部": "燕云村2024年度党员名册.txt: 所属支部"
+                },
+                {
+                    "成为正式党员时间": "燕云村2024年度党员名册.txt: 转正时间"
+                },
+                {
+                    "党龄（年）": "推理规则: 当前年份(2024) - 转正时间的年份"
+                },
+                {
+                    "生活补贴标准（元／月）": "推理规则: 根据《重庆市巴南区党内关怀办法（修订）》中关于老党员敬老补助的规定，需结合党龄和年龄综合确定。例如：党龄满50年且年龄80岁以上补贴500元/月，党龄满40年补贴300元/月等（需补充具体政策条款）"
+                },
+                {
+                    "备注": "推理规则: 手动填写或根据其他特殊情况补充说明"
+                }
+            ]
+        }
+        }
+    })
         config = {"configurable": {"thread_id": session_id}}
         
         print(f"📋 初始状态创建完成，会话ID: {session_id}")

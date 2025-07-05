@@ -998,31 +998,43 @@ class ProcessUserInputAgent:
             previous_ai_content = ""
             
         print(f"上一轮ai输入内容：=========================================\n{previous_ai_content}")
-        system_prompt = f"""你是一个输入验证专家，需要判断用户的文本输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容，你的判断需要根据上下文，
-        我会提供上一个AI的回复，以及用户输入，你需要根据上下文，判断用户输入是否为对上一轮AI的回复，或者与表格生成、Excel处理相关，并且是否包含有意义的内容。
+        system_prompt = f"""
+你是一位专业的输入验证专家，任务是判断用户的文本输入是否与**表格生成或 Excel 处理相关**，并且是否在当前对话上下文中具有实际意义。
 
-        验证标准：
-        1. **有效输入 [Valid]**:
-           - 明确提到需要生成表格、填写表格、Excel相关操作
-           - 包含具体的表格要求、数据描述、字段信息
-           - 询问表格模板、表格格式相关问题
-           - 提供了表格相关的数据或信息
-           - 是在回复上一轮AI的回复
+你将获得以下两部分信息：
+- 上一轮 AI 的回复（用于判断上下文是否连贯）
+- 当前用户的输入内容
 
-        2. **无效输入 [Invalid]**:
-           - 完全与表格/Excel无关的内容
-           - 垃圾文本、随机字符、无意义内容
-           - 空白或只有标点符号
-           - 明显的测试输入或无关问题
+请根据以下标准进行判断：
 
-        请仔细分析用户输入，然后只回复以下选项之一：
-        [Valid] - 如果输入与表格相关且有意义
-        [Invalid] - 如果输入无关或无意义"""
+【有效输入 [Valid]】满足以下任一条件即可视为有效：
+- 明确提到生成表格、填写表格、Excel 处理、数据整理等相关操作
+- 提出关于表格字段、数据格式、模板结构等方面的需求或提问
+- 提供表格相关的数据内容、字段说明或规则
+- 对上一轮 AI 的回复作出有意义的延续或回应（即使未直接提到表格）
+- 即使存在错别字、语病、拼写错误，只要语义清晰合理，也视为有效
+
+【无效输入 [Invalid]】符合以下任一情况即视为无效：
+- 内容与表格/Excel 完全无关（如闲聊、情绪表达、与上下文跳脱）
+- 明显为测试文本、随机字符或系统调试输入（如 “123”、“测试一下”、“哈啊啊啊” 等）
+- 仅包含空白、表情符号、标点符号等无实际内容
+
+【输出要求】
+请你根据上述标准，**仅输出以下两种结果之一**（不添加任何其他内容）：
+- [Valid]
+- [Invalid]
+
+【上一轮 AI 的回复】
+{previous_ai_content}
+"""
+
+
+
         
         try:
             print("📤 正在调用LLM进行文本输入验证...")
             # Get LLM validation
-            user_input = "上一轮AI的回复：" + previous_ai_content + "\n用户输入：" + user_input
+            user_input = "用户输入：" + user_input
             print("analyze_text_input时调用模型的输入: \n" + user_input)              
             validation_response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
             # validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
@@ -1129,6 +1141,7 @@ class ProcessUserInputAgent:
   - 对召回文件的判断（例如用户确认某些文件是否相关）；
 - 注意：有时你被作为“确认节点”调用，任务是让用户判断文件是否相关，此时你需要总结的是“用户的判断结果”，而不是文件本身。
 - 请基于上下文灵活判断哪些内容构成有价值的信息。
+- 总结中请不要包含用户上传的无关信息内容，以及有效性验证
 
 【输出格式】
 仅返回以下 JSON 对象，不得包含任何额外解释或文本：
