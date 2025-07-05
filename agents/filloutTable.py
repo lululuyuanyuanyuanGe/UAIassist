@@ -423,7 +423,7 @@ def fill_html_table(html_path, csv_path, output_path):
         CSV_data = CSV_data.to_string(index=False)
 
         user_input = f"""上一轮代码的错误信息:\n{previous_code_error_message}\n
-                         需要填的模板表格(路径：D:\asianInfo\ExcelAssist\agents\output\老党员补贴_结果.html):\n{template_file_content}\n
+                         需要填的模板表格(路径：D:\asianInfo\ExcelAssist\agents\output\老党员补贴.html):\n{template_file_content}\n
                          需要填入的CSV数据例子(路径：D:\asianInfo\ExcelAssist\agents\output\synthesized_table.csv):\n{CSV_data}"""
         print(f"📝 用户输入总长度: {len(user_input)} 字符")
         print(f"📝 用户输入: {user_input}")
@@ -1105,7 +1105,12 @@ th {
     #         print(f"❌ 转换过程中发生错误: {e}")
     #         return {"error_message": f"转换失败: {str(e)}"}
 
-    def run_fillout_table_agent(self, session_id: str = "1") -> None:
+    def run_fillout_table_agent(self, session_id: str = "1",
+                                template_file: str = r"D:\asianInfo\ExcelAssist\agents\output\老党员补贴.html",
+                                data_file_path: list[str] = [r"D:\asianInfo\ExcelAssist\燕云村case\燕云村2024年度党员名册.xlsx"],
+                                supplement_files_path: list[str] = [r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_files\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.txt"],
+                                headers_mapping: dict[str, str] = {}
+                                ) -> None:
         """This function will run the fillout table agent using invoke method with manual debug printing"""
         print("\n🚀 启动 FilloutTableAgent")
         print("=" * 60)

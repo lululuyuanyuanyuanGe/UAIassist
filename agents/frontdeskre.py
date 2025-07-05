@@ -30,6 +30,7 @@ from langchain_core.tools import tool
 # import other agents
 from agents.processUserInput import ProcessUserInputAgent
 from agents.recallFilesAgent import RecallFilesAgent
+from agents.filloutTable import FilloutTableAgent
 
 load_dotenv()
 
@@ -471,6 +472,23 @@ class FrontdeskAgent:
         headers_mapping = recallFilesAgent_final_state.get("headers_mapping")
         print(f"🔍 表头映射: {headers_mapping}")
         return {"headers_mapping": headers_mapping}
+    
+
+
+    def _fillout_table_agent(self, state: FrontdeskState) -> FrontdeskState:
+        """This node will fill out the table based on the headers mapping"""
+        print("\n🔍 开始执行: _fillout_table_agent")
+        print("=" * 50)
+        
+        filloutTableAgent = FilloutTableAgent()
+        filloutTableAgent_final_state = filloutTableAgent.run_fillout_table_agent(headers_mapping=state["headers_mapping"]
+                                        
+                                                                                  
+                                                                                  )
+        print(f"🔍 填充表格响应: {filloutTableAgent_final_state}")
+
+        return state
+
     
     def run_frontdesk_agent(self, session_id: str = "1") -> None:
         """This function will run the frontdesk agent using stream method with interrupt handling"""

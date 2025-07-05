@@ -144,14 +144,8 @@ class RecallFilesAgent:
 {previous_AI_summary}
 """
 
-
-        user_input = f"""
-模板结构信息：
-{state["template_structure"]}
-"""
-
         response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", 
-                                           messages = [SystemMessage(content = system_prompt), HumanMessage(content = user_input)], 
+                                           messages = [SystemMessage(content = system_prompt)], 
                                            tools=self.tools,
                                            temperature = 0.3)
 
