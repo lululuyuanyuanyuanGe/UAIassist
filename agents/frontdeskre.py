@@ -11,8 +11,6 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated, Union
 from datetime import datetime
 
 from utilities.modelRelated import invoke_model, invoke_model_with_tools
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content
-
 
 from pathlib import Path
 # Create an interactive chatbox using gradio
@@ -66,11 +64,12 @@ def _collect_user_input(session_id: str, AI_question: str) -> str:
 class FrontdeskState(TypedDict):
     chat_history: Annotated[list[str], append_strings]
     messages: Annotated[list[BaseMessage], add_messages]
-    table_structure: str
+    template_structure: str
     previous_node: str # Track the previous node
     session_id: str
     template_file_path: str
     table_summary: str
+    headers_mapping: dict[str, str]
 
 
 class FrontdeskAgent:
@@ -99,6 +98,7 @@ class FrontdeskAgent:
         graph.add_node("complex_template_handle", self._complex_template_analysis)
         graph.add_node("simple_template_handle", self._simple_template_analysis)
         graph.add_node("chat_with_user_to_determine_template", self._chat_with_user_to_determine_template)
+        graph.add_node("recall_files_agnet", self._recall_files_agnet)
 
         graph.add_edge(START, "entry")
         graph.add_edge("entry", "initial_collect_user_input")
@@ -106,6 +106,7 @@ class FrontdeskAgent:
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
         graph.add_conditional_edges("simple_template_handle", self._route_after_simple_template_analysis)
+        graph.add_edge("recall_files_agnet", END)
 
         
         # Compile the graph to make it executable with stream() method
@@ -118,11 +119,13 @@ class FrontdeskAgent:
         """This function will create the initial state of the frontdesk agent"""
         return {
             "chat_history": [],
+            "template_structure": "",
             "messages": [],
             "messages_s": [],
             "table_structure": "",
             "session_id": session_id,
-            "previous_node": ""
+            "previous_node": "",
+            "headers_mapping": {}
         }
 
 
@@ -253,15 +256,15 @@ class FrontdeskAgent:
             
 
 
-    def _complex_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
-        """This node will be use to analyze the complex table template, we will skip for now"""
-        print("\n🔧 开始执行: _complex_template_analysis")
-        print("=" * 50)
-        print("⚠️ 复杂模板分析功能暂未实现")
-        print("✅ _complex_template_analysis 执行完成")
-        print("=" * 50)
+    # def _complex_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
+    #     """This node will be use to analyze the complex table template, we will skip for now"""
+    #     print("\n🔧 开始执行: _complex_template_analysis")
+    #     print("=" * 50)
+    #     print("⚠️ 复杂模板分析功能暂未实现")
+    #     print("✅ _complex_template_analysis 执行完成")
+    #     print("=" * 50)
         
-        return state
+    #     return state
 
     def _chat_with_user_to_determine_template(self, state: FrontdeskState) -> FrontdeskState:
         """This node will chat with the user to determine the template, when the template is not provided"""
@@ -333,7 +336,7 @@ class FrontdeskAgent:
         print("✅ _chat_with_user_to_determine_template 执行完成")
         print("=" * 50)
         
-        return {"table_structure": str(response),
+        return {"template_structure": str(response),
                 "previous_node": "chat_with_user_to_determine_template",
                 "messages": [ai_message]
                 }
@@ -353,7 +356,7 @@ class FrontdeskAgent:
             print("✅ 无工具调用，路由到 END")
             print("✅ _route_after_chat_with_user_to_determine_template 执行完成")
             print("=" * 50)
-            return "END"
+            return "recall_files_agnet"
 
     def _simple_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
         """处理用户上传的简单模板"""
@@ -451,20 +454,23 @@ class FrontdeskAgent:
             print("✅ 无工具调用，路由到 END")
             print("✅ _route_after_simple_template_analysis 执行完成")
             print("=" * 50)
-            return "END"
+            return "recall_files_agnet"
 
     def _recall_files_agnet(self, state: FrontdeskState) -> FrontdeskState:
         """This node will recall the files from the user"""
         print("\n🔍 开始执行: _recall_files_agnet")
         print("=" * 50)
 
+        template_structure = state["template_structure"]
+
         recallFilesAgent = RecallFilesAgent()
         # return the final state of the recallFilesAgent
-        recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(state["messages"])
+        recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(template_structure=template_structure)
         print(f"🔍 召回文件响应: {recallFilesAgent_final_state}")
 
-
-        return 
+        headers_mapping = recallFilesAgent_final_state.get("headers_mapping")
+        print(f"🔍 表头映射: {headers_mapping}")
+        return {"headers_mapping": headers_mapping}
     
     def run_frontdesk_agent(self, session_id: str = "1") -> None:
         """This function will run the frontdesk agent using stream method with interrupt handling"""

@@ -661,7 +661,7 @@ def fill_html_table(html_path, csv_path, output_path):
         print("\n🔄 开始执行: _generate_html_table_completion_code")
         print("=" * 50)
 
-        system_prompt = f"""你是一位专业的 HTML 表格处理和样式优化专家，擅长通过 Python 代码实现表格的动态扩展和美化。
+        system_prompt = """你是一位专业的 HTML 表格处理和样式优化专家，擅长通过 Python 代码实现表格的动态扩展和美化。
 
 【核心任务】
 根据用户提供的 HTML 表格模板，生成一段完整可执行的 Python 代码，实现以下功能：
@@ -755,30 +755,37 @@ if footer_row:
     table.append(footer_row)
 
 style_tag = soup.new_tag('style')
-style_tag.string = \"\"\"
-table {{
+style_tag.string =
+table {
     border-collapse: collapse;
     width: 100%;
-    font-family: 'Arial', sans-serif;
+    font-family: 'Microsoft YaHei', 'Arial', sans-serif;
     font-size: 14px;
-}}
-td {{
-    border: 1px solid #333;
-    padding: 6px;
+    margin-top: 20px;
+    color: #333;
+}
+th, td {
+    border: 1px solid #444;
+    padding: 8px 10px;
     text-align: center;
-}}
-td[colspan="11"] {{
+    vertical-align: middle;
+}
+td[colspan="11"] {
     font-weight: bold;
-    background-color: #f2f2f2;
-}}
-tr:nth-child(even) {{
+    background-color: #e6f0ff;
+    text-align: left;
+    padding: 10px;
+}
+tr:nth-child(even) td {
     background-color: #f9f9f9;
-}}
-\"\"\"
-soup.html.insert(0, style_tag)
-
-with open(output_path, 'w', encoding='utf-8') as f:
-    f.write(str(soup))
+}
+tr:nth-child(odd) td {
+    background-color: #ffffff;
+}
+th {
+    background-color: #dce6f1;
+    font-weight: bold;
+}
 """
 
 

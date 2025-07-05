@@ -111,48 +111,49 @@ class RecallFilesAgent:
         print("=========历史对话记录==========")
         
         system_prompt = f"""
-你是一位专业的文件分析专家，擅长根据表格模板内容，从用户提供的文件摘要中筛选出最相关的参考文件。
+你是一位专业的文件分析专家，擅长从文件摘要中筛选出最适合用于填写模板表格的数据文件和辅助参考文件。
 
-你的任务是根据用户提供的模板结构，从文件摘要中召回可能用于填写模板的数据文件或辅助文件（如政策说明文档等）。请严格按照以下流程执行：
+【你的任务】
+根据我提供的表格模板结构、任务背景和文件摘要信息，从中挑选出可能用于填写模板的相关文件。请特别注意，**每一次文件召回后必须调用工具 `request_user_clarification` 与用户确认选择是否合适**，不得直接返回文件列表或跳过确认。
 
-【执行流程】
+【执行标准】
+1. 分析模板的结构字段，判断填写所需的数据和可能的计算或解释依据；
+2. 从文件摘要中初步筛选 3~5 个高度相关的文件，可能包括：
+   - 含有原始数据字段的 Excel 或 CSV 文件；
+   - 含有字段说明、政策依据、计算规则的 Word 或 PDF 文件；
+3. 无论是否已有历史召回记录或用户反馈，**本轮都必须调用工具与用户确认筛选结果**；
+4. 如果用户反馈不满意，应根据其意见重新筛选并再次确认；
+5. 一旦用户确认，后续节点将使用该确认结果继续流程；
+6. 最终文件列表请以**严格的 JSON 数组格式**输出，内容示例如下：
+   ["基础信息表.xlsx", "补贴政策说明.docx"]
 
-1. **判断是否为首次执行或需要重新确认文件：**
-   - 如果历史记录为空，或未包含用户对召回文件的确认信息 → 视为首次执行
-   - 如果历史记录显示用户不满意 → 需要重新召回
-   - 否则 → 用户已确认文件选择，可直接输出文件列表
+【格式要求】
+- 仅输出 JSON 数组格式；
+- 不允许出现多余文字或 markdown 包裹（如 ```json）；
+- 不允许自行与用户对话，必须使用 `request_user_clarification` 工具发起确认；
+- 所有返回值仅包含文件名，不含路径或摘要内容；
 
-2. **首次执行或需要重新召回时，按以下步骤操作：**
-   - 分析模板结构和文件摘要内容
-   - 基于内容相关性，初步筛选出3-5个高相关文件
-   - 使用工具 `request_user_clarification` 向用户发起确认请求
+【输入上下文】
+表格模板结构：
+{state["template_structure"]}
 
-3. **用户已确认文件选择时：**
-   - 直接返回最终筛选结果，**返回格式必须严格为 JSON 数组形式**，例如：
-     ["文件名1.xlsx", "文件名2.docx"]
+文件摘要列表：
+{state["file_content"]}
 
-【关键规则】
-
-- **禁止在回答中直接向用户提问**，必须通过工具调用实现互动。
-- **禁止跳过工具调用步骤**，除非历史记录中明确用户已确认。
-- 无论何时返回文件结果，格式必须为**纯粹的 JSON 数组**，仅包含文件名，不能添加任何说明或多余文字。
-- 若用户反馈不满意，应根据其反馈信息重新调整文件选择，再次调用工具确认。
-
-请严格遵守以上流程与格式要求，确保每次输出都符合任务规范。
-
-     【文件摘要列表】
-     {state["file_content"]}
-
-    【历史对话记录】
-    {previous_AI_summary}
+用户历史行为摘要：
+{previous_AI_summary}
 """
+
 
         user_input = f"""
 模板结构信息：
 {state["template_structure"]}
 """
 
-        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content = system_prompt), HumanMessage(content = user_input)], tools=self.tools)
+        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", 
+                                           messages = [SystemMessage(content = system_prompt), HumanMessage(content = user_input)], 
+                                           tools=self.tools,
+                                           temperature = 0.3)
 
         # Extract response content properly
         if isinstance(response, str):
