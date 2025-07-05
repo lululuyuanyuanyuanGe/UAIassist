@@ -50,10 +50,8 @@ class FilloutTableState(TypedDict):
     template_file: str
     template_file_completion_code: str
     fill_CSV_2_template_code: str
-    rules: str
     combined_data: str
     final_table: str
-    styled_html_table: str
     error_message: str
     error_message_summary: str
     template_completion_code_template_completion_code_execution_successful: bool
@@ -106,8 +104,9 @@ class FilloutTableAgent:
         return graph.compile()
 
     
-    def create_initialize_state(self, template_file: str = None, rules: str = None, 
-                                 data_file_path: list[str] = None, supplement_files_path: list[str] = None) -> FilloutTableState:
+    def create_initialize_state(self, template_file: str = None,
+                                 data_file_path: list[str] = None, supplement_files_path: list[str] = None,
+                                 headers_mapping: dict[str, str] = None) -> FilloutTableState:
         """This node will initialize the state of the graph"""
         return {
             "messages": [],
@@ -117,17 +116,15 @@ class FilloutTableAgent:
             "supplement_files_summary": "",
             "template_file_completion_code": "",
             "fill_CSV_2_template_code": "",
-            "rules": rules,
             "combined_data": "",
             "final_table": "",
-            "styled_html_table": "",
             "error_message": "",
             "error_message_summary": "",
             "template_completion_code_execution_successful": False,
             "CSV2Teplate_template_completion_code_execution_successful": False,
             "retry": 0,
             "combined_data_array": [],
-            "headers_mapping": "",
+            "headers_mapping": headers_mapping,
             "CSV_data": []
         }
     
@@ -997,17 +994,9 @@ with open(output_path, 'w', encoding='utf-8') as f:
         print("\n🚀 启动 FilloutTableAgent")
         print("=" * 60)
         
-        initial_state = self.create_initialize_state(template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\老党员补贴.txt", 
-                                                        rules = """党员补助列需要你智能计算，规则如下，党龄需要根据党员名册中的转正时间计算，（1）党龄40—49年的，补助标准为：100元/月；
-（2）党龄50—54年的，补助标准为：120元/月；
-（3）党龄55年及以上的，补助标准为：150元/月。
-以上补助从党员党龄达到相关年限的次月起按月发放。补助标准根据市里政策作相应调整。
-2.党组织关系在区、年满80周岁、党龄满55年的老党员：
-（1）年龄80—89周岁且党龄满55年的，补助标准为500元/年；
-（2）年龄90—99周岁且党龄满55年的，补助标准为1000元/年；
-（3）年龄100周岁及以上的，补助标准为3000元/年。
-以上补助年龄、党龄计算时间截至所在年份的12月31日。""", data_file_path = [r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\燕云村2024年度党员名册.txt"], 
-                                                        supplement_files_path = [r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_files\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.txt"])
+        initial_state = self.create_initialize_state(
+            template_file = r
+        )
         config = {"configurable": {"thread_id": session_id}}
         
         print(f"📋 初始状态创建完成，会话ID: {session_id}")

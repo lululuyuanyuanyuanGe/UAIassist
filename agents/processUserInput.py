@@ -999,7 +999,7 @@ class ProcessUserInputAgent:
             
         print(f"上一轮ai输入内容：=========================================\n{previous_ai_content}")
         system_prompt = f"""你是一个输入验证专家，需要判断用户的文本输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容，你的判断需要根据上下文，
-        我会提供上一个AI的回复，以及用户输入，你需要根据上下文，判断用户输入是否与表格生成、Excel处理相关，并且是否包含有意义的内容。
+        我会提供上一个AI的回复，以及用户输入，你需要根据上下文，判断用户输入是否为对上一轮AI的回复，或者与表格生成、Excel处理相关，并且是否包含有意义的内容。
 
         验证标准：
         1. **有效输入 [Valid]**:
@@ -1023,6 +1023,7 @@ class ProcessUserInputAgent:
             print("📤 正在调用LLM进行文本输入验证...")
             # Get LLM validation
             user_input = "上一轮AI的回复：" + previous_ai_content + "\n用户输入：" + user_input
+            print("analyze_text_input时调用模型的输入: \n" + user_input)              
             validation_response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
             # validation_response = self.llm_s.invoke([SystemMessage(content=system_prompt)])
             
@@ -1119,16 +1120,28 @@ class ProcessUserInputAgent:
         print(f"🎯 路由决定: {route_decision}")
         
         system_prompt = f"""
-        根据历史对话总结这轮用户信息收集过程中，用户都提供了哪些有价值的信息，包括文件上传，文本输入，模板上传等
-        历史对话: {process_user_input_messages_content}，
-        请只返回JSON格式，无其他文字：
-        {{
-            "summary": "用户本轮提供的信息总结，输入了什么信息，提供了哪些文件等"
-        }}"""
+你是一位专业的用户输入分析专家，任务是根据当前轮次的历史对话内容，总结用户在信息收集过程中的所有有效输入。
+
+【你的目标】
+- 提取本轮对话中用户提供的所有有价值信息，包括但不限于：
+  - 文件上传（如数据文件、模板文件等）；
+  - 文本输入（如填写说明、政策信息、计算规则等）；
+  - 对召回文件的判断（例如用户确认某些文件是否相关）；
+- 注意：有时你被作为“确认节点”调用，任务是让用户判断文件是否相关，此时你需要总结的是“用户的判断结果”，而不是文件本身。
+- 请基于上下文灵活判断哪些内容构成有价值的信息。
+
+【输出格式】
+仅返回以下 JSON 对象，不得包含任何额外解释或文本：
+{{
+  "summary": "对本轮用户提供的信息进行总结"
+}}
+"""
+
 
         try:
+            user_input = "【历史对话】\n" + process_user_input_messages_content
             print("📤 正在调用LLM生成总结...")
-            response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
+            response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
             print(f"📥 LLM总结响应长度: {len(response)} 字符")
             
             # Clean the response to handle markdown code blocks and malformed JSON
@@ -1239,4 +1252,3 @@ if __name__ == "__main__":
     agent = ProcessUserInputAgent()
     # save_graph_visualization(agent.graph, "process_user_input_graph.png")
     agent.run_process_user_input_agent("")
-

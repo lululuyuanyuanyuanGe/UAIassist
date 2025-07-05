@@ -789,7 +789,7 @@ def clean_and_pretty_print_csv(csv_data_list: list[str], output_file: str = None
     return df
 
 
-def extract_file_from_recall(self, response: str) -> list:
+def extract_file_from_recall(response: str) -> list:
     """返回文件名数组"""
 
     # Parse the response to extract the file list

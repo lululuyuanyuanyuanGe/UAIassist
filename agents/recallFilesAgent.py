@@ -41,6 +41,11 @@ def request_user_clarification(question: str) -> str:
         
         # Extract the summary message from response
         summary_message = response[0]
+        print("request_user_clarification 调用模型的输入: \n" + summary_message)
+        summary_message = json.loads(summary_message)
+        print("request_user_clarification 调用模型的输入类型: \n" + str(type(summary_message)))
+        summary_message = summary_message["summary"]
+        print("request_user_clarification 调用模型的输出: \n" + summary_message)
         return summary_message
 
 
@@ -105,36 +110,44 @@ class RecallFilesAgent:
         print(previous_AI_summary)
         print("=========历史对话记录==========")
         
-        system_prompt = f"""
-你是一位专业的文件分析专家，擅长根据表格模板内容，从用户提供的文件摘要中识别与其高度相关的参考文件。
+        system_prompt = """
+你是一位专业的文件分析专家。你的任务是根据表格模板从文件摘要中筛选相关文件。
 
-【任务背景】
-用户提供了一个表格模板，其内容包括表头结构、摘要信息、文件名等；
-同时还提供了一份文件摘要列表，其中每条记录包含一个文件的完整文件名及其简要说明。
+重要：你必须严格按照以下流程执行：
 
-你的任务是：
-1. 根据模板表格的结构和内容（特别是表头结构和摘要信息）；
-2. 从提供的文件摘要中筛选出所有可能用于填写该模板的相关文件；
-3. 返回这些相关文件的完整文件名组成的数组。
+1. 检查历史对话记录：
+   - 如果历史记录为空或没有文件确认信息 → 这是首次执行
+   - 如果历史记录显示用户已确认文件选择 → 可以直接返回文件列表
 
-【重要要求】
-- **如果是第一次召回相关文件，必须调用工具向用户确认这些文件是否合适**，确认后才可继续后续流程；
-- 如果不是第一次（用户已确认），则可直接返回最终文件列表；
-- 当和用户确认后，请确保返回结果严格为一个字符串数组，内容为文件的完整文件名，不包含其他文字、标点或注释。例如：
-  ["2024年党员数据.xlsx", "补贴规则说明.docx"]
+2. 如果是首次执行或需要重新选择：
+   - 分析模板结构和文件摘要
+   - 识别3-5个最相关的文件
+   - 立即使用 request_user_clarification 工具询问用户确认
+   - 工具参数格式：{"question": "我为您选择了以下文件：[文件列表]，选择理由：[理由]。请确认这些文件是否适合？"}
 
-【文件摘要列表】：
+3. 如果用户已经确认过文件选择：
+   - 直接返回JSON格式的文件列表：["文件名1.xlsx", "文件名2.docx"]
+
+关键规则：
+- 绝对不要在回复中直接询问用户
+- 绝对不要跳过工具调用步骤
+- 当历史记录为空或无确认信息时，必须使用 request_user_clarification 工具
+"""
+
+        user_input = f"""
+模板结构信息：
+{state["template_structure"]}
+
+文件摘要列表：
 {state["file_content"]}
 
- 【历史对话记录】
- {previous_AI_summary}
+历史对话记录：
+{previous_AI_summary}
+
+请按照系统提示的流程执行。
 """
-        
 
-
-        template_structure = state["template_structure"]
-
-        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content = system_prompt), HumanMessage(content = template_structure)], tools=self.tools)
+        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", messages = [SystemMessage(content = system_prompt), HumanMessage(content = user_input)], tools=self.tools)
 
         # Extract response content properly
         if isinstance(response, str):
