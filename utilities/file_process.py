@@ -594,19 +594,26 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     
     # Split the largest file content into structure and data parts
     largest_file_lines = largest_file_content.split('\n')
-    structure_end_index = -1
+    data_section_start = -1
+    
+    # Look for the correct pattern: "=== filename 的表格数据 ==="
+    largest_filename = Path(largest_file).name
+    data_header_pattern = f"=== {largest_filename} 的表格数据 ==="
+    
     for i, line in enumerate(largest_file_lines):
-        if line.startswith("=== CSV Data Content ==="):
-            structure_end_index = i
+        if line.strip() == data_header_pattern:
+            data_section_start = i
             break
     
-    if structure_end_index == -1:
-        print("⚠️ Could not find CSV data content separator, using full content")
+    if data_section_start == -1:
+        print(f"⚠️ Could not find data section separator '{data_header_pattern}', using full content")
         largest_structure = ""
         largest_data_lines = largest_file_lines
     else:
-        largest_structure = '\n'.join(largest_file_lines[:structure_end_index + 1])
-        largest_data_lines = largest_file_lines[structure_end_index + 1:]
+        # Structure is everything before the data header
+        largest_structure = '\n'.join(largest_file_lines[:data_section_start])
+        # Data is everything after the data header (excluding the header itself)
+        largest_data_lines = largest_file_lines[data_section_start + 1:]
     
     # Remove empty lines at the beginning of data
     while largest_data_lines and not largest_data_lines[0].strip():
@@ -616,7 +623,42 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     chunk_size = max(1, len(largest_data_lines) // 5)
     print(f"📏 Dividing {len(largest_data_lines)} data lines into chunks of ~{chunk_size} lines each")
     
-    # Step 5: Create 5 chunks and combine with other files and supplements
+    # Step 5: Separate structure and data from other files
+    other_files_structure = []
+    other_files_data = []
+    
+    for other_content in other_files_content:
+        lines = other_content.split('\n')
+        other_filename = None
+        
+        # Find the filename from the structure header
+        for line in lines:
+            if line.startswith("=== ") and " 的表格结构 ===" in line:
+                other_filename = line.replace("=== ", "").replace(" 的表格结构 ===", "")
+                break
+        
+        if other_filename:
+            other_data_header = f"=== {other_filename} 的表格数据 ==="
+            other_data_start = -1
+            
+            for i, line in enumerate(lines):
+                if line.strip() == other_data_header:
+                    other_data_start = i
+                    break
+            
+            if other_data_start != -1:
+                structure_part = '\n'.join(lines[:other_data_start])
+                data_part = '\n'.join(lines[other_data_start:])
+                other_files_structure.append(structure_part)
+                other_files_data.append(data_part)
+            else:
+                # If no data section found, treat as structure only
+                other_files_structure.append(other_content)
+        else:
+            # If no filename found, treat as structure
+            other_files_structure.append(other_content)
+    
+    # Step 6: Create 5 chunks with proper order
     combined_chunks = []
     
     for chunk_index in range(5):
@@ -628,22 +670,38 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         
         chunk_data_lines = largest_data_lines[start_idx:end_idx]
         
-        # Recreate chunk with structure
-        chunk_content = f"{largest_structure}\n\n" + '\n'.join(chunk_data_lines)
+        # Create chunk following the required order:
+        # 1. All structure information first
+        # 2. All data information second  
+        # 3. Supplement information last
         
-        # Combine chunk with all other files and supplements
         chunk_combined = []
         
-        # Add all other Excel files first
-        for other_content in other_files_content:
-            chunk_combined.append(other_content)
+        # 1. Add all structure information first
+        for structure_content in other_files_structure:
+            if structure_content.strip():
+                chunk_combined.append(structure_content)
         
-        # Add supplement files content (string, not list)
+        # Add largest file structure
+        if largest_structure.strip():
+            chunk_combined.append(largest_structure)
+        
+        # 2. Add all data information second
+        for data_content in other_files_data:
+            if data_content.strip():
+                chunk_combined.append(data_content)
+        
+        # Add largest file data chunk
+        if chunk_data_lines:
+            chunk_combined.append(f"=== {largest_filename} 的表格数据 ===\n" + '\n'.join(chunk_data_lines))
+        
+        # 3. Add supplement information last
         if supplement_files_summary:
-            chunk_combined.append(f"{supplement_files_summary}")
-        
-        # Add the chunk from largest file
-        chunk_combined.append(f"=== {Path(largest_file).name} 的表格数据 === {chunk_content}")
+            # Check if supplement content already has header
+            if supplement_files_summary.strip().startswith("=== 补充文件内容 ==="):
+                chunk_combined.append(supplement_files_summary)
+            else:
+                chunk_combined.append(f"=== 补充文件内容 ===\n{supplement_files_summary}")
         
         # Join all parts with clean separators
         final_combined = "\n\n".join(chunk_combined)
