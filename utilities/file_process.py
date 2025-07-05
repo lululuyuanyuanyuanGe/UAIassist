@@ -9,6 +9,7 @@ import subprocess
 import chardet
 from typing import Union, List, Dict
 import pandas as pd
+from datetime import datetime
 
 def detect_and_process_file_paths(user_input: str) -> list:
     """检测用户输入中的文件路径并验证文件是否存在，返回结果为用户上传的文件路径组成的数列"""
@@ -459,12 +460,113 @@ def fetch_related_files_content(related_files: List[str], base_path: str = "D:/a
 
 
 def excel_to_csv(excel_file, csv_file, sheet_name="Sheet1"):
-    """Simple Excel to CSV conversion using pandas"""
-    # Read Excel file
-    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+    """Enhanced Excel to CSV conversion with proper date handling"""
+    import re
     
-    # Convert to CSV
-    df.to_csv(csv_file, index=False, encoding='utf-8')
+    try:
+        # Read Excel file
+        df = pd.read_excel(excel_file, sheet_name=sheet_name)
+        print(f"📊 Processing {len(df.columns)} columns for date cleaning...")
+        
+        # Process each column to handle dates properly
+        for col in df.columns:
+            print(f"🔍 Processing column '{col}' with dtype: {df[col].dtype}")
+            
+            # Check if column contains datetime-like data
+            if df[col].dtype == 'datetime64[ns]' or any(isinstance(x, pd.Timestamp) for x in df[col].dropna()):
+                print(f"📅 Found datetime column: {col}")
+                # Convert datetime columns to clean date format
+                df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) and hasattr(x, 'strftime') else x)
+            
+            else:
+                # Apply aggressive date cleaning to ALL columns (not just object columns)
+                df[col] = df[col].apply(lambda x: clean_date_string(x) if pd.notna(x) else x)
+        
+        # Convert to CSV
+        df.to_csv(csv_file, index=False, encoding='utf-8')
+        print(f"✅ Successfully converted {excel_file} to {csv_file}")
+        
+        # Read back and verify cleaning worked
+        with open(csv_file, 'r', encoding='utf-8') as f:
+            sample_content = f.read()[:500]
+            if " 00:00:00" in sample_content:
+                print(f"⚠️ Warning: Still found '00:00:00' in output, applying post-processing...")
+                # Apply additional cleaning to the entire CSV content
+                with open(csv_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Clean up the content with regex
+                content = re.sub(r' 00:00:00', '', content)
+                content = re.sub(r'\.00\.00\.00', '', content)
+                content = re.sub(r'\.0+(?=,|$)', '', content)
+                
+                # Write back the cleaned content
+                with open(csv_file, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"✅ Applied post-processing date cleanup")
+        
+    except Exception as e:
+        print(f"❌ Error converting Excel to CSV: {e}")
+        # Fallback to simple conversion with post-processing
+        try:
+            df = pd.read_excel(excel_file, sheet_name=sheet_name)
+            df.to_csv(csv_file, index=False, encoding='utf-8')
+            
+            # Apply post-processing cleanup
+            with open(csv_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            content = re.sub(r' 00:00:00', '', content)
+            content = re.sub(r'\.00\.00\.00', '', content)
+            
+            with open(csv_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print(f"✅ Fallback conversion with post-processing completed")
+            
+        except Exception as fallback_error:
+            print(f"❌ Fallback conversion also failed: {fallback_error}")
+
+
+def clean_date_string(value):
+    """Clean up date strings and remove malformed time portions"""
+    if not isinstance(value, str):
+        return value
+    
+    # Remove malformed time formats like "00.00.00.00"
+    if ".00.00.00" in str(value):
+        value = str(value).replace(".00.00.00", "")
+    
+    # Remove "00:00:00" time portions from date strings
+    if " 00:00:00" in str(value):
+        value = str(value).replace(" 00:00:00", "")
+    
+    # Handle other common malformed patterns
+    value = re.sub(r'\.00\.00\.00$', '', str(value))  # Remove trailing .00.00.00
+    value = re.sub(r' 00:00:00\.0+$', '', str(value))  # Remove trailing 00:00:00.000...
+    value = re.sub(r'\.0+$', '', str(value))  # Remove trailing .000...
+    
+    # Try to parse and reformat date strings
+    try:
+        # Common date patterns to try
+        date_patterns = [
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d',
+            '%Y/%m/%d',
+            '%m/%d/%Y',
+            '%d/%m/%Y',
+            '%Y%m%d'
+        ]
+        
+        for pattern in date_patterns:
+            try:
+                parsed_date = datetime.strptime(str(value), pattern)
+                return parsed_date.strftime('%Y-%m-%d')  # Return clean date format
+            except ValueError:
+                continue
+    except:
+        pass
+    
+    return value  # Return original if no date pattern matched
 
 
 def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", data_json_path: str = "agents/data.json") -> list[str]:

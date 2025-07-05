@@ -240,9 +240,9 @@ class FilloutTableAgent:
 - 输出结果应可直接导入 Excel，无需额外处理。
 
 【字段处理要求】
-- 所有日期字段若带有时间部分（如 `00:00:00`），请仅保留日期（格式：`yyyy-mm-dd`）；
+- 日期格式：`yyyy-mm-dd`）；
 - 清除无效或占位时间格式，如 `00.00.00.00`，直接替换为空；
-- 对于像“备注”等可能没有明确来源字段的列，可根据上下文推理填写（如“满足补贴条件”、“未满条件”等），不能留空；
+- 对于像“备注”等可能没有明确来源字段的列，可根据上下文推理填写补充内容；
 - 计算字段（如“党龄”、“补贴标准”）必须提供实际计算结果，不能省略；
 - 若某字段无数据但允许为空，请保持空值（两个逗号之间留空）。
 
@@ -251,7 +251,6 @@ class FilloutTableAgent:
 - ❌ 禁止输出非结构化内容；
 - ❌ 禁止跳过映射或计算逻辑；
 - ❌ 禁止输出表头或无关内容；
-- ❌ 禁止输出“00.00.00.00”格式；
 
 请立即开始数据处理，并**只返回纯 CSV 格式的数据记录**，每一行为一条记录，**不包含字段名**。
 """
@@ -272,7 +271,8 @@ class FilloutTableAgent:
                 print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
                 response = invoke_model(
                     model_name="deepseek-ai/DeepSeek-V3", 
-                    messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)]
+                    messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
+                    temperature=0.8
                 )
                 print(f"✅ Completed chunk {index + 1}")
                 return (index, response)
@@ -341,7 +341,98 @@ class FilloutTableAgent:
         print("\n🔄 开始执行: _generate_code_fill_CSV_2_template")
         print("=" * 50)
         
-        system_prompt = """那你是一个python专家, 另外如果代码没有执行正确的话, 请根据错误信息修复代码"""
+        system_prompt = f"""
+你是一位专业的 HTML 表格处理与数据填充专家，擅长使用 Python 将结构化数据写入 HTML 模板中，生成格式标准、美观可用的表格文件。
+
+【任务目标】
+请根据用户提供的 HTML 表格模板文件和数据源 CSV 文件，生成一段**完整、可执行**的 Python 脚本，实现以下功能：
+
+1. **数据填充**
+   - 使用 CSV 文件中的每一行数据填充 HTML 表格；
+   - 仅替换模板中的“数据行”部分（即有序号的行）；
+   - 清除原始模板中的示例数据行，使用 CSV 中的数据逐行追加；
+   - 字段顺序应严格按照 HTML 模板的列顺序排列；
+   - 第一列“序号”需自动从 1 开始递增，其他字段来自 CSV 数据。
+
+2. **结构保持**
+   - 保留 HTML 模板中原有的结构，包括：
+     - `<colgroup>` 列宽设定；
+     - `<thead>` 表头；
+     - 标题行（如合并单元格的表名）；
+     - 表尾备注（如含“审核人”、“制表人”的行）；
+   - 不得破坏 HTML 原有结构；
+   - 最终生成的 HTML 文件必须结构完整，浏览器可正常打开查看。
+
+3. **技术要求**
+   - 使用 `pandas` 读取 CSV 数据；
+   - 使用 `BeautifulSoup` 解析和修改 HTML 内容；
+   - 使用 `soup.new_tag()` 或 `copy.deepcopy()` 插入 `<tr>` 行；
+   - 所有字段以 `<td>` 标签形式添加；
+   - 文件读写使用 UTF-8 编码；
+   - 输入 HTML 路径：`D:\\asianInfo\\ExcelAssist\\agents\\input\\老党员补贴.txt`；
+   - 输入 CSV 路径：`D:\\path\\to\\processed_filled.csv`（可自定义）；
+   - 输出 HTML 路径：`D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_最终含李静.html`。
+
+4. **输出要求**
+   - 你必须**只输出完整、可直接运行的 Python 脚本**；
+   - 不得输出 Markdown 格式、代码块标记（如```）、解释性文字或其他说明内容；
+   - 所有依赖（如 `pandas`, `bs4`）必须在脚本中导入；
+   - 结果 HTML 文件必须是结构闭合、浏览器可渲染的标准 HTML 表格。
+
+【示例代码结构（请据此生成完整脚本）】
+
+from bs4 import BeautifulSoup
+import pandas as pd
+
+# 路径设置
+input_html_path = "D:/asianInfo/ExcelAssist/agents/input/老党员补贴.txt"
+output_html_path = "D:/asianInfo/ExcelAssist/agents/output/老党员补贴_最终含李静.html"
+csv_path = "D:/path/to/processed_filled.csv"  # 请将此路径替换为实际 CSV 文件路径
+
+# 读取 HTML 模板
+with open(input_html_path, 'r', encoding='utf-8') as f:
+    soup = BeautifulSoup(f, 'html.parser')
+
+# 读取 CSV 数据
+df = pd.read_csv(csv_path)
+
+# 获取表格并分析行结构
+table = soup.find('table')
+all_rows = table.find_all('tr')
+
+# 查找数据行模板
+template_row = None
+for row in all_rows:
+    cells = row.find_all('td')
+    if cells and cells[0].text.strip().isdigit():
+        template_row = row
+        break
+
+# 删除原始数据行
+for row in all_rows:
+    cells = row.find_all('td')
+    if cells and cells[0].text.strip().isdigit():
+        row.extract()
+
+# 插入新的数据行
+for i, (_, record) in enumerate(df.iterrows(), start=1):
+    new_row = soup.new_tag("tr")
+    # 序号
+    td_serial = soup.new_tag("td")
+    td_serial.string = str(i)
+    new_row.append(td_serial)
+    # 其他字段
+    for value in record.values:
+        td = soup.new_tag("td")
+        td.string = str(value) if pd.notna(value) else ""
+        new_row.append(td)
+    table.append(new_row)
+
+# 输出 HTML 文件
+with open(output_html_path, 'w', encoding='utf-8') as f:
+    f.write(str(soup))
+"""
+
         template = state["final_table"]
         CSV_data = state["CSV_data"]
         

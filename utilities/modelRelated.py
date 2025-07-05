@@ -28,9 +28,9 @@ def execution_timeout(seconds):
         timer.cancel()
 
 
-def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
+def invoke_model(model_name : str, messages : List[BaseMessage], temperature: float = 0.2) -> str:
     """调用大模型"""
-    print(f"🚀 开始调用LLM: {model_name}")
+    print(f"🚀 开始调用LLM: {model_name} (temperature={temperature})")
     start_time = time.time()
     
     llm = ChatOpenAI(
@@ -38,7 +38,7 @@ def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
         api_key=os.getenv("SILICONFLOW_API_KEY"), 
         base_url="https://api.siliconflow.cn/v1",
         streaming=True,
-        temperature=0.2,
+        temperature=temperature,
         request_timeout=30  # 30 seconds network timeout
     )
 
@@ -96,9 +96,9 @@ def invoke_model(model_name : str, messages : List[BaseMessage]) -> str:
     
     return full_response
 
-def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tools : List[str]) -> Any:
+def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tools : List[str], temperature: float = 0.2) -> Any:
     """调用大模型并使用工具"""
-    print(f"🚀 开始调用LLM(带工具): {model_name}")
+    print(f"🚀 开始调用LLM(带工具): {model_name} (temperature={temperature})")
     start_time = time.time()
     
     # For tool calls, use non-streaming to avoid invoke/stream conflict
@@ -107,7 +107,7 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
         api_key=os.getenv("SILICONFLOW_API_KEY"), 
         base_url="https://api.siliconflow.cn/v1",
         streaming=False,  # Must be False for invoke() to work properly
-        temperature=0.2,
+        temperature=temperature,
         request_timeout=30  # 30 seconds network timeout
     )
     
