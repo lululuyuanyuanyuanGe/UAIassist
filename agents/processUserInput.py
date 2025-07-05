@@ -8,8 +8,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, extract_filename
 from utilities.modelRelated import invoke_model
+from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, 
+                                    extract_filename, determine_location_from_content, 
+                                    ensure_location_structure, check_file_exists_in_data,
+                                    get_available_locations)
+
 
 import uuid
 import json
@@ -66,6 +70,8 @@ class ProcessUserInputAgent:
         return user_response
     
     tools = [request_user_clarification]
+
+
 
     def __init__(self):
         self.memory = MemorySaver()
@@ -217,14 +223,19 @@ class ProcessUserInputAgent:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"⚠️ data.json文件出错: {e}")
             # Initialize empty structure if file is missing or corrupted
-            data = {"表格": {}, "文档": {}}
+            data = {}
         
         print("🔍 正在检查文件是否已存在...")
+        files_to_remove = []
         for file in detected_files:
             file_name = Path(file).name
-            if file_name in data["表格"] or file_name in data["文档"]:
-                detected_files.remove(file)
+            if self.check_file_exists_in_data(data, file_name):
+                files_to_remove.append(file)
                 print(f"⚠️ 文件 {file} 已存在")
+        
+        # Remove existing files from detected_files
+        for file in files_to_remove:
+            detected_files.remove(file)
         
         if not detected_files:
             print("⚠️ 没有新文件需要上传")
@@ -506,14 +517,9 @@ class ProcessUserInputAgent:
         try:
             with open(data_json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Ensure the structure exists
-                if "表格" not in data:
-                    data["表格"] = {}
-                if "文档" not in data:
-                    data["文档"] = {}
         except FileNotFoundError:
-            print("📝 data.json不存在，创建新的数据结构")
-            data = {"表格": {}, "文档": {}}
+            print("📝 data.json不存在，创建空的数据结构")
+            data = {}
         except json.JSONDecodeError as e:
             print(f"⚠️ data.json格式错误: {e}")
             print("📝 备份原文件并创建新的数据结构")
@@ -522,7 +528,10 @@ class ProcessUserInputAgent:
             if data_json_path.exists():
                 data_json_path.rename(backup_path)
                 print(f"📦 原文件已备份到: {backup_path}")
-            data = {"表格": {}, "文档": {}}
+            data = {}
+        
+        # Get available locations from existing data
+        available_locations = self.get_available_locations(data)
         
         table_files = state["supplement_files_path"]["表格"]
         document_files = state["supplement_files_path"]["文档"]
@@ -542,6 +551,14 @@ class ProcessUserInputAgent:
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(table_file)
+                
+                # Determine location for this file
+                location = self.determine_location_from_content(
+                    file_content, 
+                    file_name, 
+                    state.get("user_input", ""),
+                    available_locations
+                )
                 
                 # Define the JSON template separately to avoid f-string nesting issues
                 json_template = '''{{
@@ -592,9 +609,10 @@ class ProcessUserInputAgent:
                     # Create fallback response  
                     analysis_response = f"表格文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
                 
-                # Create result data
+                # Create result data with location information
                 result_data = {
                     "file_key": source_path.name,
+                    "location": location,
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(table_file),
@@ -604,13 +622,15 @@ class ProcessUserInputAgent:
                     "analysis_response": analysis_response
                 }
                 
-                print(f"✅ 表格文件已分析: {source_path.name}")
+                print(f"✅ 表格文件已分析: {source_path.name} (位置: {location})")
                 return table_file, "table", result_data
                 
             except Exception as e:
                 print(f"❌ 处理表格文件出错 {table_file}: {e}")
+                default_location = available_locations[0] if available_locations else "默认位置"
                 return table_file, "table", {
                     "file_key": Path(table_file).name,
+                    "location": default_location,  # Default location on error
                     "new_entry": {
                         "summary": f"表格文件处理失败: {str(e)}",
                         "file_path": str(table_file),
@@ -629,6 +649,14 @@ class ProcessUserInputAgent:
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(document_file)
+                
+                # Determine location for this file
+                location = self.determine_location_from_content(
+                    file_content, 
+                    file_name, 
+                    state.get("user_input", ""),
+                    available_locations
+                )
                 
                 system_prompt = """你是一位专业的文档分析专家，具备法律与政策解读能力。你的任务是阅读用户提供的 HTML 格式文件，并从中提取出最重要的 1-2 条关键信息进行总结，无需提取全部内容。
 
@@ -665,9 +693,10 @@ class ProcessUserInputAgent:
                     # Create fallback response
                     analysis_response = f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
 
-                # Create result data
+                # Create result data with location information
                 result_data = {
                     "file_key": source_path.name,
+                    "location": location,
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(document_file),
@@ -677,13 +706,15 @@ class ProcessUserInputAgent:
                     "analysis_response": analysis_response
                 }
                 
-                print(f"✅ 文档文件已分析: {source_path.name}")
+                print(f"✅ 文档文件已分析: {source_path.name} (位置: {location})")
                 return document_file, "document", result_data
                 
             except Exception as e:
                 print(f"❌ 处理文档文件出错 {document_file}: {e}")
+                default_location = available_locations[0] if available_locations else "默认位置"
                 return document_file, "document", {
                     "file_key": Path(document_file).name,
+                    "location": default_location,  # Default location on error
                     "new_entry": {
                         "summary": f"文档文件处理失败: {str(e)}",
                         "file_path": str(document_file),
@@ -725,32 +756,36 @@ class ProcessUserInputAgent:
                     # Add to new_messages
                     new_messages.append(AIMessage(content=result_data["analysis_response"]))
                     
-                    # Update data.json structure
+                    # Update data.json structure with location-based storage
                     file_key = result_data["file_key"]
+                    location = result_data["location"]
                     new_entry = result_data["new_entry"]
                     
+                    # Ensure location structure exists in data
+                    data = self.ensure_location_structure(data, location)
+                    
                     if processed_file_type == "table":
-                        if file_key in data["表格"]:
-                            print(f"⚠️ 表格文件 {file_key} 已存在，将更新其内容")
+                        if file_key in data[location]["表格"]:
+                            print(f"⚠️ 表格文件 {file_key} 已存在于 {location}，将更新其内容")
                             # Preserve any additional fields that might exist
-                            existing_entry = data["表格"][file_key]
+                            existing_entry = data[location]["表格"][file_key]
                             for key, value in existing_entry.items():
                                 if key not in new_entry:
                                     new_entry[key] = value
                         else:
-                            print(f"📝 添加新的表格文件: {file_key}")
-                        data["表格"][file_key] = new_entry
+                            print(f"📝 添加新的表格文件: {file_key} 到 {location}")
+                        data[location]["表格"][file_key] = new_entry
                     else:  # document
-                        if file_key in data["文档"]:
-                            print(f"⚠️ 文档文件 {file_key} 已存在，将更新其内容")
+                        if file_key in data[location]["文档"]:
+                            print(f"⚠️ 文档文件 {file_key} 已存在于 {location}，将更新其内容")
                             # Preserve any additional fields that might exist
-                            existing_entry = data["文档"][file_key]
+                            existing_entry = data[location]["文档"][file_key]
                             for key, value in existing_entry.items():
                                 if key not in new_entry:
                                     new_entry[key] = value
                         else:
-                            print(f"📝 添加新的文档文件: {file_key}")
-                        data["文档"][file_key] = new_entry
+                            print(f"📝 添加新的文档文件: {file_key} 到 {location}")
+                        data[location]["文档"][file_key] = new_entry
                     
                 except Exception as e:
                     print(f"❌ 并行处理文件任务失败 {file_path}: {e}")
@@ -769,13 +804,26 @@ class ProcessUserInputAgent:
             
             # Atomic rename to replace the original file
             temp_path.replace(data_json_path)
-            print(f"✅ 已更新 data.json，表格文件 {len(data['表格'])} 个，文档文件 {len(data['文档'])} 个")
+            
+            # Count total files across all locations
+            total_table_files = sum(len(data[location]["表格"]) for location in data.keys() if isinstance(data[location], dict))
+            total_document_files = sum(len(data[location]["文档"]) for location in data.keys() if isinstance(data[location], dict))
+            
+            print(f"✅ 已更新 data.json，表格文件 {total_table_files} 个，文档文件 {total_document_files} 个")
             
             # Log the files that were processed in this batch
             if table_files:
                 print(f"📊 本批次处理的表格文件: {[Path(f).name for f in table_files]}")
             if document_files:
                 print(f"📄 本批次处理的文档文件: {[Path(f).name for f in document_files]}")
+            
+            # Log current distribution by location
+            print("📍 当前数据分布:")
+            for location in data.keys():
+                if isinstance(data[location], dict):
+                    table_count = len(data[location]["表格"])
+                    doc_count = len(data[location]["文档"])
+                    print(f"  {location}: 表格 {table_count} 个, 文档 {doc_count} 个")
                 
         except Exception as e:
             print(f"❌ 保存 data.json 时出错: {e}")

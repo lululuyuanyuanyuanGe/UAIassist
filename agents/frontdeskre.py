@@ -257,15 +257,15 @@ class FrontdeskAgent:
             
 
 
-    # def _complex_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
-    #     """This node will be use to analyze the complex table template, we will skip for now"""
-    #     print("\n🔧 开始执行: _complex_template_analysis")
-    #     print("=" * 50)
-    #     print("⚠️ 复杂模板分析功能暂未实现")
-    #     print("✅ _complex_template_analysis 执行完成")
-    #     print("=" * 50)
+    def _complex_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
+        """This node will be use to analyze the complex table template, we will skip for now"""
+        print("\n🔧 开始执行: _complex_template_analysis")
+        print("=" * 50)
+        print("⚠️ 复杂模板分析功能暂未实现")
+        print("✅ _complex_template_analysis 执行完成")
+        print("=" * 50)
         
-    #     return state
+        return state
 
     def _chat_with_user_to_determine_template(self, state: FrontdeskState) -> FrontdeskState:
         """This node will chat with the user to determine the template, when the template is not provided"""
@@ -482,7 +482,7 @@ class FrontdeskAgent:
         
         filloutTableAgent = FilloutTableAgent()
         filloutTableAgent_final_state = filloutTableAgent.run_fillout_table_agent(headers_mapping=state["headers_mapping"]
-                                        
+
                                                                                   
                                                                                   )
         print(f"🔍 填充表格响应: {filloutTableAgent_final_state}")

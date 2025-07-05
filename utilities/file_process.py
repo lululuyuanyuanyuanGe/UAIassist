@@ -11,6 +11,10 @@ from typing import Union, List, Dict
 import pandas as pd
 from datetime import datetime
 
+from utilities.modelRelated import invoke_model
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 def detect_and_process_file_paths(user_input: str) -> list:
     """检测用户输入中的文件路径并验证文件是否存在，返回结果为用户上传的文件路径组成的数列"""
     file_paths = []
@@ -894,3 +898,128 @@ def save_csv_to_output(csv_data_list: list[str], filename_prefix: str = "generat
     
     print(f"💾 CSV数据已保存到: {filepath}")
     return str(filepath)
+
+
+def get_available_locations(self, data: dict) -> list[str]:
+        """
+        从data.json中获取可用的村/镇位置列表
+        
+        Args:
+            data: data.json的数据结构
+            
+        Returns:
+            list[str]: 可用的位置列表
+        """
+        locations = []
+        for key in data.keys():
+            if isinstance(data[key], dict) and "表格" in data[key] and "文档" in data[key]:
+                locations.append(key)
+        return locations
+
+def determine_location_from_content(self, file_content: str, file_name: str, user_input: str, available_locations: list[str]) -> str:
+    """
+    根据文件内容、文件名和用户输入确定文件所属的村/镇
+    
+    Args:
+        file_content: 文件内容
+        file_name: 文件名
+        user_input: 用户输入
+        available_locations: 可用的位置列表（从data.json读取）
+        
+    Returns:
+        location: 确定的位置，如果无法确定则返回第一个可用位置
+    """
+    if not available_locations:
+        print("⚠️ 没有可用的位置，创建默认位置")
+        return "默认位置"
+    
+    # 首先检查文件名中是否包含位置信息
+    for location in available_locations:
+        if location in file_name:
+            print(f"📍 从文件名确定位置: {location}")
+            return location
+    
+    # 检查文件内容中是否包含位置信息
+    content_to_check = file_content[:1000]  # 只检查前1000个字符
+    for location in available_locations:
+        if location in content_to_check:
+            print(f"📍 从文件内容确定位置: {location}")
+            return location
+    
+    # 检查用户输入中是否包含位置信息
+    for location in available_locations:
+        if location in user_input:
+            print(f"📍 从用户输入确定位置: {location}")
+            return location
+    
+    # 如果无法确定，使用LLM进行智能分析
+    try:
+        analysis_prompt = f"""
+        请分析以下信息，判断文件属于哪个村/镇：
+        
+        可选位置：{', '.join(available_locations)}
+        
+        文件名：{file_name}
+        用户输入：{user_input}
+        文件内容片段：{content_to_check}
+        
+        请只回复确定的位置名称，如果无法确定，请回复"{available_locations[0]}"。
+        """
+        
+        analysis_result = invoke_model(model_name="Qwen/Qwen3-32B", 
+                                        messages=[SystemMessage(content=analysis_prompt)])
+        
+        for location in available_locations:
+            if location in analysis_result:
+                print(f"📍 通过LLM分析确定位置: {location}")
+                return location
+                
+    except Exception as e:
+        print(f"❌ LLM位置分析失败: {e}")
+    
+    # 默认返回第一个可用位置
+    default_location = available_locations[0]
+    print(f"📍 使用默认位置: {default_location}")
+    return default_location
+
+def ensure_location_structure(self, data: dict, location: str) -> dict:
+    """
+    确保指定位置的数据结构存在
+    
+    Args:
+        data: 当前的数据结构
+        location: 需要确保存在的位置
+        
+    Returns:
+        dict: 更新后的数据结构
+    """
+    if location not in data:
+        data[location] = {"表格": {}, "文档": {}}
+        print(f"📝 创建新位置结构: {location}")
+    elif not isinstance(data[location], dict):
+        data[location] = {"表格": {}, "文档": {}}
+        print(f"📝 修复位置结构: {location}")
+    else:
+        if "表格" not in data[location]:
+            data[location]["表格"] = {}
+        if "文档" not in data[location]:
+            data[location]["文档"] = {}
+    
+    return data
+
+def check_file_exists_in_data(self, data: dict, file_name: str) -> bool:
+    """
+    检查文件是否已存在于data.json中
+    
+    Args:
+        data: data.json的数据结构
+        file_name: 文件名
+        
+    Returns:
+        bool: 文件是否存在
+    """
+    for location in data.keys():
+        if isinstance(data[location], dict):
+            if file_name in data[location].get("表格", {}) or file_name in data[location].get("文档", {}):
+                return True
+    return False
