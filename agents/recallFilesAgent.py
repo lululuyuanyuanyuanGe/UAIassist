@@ -147,7 +147,7 @@ class RecallFilesAgent:
         response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", 
                                            messages = [SystemMessage(content = system_prompt)], 
                                            tools=self.tools,
-                                           temperature = 0.3)
+                                           temperature = 0.2)
 
         # Extract response content properly
         if isinstance(response, str):
