@@ -101,14 +101,24 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
     print(f"🚀 开始调用LLM(带工具): {model_name} (temperature={temperature})")
     start_time = time.time()
     
-    # For tool calls, use non-streaming to avoid invoke/stream conflict
+    
+    
+    if model_name.startswith("gpt-"):  # ChatGPT 系列模型
+        print("🔍 使用 OpenAI ChatGPT 模型")
+        base_url = "https://api.openai.com/v1"
+        api_key = os.getenv("OPENAI_API_KEY")
+    else:  # 其他模型，例如 deepseek, siliconflow...
+        print("🔍 使用 SiliconFlow 模型")
+        base_url = "https://api.siliconflow.cn/v1"
+        api_key = os.getenv("SILICONFLOW_API_KEY")
+
     llm = ChatOpenAI(
-        model = model_name,
-        api_key=os.getenv("SILICONFLOW_API_KEY"), 
-        base_url="https://api.siliconflow.cn/v1",
-        streaming=False,  # Must be False for invoke() to work properly
+        model=model_name,
+        api_key=api_key,
+        base_url=base_url,
+        streaming=False,
         temperature=temperature,
-        request_timeout=30  # 30 seconds network timeout
+        timeout=200
     )
     
     try:
