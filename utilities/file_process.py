@@ -90,7 +90,7 @@ def convert_2_markdown(file_path: str) -> str:
     
 
 
-def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
+def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: str = None) -> list[str]:
     """This function will retrieve the content of the file and store them in the conversation folder
     and with the subfolder be the session_id, then it should be stored inside another subfolder named
     user_uploaded_files, it shuld be able to handle various different files types, but the strategy are
@@ -102,10 +102,14 @@ def retrieve_file_content(file_paths: list[str], session_id: str) -> list[str]:
     import shutil
     from pathlib import Path
     
-    # Create the conversation folder structure
-    project_root = Path.cwd()  # Use current directory instead of parent
-    conversation_dir = project_root / "conversations" / session_id / "user_uploaded_files"
-    conversation_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir:
+        conversation_dir = Path(output_dir)
+        conversation_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        # Create the conversation folder structure
+        project_root = Path.cwd()  # Use current directory instead of parent
+        conversation_dir = project_root / "conversations" / session_id / "user_uploaded_files"
+        conversation_dir.mkdir(parents=True, exist_ok=True)
     
     processed_files = []
     
@@ -900,7 +904,7 @@ def save_csv_to_output(csv_data_list: list[str], filename_prefix: str = "generat
     return str(filepath)
 
 
-def get_available_locations(self, data: dict) -> list[str]:
+def get_available_locations(data: dict) -> list[str]:
         """
         从data.json中获取可用的村/镇位置列表
         
@@ -916,7 +920,7 @@ def get_available_locations(self, data: dict) -> list[str]:
                 locations.append(key)
         return locations
 
-def determine_location_from_content(self, file_content: str, file_name: str, user_input: str, available_locations: list[str]) -> str:
+def determine_location_from_content(file_content: str, file_name: str, user_input: str, available_locations: list[str]) -> str:
     """
     根据文件内容、文件名和用户输入确定文件所属的村/镇
     
@@ -982,7 +986,7 @@ def determine_location_from_content(self, file_content: str, file_name: str, use
     print(f"📍 使用默认位置: {default_location}")
     return default_location
 
-def ensure_location_structure(self, data: dict, location: str) -> dict:
+def ensure_location_structure(data: dict, location: str) -> dict:
     """
     确保指定位置的数据结构存在
     
@@ -1007,7 +1011,7 @@ def ensure_location_structure(self, data: dict, location: str) -> dict:
     
     return data
 
-def check_file_exists_in_data(self, data: dict, file_name: str) -> bool:
+def check_file_exists_in_data(data: dict, file_name: str) -> bool:
     """
     检查文件是否已存在于data.json中
     
@@ -1023,3 +1027,54 @@ def check_file_exists_in_data(self, data: dict, file_name: str) -> bool:
             if file_name in data[location].get("表格", {}) or file_name in data[location].get("文档", {}):
                 return True
     return False
+
+
+
+def move_template_file_safely(source_file: str, dest_dir_name: str = "template_files") -> str:
+        """
+        Safely move a template file to the destination directory, handling existing files.
+        
+        This function ensures robust file handling by:
+        - Creating the destination directory if it doesn't exist
+        - Generating unique filenames when target files already exist (adds _1, _2, etc.)
+        - Gracefully handling move errors and maintaining original path as fallback
+        - Providing detailed logging of the process
+        
+        Args:
+            source_file: Path to the source file to be moved
+            dest_dir_name: Name of the destination directory under conversations/files/user_uploaded_files/
+            
+        Returns:
+            str: Path to the final file location (new path if moved successfully, original path if failed)
+        """
+        try:
+            dest_dir = Path(f"conversations/files/user_uploaded_files/{dest_dir_name}")
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            
+            source_file_path = Path(source_file)
+            target_file_path = dest_dir / source_file_path.name
+            
+            # Handle existing file case by generating unique filename
+            if target_file_path.exists():
+                print(f"⚠️ 目标文件已存在: {target_file_path.name}")
+                
+                counter = 1
+                base_name = target_file_path.stem
+                extension = target_file_path.suffix
+                
+                while target_file_path.exists():
+                    new_name = f"{base_name}_{counter}{extension}"
+                    target_file_path = dest_dir / new_name
+                    counter += 1
+                
+                print(f"📝 生成新文件名: {target_file_path.name}")
+            
+            # Move the file
+            source_file_path.rename(target_file_path)
+            print(f"✅ 模板文件已移动到: {target_file_path}")
+            return str(target_file_path)
+            
+        except Exception as move_error:
+            print(f"❌ 移动模板文件失败: {move_error}")
+            print(f"⚠️ 保持原始文件路径: {source_file}")
+            return source_file

@@ -96,10 +96,10 @@ class FrontdeskAgent:
         graph.add_node("entry", self._entry_node)
         graph.add_node("collect_user_input", ToolNode(self.tools))
         graph.add_node("initial_collect_user_input", self._initial_collect_user_input)
-        graph.add_node("complex_template_handle", self._complex_template_analysis)
+        # graph.add_node("complex_template_handle", self._complex_template_analysis)  # Commented out as method is not implemented
         graph.add_node("simple_template_handle", self._simple_template_analysis)
         graph.add_node("chat_with_user_to_determine_template", self._chat_with_user_to_determine_template)
-        graph.add_node("recall_files_agnet", self._recall_files_agnet)
+        graph.add_node("recall_files_agent", self._recall_files_agent)
 
         graph.add_edge(START, "entry")
         graph.add_edge("entry", "initial_collect_user_input")
@@ -107,7 +107,7 @@ class FrontdeskAgent:
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
         graph.add_conditional_edges("simple_template_handle", self._route_after_simple_template_analysis)
-        graph.add_edge("recall_files_agnet", END)
+        graph.add_edge("recall_files_agent", END)
 
         
         # Compile the graph to make it executable with stream() method
@@ -203,7 +203,9 @@ class FrontdeskAgent:
             print("=" * 50)
                 
             if next_node == "complex_template":
-                return "complex_template_handle"
+                # Complex template handling not implemented yet, fallback to simple template
+                print("⚠️ 复杂模板处理暂未实现，转为简单模板处理")
+                return "simple_template_handle"
             elif next_node == "simple_template":
                 return "simple_template_handle"
             else:
@@ -241,7 +243,9 @@ class FrontdeskAgent:
             print("=" * 50)
                 
             if next_node == "complex_template":
-                return "complex_template_handle"
+                # Complex template handling not implemented yet, fallback to simple template
+                print("⚠️ 复杂模板处理暂未实现，转为简单模板处理")
+                return "simple_template_handle"
             elif next_node == "simple_template":
                 return "simple_template_handle"
             else:
@@ -357,7 +361,7 @@ class FrontdeskAgent:
             print("✅ 无工具调用，路由到 END")
             print("✅ _route_after_chat_with_user_to_determine_template 执行完成")
             print("=" * 50)
-            return "recall_files_agnet"
+            return "recall_files_agent"
 
     def _simple_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
         """处理用户上传的简单模板"""
@@ -455,11 +459,11 @@ class FrontdeskAgent:
             print("✅ 无工具调用，路由到 END")
             print("✅ _route_after_simple_template_analysis 执行完成")
             print("=" * 50)
-            return "recall_files_agnet"
+            return "recall_files_agent"
 
-    def _recall_files_agnet(self, state: FrontdeskState) -> FrontdeskState:
+    def _recall_files_agent(self, state: FrontdeskState) -> FrontdeskState:
         """This node will recall the files from the user"""
-        print("\n🔍 开始执行: _recall_files_agnet")
+        print("\n🔍 开始执行: _recall_files_agent")
         print("=" * 50)
 
         template_structure = state["template_structure"]
@@ -467,7 +471,7 @@ class FrontdeskAgent:
         recallFilesAgent = RecallFilesAgent()
         # return the final state of the recallFilesAgent
         recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(template_structure=template_structure)
-        print(f"🔍 召回文件响应: {recallFilesAgent_final_state}")
+        # print(f"🔍 召回文件响应: {recallFilesAgent_final_state}")
 
         headers_mapping = recallFilesAgent_final_state.get("headers_mapping")
         print(f"🔍 表头映射: {headers_mapping}")

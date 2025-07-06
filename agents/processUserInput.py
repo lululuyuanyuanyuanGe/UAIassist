@@ -12,7 +12,7 @@ from utilities.modelRelated import invoke_model
 from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, 
                                     extract_filename, determine_location_from_content, 
                                     ensure_location_structure, check_file_exists_in_data,
-                                    get_available_locations)
+                                    get_available_locations, move_template_file_safely)
 
 
 import uuid
@@ -62,11 +62,21 @@ class ProcessUserInputAgent:
 
         参数：
             question: 问题
-            contexnt: 可选补充内容，解释为甚恶魔你需要一下信息
+            context: 可选补充内容，解释为甚恶魔你需要一下信息
         """
-        prompt = f"{question}\n{context}"
-        user_response = interrupt({"prompt": prompt})
-
+        print("\n" + "="*60)
+        print("🤔 需要您的确认")
+        print("="*60)
+        print(f"📋 {question}")
+        if context:
+            print(f"💡 {context}")
+        print("="*60)
+        
+        user_response = input("👤 请输入您的选择: ").strip()
+        
+        print(f"✅ 您的选择: {user_response}")
+        print("="*60 + "\n")
+        
         return user_response
     
     tools = [request_user_clarification]
@@ -229,7 +239,7 @@ class ProcessUserInputAgent:
         files_to_remove = []
         for file in detected_files:
             file_name = Path(file).name
-            if self.check_file_exists_in_data(data, file_name):
+            if check_file_exists_in_data(data, file_name):
                 files_to_remove.append(file)
                 print(f"⚠️ 文件 {file} 已存在")
         
@@ -531,7 +541,7 @@ class ProcessUserInputAgent:
             data = {}
         
         # Get available locations from existing data
-        available_locations = self.get_available_locations(data)
+        available_locations = get_available_locations(data)
         
         table_files = state["supplement_files_path"]["表格"]
         document_files = state["supplement_files_path"]["文档"]
@@ -553,7 +563,7 @@ class ProcessUserInputAgent:
                 file_name = extract_filename(table_file)
                 
                 # Determine location for this file
-                location = self.determine_location_from_content(
+                location = determine_location_from_content(
                     file_content, 
                     file_name, 
                     state.get("user_input", ""),
@@ -650,13 +660,72 @@ class ProcessUserInputAgent:
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(document_file)
                 
-                # Determine location for this file
-                location = self.determine_location_from_content(
-                    file_content, 
-                    file_name, 
-                    state.get("user_input", ""),
-                    available_locations
-                )
+                # For document files, ask user to select location(s)
+                if len(available_locations) == 0:
+                    # If no locations exist, create a default one
+                    selected_locations = ["默认位置"]
+                    print(f"📍 没有可用位置，为文档文件创建默认位置: {selected_locations}")
+                elif len(available_locations) == 1:
+                    # If only one location exists, use it
+                    selected_locations = [available_locations[0]]
+                    print(f"📍 只有一个可用位置，文档文件使用: {selected_locations}")
+                else:
+                    # Multiple locations exist, ask user to choose
+                    try:
+                        locations_list = "\n".join([f"  {i+1}. {loc}" for i, loc in enumerate(available_locations)])
+                        question = f"""检测到文档文件: {source_path.name}
+
+📍 可选的存储位置：
+{locations_list}
+
+请选择要将此文档文件添加到哪个位置：
+  • 输入序号（如：1, 2, 3）选择单个位置
+  • 输入 "all" 添加到所有位置  
+  • 输入 "new [位置名]" 创建新位置（如：new 石龙村）"""
+                        
+                        user_choice = self.request_user_clarification.invoke(
+                            input = {"question": question,
+                                     "context" : "文档文件可以添加到多个位置，请选择合适的存储位置"
+                                    }
+                            )
+                
+                        print(f"👤 用户选择: {user_choice}")
+                        
+                        # Parse user choice
+                        choice = user_choice.strip().lower()
+                        selected_locations = []
+                        
+                        if choice == "all":
+                            selected_locations = available_locations.copy()
+                            print(f"📍 用户选择添加到所有位置: {selected_locations}")
+                        elif choice.startswith("new "):
+                            new_location = choice[4:].strip()
+                            if new_location:
+                                selected_locations = [new_location]
+                                print(f"📍 用户创建新位置: {new_location}")
+                            else:
+                                selected_locations = ["默认位置"]
+                                print(f"⚠️ 新位置名称无效，使用默认位置: {selected_locations[0]}")
+                        else:
+                            # Parse numbers
+                            try:
+                                indices = [int(x.strip()) - 1 for x in choice.split(',')]
+                                selected_locations = [available_locations[i] for i in indices if 0 <= i < len(available_locations)]
+                                if not selected_locations:
+                                    selected_locations = [available_locations[0]]
+                                print(f"📍 用户选择的位置: {selected_locations}")
+                            except (ValueError, IndexError):
+                                selected_locations = [available_locations[0]]
+                                print(f"⚠️ 输入格式错误，使用默认位置: {available_locations[0]}")
+                        
+                        # Handle multiple selected locations
+                        if not selected_locations:
+                            selected_locations = ["默认位置"]
+                        
+                    except Exception as e:
+                        print(f"❌ 用户选择过程出错: {e}")
+                        selected_locations = ["默认位置"]
+                        print(f"📍 使用默认位置: {selected_locations}")
                 
                 system_prompt = """你是一位专业的文档分析专家，具备法律与政策解读能力。你的任务是阅读用户提供的 HTML 格式文件，并从中提取出最重要的 1-2 条关键信息进行总结，无需提取全部内容。
 
@@ -693,10 +762,10 @@ class ProcessUserInputAgent:
                     # Create fallback response
                     analysis_response = f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
 
-                # Create result data with location information
+                # Create result data with multiple location information
                 result_data = {
                     "file_key": source_path.name,
-                    "location": location,
+                    "selected_locations": selected_locations,  # Multiple locations
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(document_file),
@@ -706,15 +775,15 @@ class ProcessUserInputAgent:
                     "analysis_response": analysis_response
                 }
                 
-                print(f"✅ 文档文件已分析: {source_path.name} (位置: {location})")
+                print(f"✅ 文档文件已分析: {source_path.name} (位置: {selected_locations})")
                 return document_file, "document", result_data
                 
             except Exception as e:
                 print(f"❌ 处理文档文件出错 {document_file}: {e}")
-                default_location = available_locations[0] if available_locations else "默认位置"
+                default_locations = [available_locations[0]] if available_locations else ["默认位置"]
                 return document_file, "document", {
                     "file_key": Path(document_file).name,
-                    "location": default_location,  # Default location on error
+                    "selected_locations": default_locations,  # Default locations on error
                     "new_entry": {
                         "summary": f"文档文件处理失败: {str(e)}",
                         "file_path": str(document_file),
@@ -734,7 +803,7 @@ class ProcessUserInputAgent:
             print("=" * 50)
             return {"process_user_input_messages": new_messages}
         
-        max_workers = min(total_files, 4)  # Limit to 4 concurrent requests for supplement processing
+        max_workers = min(total_files, 5)  # Limit to 4 concurrent requests for supplement processing
         print(f"🚀 开始并行处理补充文件，使用 {max_workers} 个工作线程")
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -758,13 +827,14 @@ class ProcessUserInputAgent:
                     
                     # Update data.json structure with location-based storage
                     file_key = result_data["file_key"]
-                    location = result_data["location"]
                     new_entry = result_data["new_entry"]
                     
-                    # Ensure location structure exists in data
-                    data = self.ensure_location_structure(data, location)
-                    
                     if processed_file_type == "table":
+                        # Table files have single location
+                        location = result_data["location"]
+                        # Ensure location structure exists in data
+                        data = ensure_location_structure(data, location)
+                        
                         if file_key in data[location]["表格"]:
                             print(f"⚠️ 表格文件 {file_key} 已存在于 {location}，将更新其内容")
                             # Preserve any additional fields that might exist
@@ -775,17 +845,25 @@ class ProcessUserInputAgent:
                         else:
                             print(f"📝 添加新的表格文件: {file_key} 到 {location}")
                         data[location]["表格"][file_key] = new_entry
-                    else:  # document
-                        if file_key in data[location]["文档"]:
-                            print(f"⚠️ 文档文件 {file_key} 已存在于 {location}，将更新其内容")
-                            # Preserve any additional fields that might exist
-                            existing_entry = data[location]["文档"][file_key]
-                            for key, value in existing_entry.items():
-                                if key not in new_entry:
-                                    new_entry[key] = value
-                        else:
-                            print(f"📝 添加新的文档文件: {file_key} 到 {location}")
-                        data[location]["文档"][file_key] = new_entry
+                    else:  # document - can have multiple locations
+                        selected_locations = result_data["selected_locations"]
+                        for location in selected_locations:
+                            # Ensure location structure exists in data
+                            data = ensure_location_structure(data, location)
+                            
+                            # Create a copy of new_entry for each location
+                            entry_copy = new_entry.copy()
+                            
+                            if file_key in data[location]["文档"]:
+                                print(f"⚠️ 文档文件 {file_key} 已存在于 {location}，将更新其内容")
+                                # Preserve any additional fields that might exist
+                                existing_entry = data[location]["文档"][file_key]
+                                for key, value in existing_entry.items():
+                                    if key not in entry_copy:
+                                        entry_copy[key] = value
+                            else:
+                                print(f"📝 添加新的文档文件: {file_key} 到 {location}")
+                            data[location]["文档"][file_key] = entry_copy
                     
                 except Exception as e:
                     print(f"❌ 并行处理文件任务失败 {file_path}: {e}")
@@ -891,13 +969,20 @@ class ProcessUserInputAgent:
         if len(template_files) > 1:
             print("⚠️ 检测到多个模板文件，需要用户选择")
             template_names = [Path(f).name for f in template_files]
-            question = f"检测到多个模板文件，请选择要使用的模板：\n" + \
-                      "\n".join([f"{i+1}. {name}" for i, name in enumerate(template_names)]) + \
-                      "\n请输入序号（如：1）："
+            template_list = "\n".join([f"  {i+1}. {name}" for i, name in enumerate(template_names)])
+            question = f"""检测到多个模板文件，请选择要使用的模板：
+
+📋 可用模板：
+{template_list}
+
+请输入序号（如：1）选择模板："""
             
             try:
                 print("🤝 正在请求用户确认模板选择...")
-                user_choice = self.request_user_clarification(question, "系统需要确定使用哪个模板文件进行后续处理")
+                user_choice = self.request_user_clarification.invoke(
+                    input = {"question": question,
+                             "context": "系统需要确定使用哪个模板文件进行后续处理"}
+                    )
                 
                 # Parse user choice
                 try:
@@ -968,13 +1053,16 @@ class ProcessUserInputAgent:
                 template_type = "[Simple]"
             else:
                 template_type = "[Simple]"  # Default fallback
-                
+            
+            # 将模板文件转存到conversations/files/user_uploaded_files/template_files
+            final_template_path = move_template_file_safely(template_file)
+
             print(f"📥 模板分析结果: {template_type}")
             print("✅ _process_template 执行完成")
             print("=" * 50)
 
             return {"template_complexity": template_type,
-                    "uploaded_template_files_path": [template_file]
+                    "uploaded_template_files_path": [final_template_path]
                     }
 
         except Exception as e:
@@ -982,12 +1070,16 @@ class ProcessUserInputAgent:
             # Default to Simple if analysis fails
             template_type = "[Simple]"
             print("⚠️ 模板分析失败，默认为简单模板")
+            
+            # Still try to move the template file even if LLM analysis fails
+            final_template_path = move_template_file_safely(template_file)
+            
             print("✅ _process_template 执行完成")
             print("=" * 50)
             
             return {
                 "template_complexity": template_type,
-                "uploaded_template_files_path": [template_file]
+                "uploaded_template_files_path": [final_template_path]
             }
         
 
