@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 from typing import Dict, TypedDict, Annotated
-from utilities.file_process import fetch_related_files_content, extract_file_from_recall
+from utilities.file_process import fetch_related_files_content, extract_file_from_recall, convert_html_to_excel
 from utilities.modelRelated import invoke_model, invoke_model_with_tools
 
 import json
@@ -63,10 +63,13 @@ class RecallFilesState(TypedDict):
     headers_mapping_: dict[any, any]
     file_content: str
 
+
 class RecallFilesAgent:
     def __init__(self):
         self.tools = [request_user_clarification]  # Reference the standalone function
         self.graph = self._build_graph()
+        self.location: str # 村子名字
+        self.files_under_location: str # 村子下的文件
 
     def _build_graph(self):
         graph = StateGraph(RecallFilesState)
@@ -116,11 +119,12 @@ class RecallFilesAgent:
         #     print("key: \n", key)
         #     if key in template_structure:
         #         file_content = value
+        #         self.location = key
         file_content = json.loads(file_content)
-
-        file_content = file_content["燕云村"]
-        file_content = extract_summary_for_each_file(file_content)
-        print(file_content)
+        self.location = "燕云村"
+        self.files_under_location = file_content["燕云村"]
+        file_content = extract_summary_for_each_file(self.files_under_location)
+        print(self.files_under_location)
         
 
         return {
@@ -130,7 +134,7 @@ class RecallFilesAgent:
             "headers_mapping": {},
             "template_structure": template_structure,
             "headers_mapping_": {},
-            "file_content": file_content
+            "file_content": self.files_under_location,
         }
     
 
@@ -174,7 +178,7 @@ class RecallFilesAgent:
    - 不要返回任何其他内容，不要返回任何其他内容，不要返回任何其他内容
 
 【重要说明】
-- 根据历史对话记录，判断是否需要调用工具，当得到用户确认后，再返回文件列表
+- 根据历史对话记录，判断是否需要调用工具，当得到用户确认后，不需要再调用工具
 - 不允许跳过用户确认直接返回文件列表，但也不要重复调用工具
 - 不允许自行与用户对话，必须使用 `request_user_clarification` 工具
 - 文件名不含路径或摘要内容，仅包含文件名
@@ -272,16 +276,10 @@ class RecallFilesAgent:
 ### 输入信息如下：
 
 - **模板表格结构**：
-  ```json
   {state["template_structure"]}
-  ```
 
 - **相关数据文件内容**：
-  ```text
   {files_content_str}
-  ```
-
----
 
 ### 任务要求：
 
@@ -301,12 +299,13 @@ class RecallFilesAgent:
    返回结果应保持与原模板表格结构一致，但每个表头需扩展为以下形式之一：
    - `来源文件名: 数据字段名`（表示该字段来自数据文件）
    - `推理规则: ...`（表示该字段通过逻辑推导得出）
+   - 不要将返回结果包裹在```json中，直接返回json格式即可
 
 
 ---
 请返回最终的模板表格结构，确保准确反映字段来源与生成逻辑，格式与上面一致，便于后续程序解析和处理。
         """
-        
+        print("提示词：\n", system_prompt)
         print("📤 正在调用LLM进行表头映射分析...")
         response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
         print("📥 LLM映射分析完成")
@@ -332,6 +331,65 @@ class RecallFilesAgent:
         try:
             # Use invoke instead of stream
             final_state = self.graph.invoke(initial_state, config=config)
+
+            # 将数据的html转换成excel
+            print(self.files_under_location)
+            table_files = self.files_under_location["表格"]
+            converted_excel_files = []
+            
+            for file in final_state["related_files"]:
+                if file in table_files:
+                    # Convert HTML file to Excel using LibreOffice
+                    try:
+                        # Get the file info from the table files mapping
+                        file_info = table_files[file]
+                        
+                        # Extract the actual file path from the dictionary
+                        if isinstance(file_info, dict) and "file_path" in file_info:
+                            source_file_path = file_info["file_path"]
+                        else:
+                            source_file_path = file_info  # fallback if it's already a string
+                        
+                        print(f"🔍 Source file path: {source_file_path}")
+                        
+                        # Check if this is actually an HTML file or if we need to find the corresponding HTML file
+                        if source_file_path.endswith('.txt'):
+                            # Look for corresponding HTML file in the output directory
+                            file_stem = Path(source_file_path).stem
+                            potential_html_files = [
+                                f"agents/output/{file_stem}.html",
+                                f"agents/output/{file_stem}_结果.html",
+                                f"agents/output/{file_stem}_filled.html"
+                            ]
+                            
+                            html_file_path = None
+                            for potential_file in potential_html_files:
+                                if Path(potential_file).exists():
+                                    html_file_path = potential_file
+                                    break
+                            
+                            if html_file_path is None:
+                                print(f"⚠️ No corresponding HTML file found for {file}")
+                                continue
+                        else:
+                            html_file_path = source_file_path
+                        
+                        print(f"🔄 Converting HTML file: {html_file_path}")
+                        
+                        # Verify the HTML file exists before conversion
+                        if not Path(html_file_path).exists():
+                            print(f"❌ HTML file does not exist: {html_file_path}")
+                            continue
+                        
+                        # Convert HTML to Excel and save to output folder
+                        excel_file_path = convert_html_to_excel(html_file_path, "agents/output")
+                        converted_excel_files.append(excel_file_path)
+                        
+                        print(f"✅ Successfully converted {file} to Excel: {excel_file_path}")
+                    except Exception as e:
+                        print(f"❌ Failed to convert {file} to Excel: {e}")
+                        continue
+                    
             
             print("\n🎉 RecallFilesAgent 执行完成！")
             print("=" * 60)
@@ -339,6 +397,11 @@ class RecallFilesAgent:
             print(f"- 召回文件数量: {len(final_state.get('related_files', []))}")
             print(f"- 相关文件: {final_state.get('related_files', [])}")
             print(f"- 表头映射已生成: {'是' if final_state.get('headers_mapping') else '否'}")
+            print(f"- 转换的Excel文件数量: {len(converted_excel_files)}")
+            print(f"- 转换的Excel文件: {converted_excel_files}")
+            
+            # Add converted Excel files to the final state
+            final_state["converted_excel_files"] = converted_excel_files
             
             return final_state
             

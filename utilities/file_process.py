@@ -1074,3 +1074,127 @@ def move_template_file_safely(source_file: str, dest_dir_name: str = "template_f
             print(f"❌ 移动模板文件失败: {move_error}")
             print(f"⚠️ 保持原始文件路径: {source_file}")
             return source_file
+
+
+def convert_html_to_excel(html_file_path: str, output_dir: str = "agents/output") -> str:
+    """
+    Convert HTML file to Excel format using LibreOffice and save to output directory.
+    
+    This function uses LibreOffice's headless mode to convert HTML files to Excel format.
+    The converted file will be saved in the specified output directory with the same
+    base name but with .xlsx extension.
+    
+    Args:
+        html_file_path: Path to the HTML file to convert
+        output_dir: Directory where the Excel file should be saved (default: "agents/output")
+        
+    Returns:
+        str: Path to the converted Excel file
+        
+    Raises:
+        FileNotFoundError: If the source HTML file doesn't exist
+        subprocess.CalledProcessError: If LibreOffice conversion fails
+        Exception: For other conversion errors
+    """
+    try:
+        # Validate input file
+        html_path = Path(html_file_path)
+        if not html_path.exists():
+            raise FileNotFoundError(f"HTML file not found: {html_file_path}")
+        
+        print(f"🔄 Converting HTML to Excel: {html_path.name}")
+        
+        # Create output directory
+        output_directory = Path(output_dir)
+        output_directory.mkdir(parents=True, exist_ok=True)
+        
+        # LibreOffice executable path
+        soffice = r"D:\LibreOffice\program\soffice.exe"
+        
+        # Convert HTML to Excel using LibreOffice
+        # --headless: run without GUI
+        # --convert-to xlsx: convert to Excel format
+        # --outdir: specify output directory
+        conversion_command = [
+            soffice, 
+            "--headless", 
+            "--convert-to", "xlsx", 
+            str(html_path),
+            "--outdir", str(output_directory)
+        ]
+        
+        print(f"📋 Running LibreOffice conversion: {' '.join(conversion_command)}")
+        
+        # Execute the conversion
+        result = subprocess.run(
+            conversion_command,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        
+        # Construct expected output file path
+        excel_file_path = output_directory / f"{html_path.stem}.xlsx"
+        
+        # Verify the conversion was successful
+        if excel_file_path.exists():
+            print(f"✅ Successfully converted HTML to Excel: {excel_file_path}")
+            return str(excel_file_path)
+        else:
+            # Sometimes LibreOffice creates files with slightly different names
+            # Look for any .xlsx files with similar names
+            potential_files = list(output_directory.glob(f"{html_path.stem}*.xlsx"))
+            if potential_files:
+                actual_file = potential_files[0]
+                print(f"✅ Conversion successful, found file: {actual_file}")
+                return str(actual_file)
+            else:
+                raise Exception(f"LibreOffice conversion completed but Excel file not found at: {excel_file_path}")
+                
+    except subprocess.CalledProcessError as e:
+        print(f"❌ LibreOffice conversion failed: {e}")
+        print(f"   Command: {' '.join(conversion_command)}")
+        print(f"   Return code: {e.returncode}")
+        print(f"   stdout: {e.stdout}")
+        print(f"   stderr: {e.stderr}")
+        raise Exception(f"LibreOffice conversion failed with return code {e.returncode}: {e.stderr}")
+        
+    except FileNotFoundError as e:
+        print(f"❌ File not found error: {e}")
+        raise
+        
+    except Exception as e:
+        print(f"❌ Unexpected error during HTML to Excel conversion: {e}")
+        raise
+
+
+def batch_convert_html_to_excel(html_files: list[str], output_dir: str = "agents/output") -> list[str]:
+    """
+    Convert multiple HTML files to Excel format in batch.
+    
+    This function processes multiple HTML files and converts them to Excel format
+    using the convert_html_to_excel function. It handles errors gracefully and
+    provides detailed logging for each conversion.
+    
+    Args:
+        html_files: List of HTML file paths to convert
+        output_dir: Directory where Excel files should be saved
+        
+    Returns:
+        list[str]: List of paths to successfully converted Excel files
+    """
+    converted_files = []
+    
+    print(f"🔄 Starting batch conversion of {len(html_files)} HTML files")
+    
+    for html_file in html_files:
+        try:
+            excel_file = convert_html_to_excel(html_file, output_dir)
+            converted_files.append(excel_file)
+            print(f"✅ Batch conversion success: {Path(html_file).name} -> {Path(excel_file).name}")
+        except Exception as e:
+            print(f"❌ Batch conversion failed for {html_file}: {e}")
+            continue
+    
+    print(f"🎉 Batch conversion completed: {len(converted_files)} out of {len(html_files)} files converted successfully")
+    return converted_files
