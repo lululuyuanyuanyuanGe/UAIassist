@@ -84,14 +84,21 @@ class RecallFilesAgent:
         graph.add_edge("determine_the_mapping_of_headers", END)
         return graph.compile(checkpointer = MemorySaver())
 
-    def _create_initial_state(self) -> RecallFilesState:
+    def _create_initial_state(self, template_structure: str) -> RecallFilesState:
+        # 只读取相关村的文件
         with open(r'agents\data.json', 'r', encoding = 'utf-8') as f:
             file_content = f.read()
+        for key, value in json.loads(file_content).items():
+            if key in template_structure:
+                file_content = value
+        print("模板结构: \n" + template_structure)
+        print("数据库文件内容: \n" + file_content)
+
         return {
             "messages": [],
             "related_files": [],
             "headers_mapping": {},
-            "template_structure": "",
+            "template_structure": template_structure,
             "headers_mapping_": {},
             "file_content": file_content
         }
@@ -144,7 +151,7 @@ class RecallFilesAgent:
 {previous_AI_summary}
 """
 
-        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", 
+        response = invoke_model_with_tools(model_name = "deepseek-ai/DeepSeek-V3", 
                                            messages = [SystemMessage(content = system_prompt)], 
                                            tools=self.tools,
                                            temperature = 0.3)
@@ -279,19 +286,7 @@ class RecallFilesAgent:
         print("=" * 60)
 
         config = {"configurable": {"thread_id": session_id}}
-        initial_state = self._create_initial_state()
-        
-        # Set the template structure if provided
-        if template_structure:
-            initial_state["template_structure"] = template_structure
-            print(f"📋 已设置模板结构: {len(template_structure)} 字符")
-        elif hasattr(self, 'template_structure'):
-            initial_state["template_structure"] = self.template_structure
-            print(f"📋 使用预设模板结构: {len(self.template_structure)} 字符")
-        else:
-            print("⚠️ Warning: No template structure provided")
-            
-        print("🔄 正在执行图形工作流...")
+        initial_state = self._create_initial_state(template_structure)
         
         try:
             # Use invoke instead of stream

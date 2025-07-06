@@ -1044,7 +1044,7 @@ class ProcessUserInputAgent:
 
             print("📤 正在调用LLM进行模板复杂度分析...")
             
-            analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
+            analysis_response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
             
             # Extract the classification from the response
             if "[Complex]" in analysis_response:
@@ -1294,7 +1294,7 @@ class ProcessUserInputAgent:
         try:
             user_input = "【历史对话】\n" + process_user_input_messages_content
             print("📤 正在调用LLM生成总结...")
-            response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
+            response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
             print(f"📥 LLM总结响应长度: {len(response)} 字符")
             
             # Clean the response to handle markdown code blocks and malformed JSON
