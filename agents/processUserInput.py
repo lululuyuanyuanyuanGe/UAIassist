@@ -601,6 +601,9 @@ class ProcessUserInputAgent:
    - 内容应包括表格用途、主要信息类别、适用范围等；
    - 语言简洁，不超过 150 字；
 
+输出要求:
+返回内容不要包裹在```json中，直接返回json格式即可
+
 输出格式如下：
 {json_template}
 
@@ -737,7 +740,7 @@ class ProcessUserInputAgent:
 
 3. 对提取的信息进行结构化总结，语言正式、逻辑清晰、简洁明了；
 
-4. 输出格式为严格的 JSON：
+4. 输出格式为严格的 JSON，但不要包裹在```json中，直接返回json格式即可：
    {{
      "{file_name}": "内容总结"
    }}

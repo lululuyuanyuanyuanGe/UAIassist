@@ -326,7 +326,7 @@ class FrontdeskAgent:
 """
 
         print("📤 正在调用LLM进行表格结构确定...")
-        response = invoke_model_with_tools(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
+        response = invoke_model_with_tools(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
         
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:

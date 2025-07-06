@@ -55,6 +55,7 @@ def request_user_clarification(question: str) -> str:
 
 class RecallFilesState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    chat_history: list[str]
     related_files_str: str
     related_files: list[str]
     headers_mapping: dict[str, str]
@@ -91,7 +92,7 @@ class RecallFilesAgent:
                 tables = file_content["表格"]
                 for table_name in tables:
                     if isinstance(tables[table_name], dict) and "summary" in tables[table_name]:
-                        summary += f"  {table_name}: {tables[table_name]['summary']}\n"
+                        summary += f"  {tables[table_name]['summary']}\n"
                     else:
                         summary += f"  {table_name}: [无摘要信息]\n"
             
@@ -101,7 +102,7 @@ class RecallFilesAgent:
                 documents = file_content["文档"]
                 for doc_name in documents:
                     if isinstance(documents[doc_name], dict) and "summary" in documents[doc_name]:
-                        summary += f"  {doc_name}: {documents[doc_name]['summary']}\n"
+                        summary += f"  {documents[doc_name]['summary']}\n"
                     else:
                         summary += f"  {doc_name}: [无摘要信息]\n"
             
@@ -124,6 +125,7 @@ class RecallFilesAgent:
 
         return {
             "messages": [],
+            "chat_history": [],
             "related_files": [],
             "headers_mapping": {},
             "template_structure": template_structure,
@@ -136,13 +138,14 @@ class RecallFilesAgent:
         """根据要生成的表格模板，从向量库中召回相关文件"""
         print("\n🔍 开始执行: _recall_relative_files")
         print("=" * 50)
-        
-        previous_AI_summary = ""
-        for message in state["messages"]:
-            previous_AI_summary += message.content
+        if state["messages"]:   
+            previous_AI_message = state["messages"][-1]
+            previous_AI_message_content = previous_AI_message.content
+            state["chat_history"].append(previous_AI_message_content)
+        chat_history = "\n".join(state["chat_history"])
 
         print("=========历史对话记录==========")
-        print(previous_AI_summary)
+        print(chat_history)
         print("=========历史对话记录==========")
         
         system_prompt = f"""
@@ -163,15 +166,16 @@ class RecallFilesAgent:
 2. **确认阶段**：
    - **必须调用工具 `request_user_clarification` 与用户确认筛选结果**
    - 在工具调用中，向用户展示你筛选的文件列表，并询问是否合适
-   - 等待用户反馈后，根据用户意见调整文件选择
+   - 等待用户反馈后，根据用户意见调整文件选择，如果用户给出了肯定的回答，则直接返回文件列表，不要重复调用工具
 
 3. **输出阶段**：
    - 只有在用户确认后，才能输出最终的文件列表
-   - 输出格式必须是严格的 JSON 数组，例如：["基础信息表.xlsx", "补贴政策说明.docx"]
+   - 输出格式必须是严格的 JSON 数组，例如：["基础信息表.xlsx", "补贴政策说明.docx"]，不要包裹在```json中，直接返回json格式即可
+   - 不要返回任何其他内容，不要返回任何其他内容，不要返回任何其他内容
 
 【重要说明】
 - 根据历史对话记录，判断是否需要调用工具，当得到用户确认后，再返回文件列表
-- 不允许跳过用户确认直接返回文件列表
+- 不允许跳过用户确认直接返回文件列表，但也不要重复调用工具
 - 不允许自行与用户对话，必须使用 `request_user_clarification` 工具
 - 文件名不含路径或摘要内容，仅包含文件名
 
@@ -182,7 +186,7 @@ class RecallFilesAgent:
 {state["file_content"]}
 
 历史对话记录：
-{previous_AI_summary}
+{chat_history}
 
 请开始执行第一步：分析模板结构并初步筛选文件，然后调用工具与用户确认。
 """
@@ -199,16 +203,14 @@ class RecallFilesAgent:
             AI_message = AIMessage(content=response)
             print(f"📥 LLM响应(字符串): {response_content}")
         else:
+            question = response.tool_calls[0]['args']['question']
+            print("问题：")
+            print(question)
+            state["chat_history"].append(question)
             response_content = response.content if hasattr(response, 'content') else str(response)
             AI_message = response
             print(f"📥 LLM响应(对象): {response_content}")
         
-        # Always print the response content for debugging
-        print("💬 智能体回复内容:")
-        print(type(response))
-        print(response)
-        print("问题：")
-        print(response.tool_calls[0]['args']['question'])
         
         # Check for tool calls
         has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
