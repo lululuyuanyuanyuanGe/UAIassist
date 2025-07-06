@@ -166,7 +166,7 @@ class RecallFilesAgent:
 2. **确认阶段**：
    - **必须调用工具 `request_user_clarification` 与用户确认筛选结果**
    - 在工具调用中，向用户展示你筛选的文件列表，并询问是否合适
-   - 等待用户反馈后，根据用户意见调整文件选择，如果用户给出了肯定的回答，则直接返回文件列表，不要重复调用工具
+   - 等待用户反馈后，根据用户意见调整文件选择，如果用户给出了正面的回答，则直接返回文件列表，不要重复调用工具
 
 3. **输出阶段**：
    - 只有在用户确认后，才能输出最终的文件列表
@@ -194,22 +194,21 @@ class RecallFilesAgent:
         response = invoke_model_with_tools(model_name = "gpt-4o", 
                                            messages = [SystemMessage(content = system_prompt)], 
                                            tools=self.tools,
-                                           temperature = 1.3)
-
+                                           temperature = 0.5)
+        response_content = ""
         print("Garbage returned from our LLM: \n", response)
-        # Extract response content properly
-        if isinstance(response, str):
-            response_content = response
-            AI_message = AIMessage(content=response)
-            print(f"📥 LLM响应(字符串): {response_content}")
-        else:
+        # invoke_maodel_with_tools永远不会返回str
+        if hasattr(response, 'tool_calls') and response.tool_calls:
             question = response.tool_calls[0]['args']['question']
             print("问题：")
             print(question)
             state["chat_history"].append(question)
-            response_content = response.content if hasattr(response, 'content') else str(response)
             AI_message = response
-            print(f"📥 LLM响应(对象): {response_content}")
+
+        else:
+            response_content = response.content
+            AI_message = AIMessage(content=response_content)
+        
         
         
         # Check for tool calls
