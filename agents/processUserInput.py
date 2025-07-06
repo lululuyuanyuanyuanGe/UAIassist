@@ -8,8 +8,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, extract_filename
 from utilities.modelRelated import invoke_model
+from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, 
+                                    extract_filename, determine_location_from_content, 
+                                    ensure_location_structure, check_file_exists_in_data,
+                                    get_available_locations, move_template_file_safely)
+
 
 import uuid
 import json
@@ -58,14 +62,26 @@ class ProcessUserInputAgent:
 
         参数：
             question: 问题
-            contexnt: 可选补充内容，解释为甚恶魔你需要一下信息
+            context: 可选补充内容，解释为甚恶魔你需要一下信息
         """
-        prompt = f"{question}\n{context}"
-        user_response = interrupt({"prompt": prompt})
-
+        print("\n" + "="*60)
+        print("🤔 需要您的确认")
+        print("="*60)
+        print(f"📋 {question}")
+        if context:
+            print(f"💡 {context}")
+        print("="*60)
+        
+        user_response = input("👤 请输入您的选择: ").strip()
+        
+        print(f"✅ 您的选择: {user_response}")
+        print("="*60 + "\n")
+        
         return user_response
     
     tools = [request_user_clarification]
+
+
 
     def __init__(self):
         self.memory = MemorySaver()
@@ -217,14 +233,19 @@ class ProcessUserInputAgent:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"⚠️ data.json文件出错: {e}")
             # Initialize empty structure if file is missing or corrupted
-            data = {"表格": {}, "文档": {}}
+            data = {}
         
         print("🔍 正在检查文件是否已存在...")
+        files_to_remove = []
         for file in detected_files:
             file_name = Path(file).name
-            if file_name in data["表格"] or file_name in data["文档"]:
-                detected_files.remove(file)
+            if check_file_exists_in_data(data, file_name):
+                files_to_remove.append(file)
                 print(f"⚠️ 文件 {file} 已存在")
+        
+        # Remove existing files from detected_files
+        for file in files_to_remove:
+            detected_files.remove(file)
         
         if not detected_files:
             print("⚠️ 没有新文件需要上传")
@@ -506,14 +527,9 @@ class ProcessUserInputAgent:
         try:
             with open(data_json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Ensure the structure exists
-                if "表格" not in data:
-                    data["表格"] = {}
-                if "文档" not in data:
-                    data["文档"] = {}
         except FileNotFoundError:
-            print("📝 data.json不存在，创建新的数据结构")
-            data = {"表格": {}, "文档": {}}
+            print("📝 data.json不存在，创建空的数据结构")
+            data = {}
         except json.JSONDecodeError as e:
             print(f"⚠️ data.json格式错误: {e}")
             print("📝 备份原文件并创建新的数据结构")
@@ -522,7 +538,10 @@ class ProcessUserInputAgent:
             if data_json_path.exists():
                 data_json_path.rename(backup_path)
                 print(f"📦 原文件已备份到: {backup_path}")
-            data = {"表格": {}, "文档": {}}
+            data = {}
+        
+        # Get available locations from existing data
+        available_locations = get_available_locations(data)
         
         table_files = state["supplement_files_path"]["表格"]
         document_files = state["supplement_files_path"]["文档"]
@@ -542,6 +561,14 @@ class ProcessUserInputAgent:
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(table_file)
+                
+                # Determine location for this file
+                location = determine_location_from_content(
+                    file_content, 
+                    file_name, 
+                    state.get("user_input", ""),
+                    available_locations
+                )
                 
                 # Define the JSON template separately to avoid f-string nesting issues
                 json_template = '''{{
@@ -574,6 +601,9 @@ class ProcessUserInputAgent:
    - 内容应包括表格用途、主要信息类别、适用范围等；
    - 语言简洁，不超过 150 字；
 
+输出要求:
+返回内容不要包裹在```json中，直接返回json格式即可
+
 输出格式如下：
 {json_template}
 
@@ -592,9 +622,10 @@ class ProcessUserInputAgent:
                     # Create fallback response  
                     analysis_response = f"表格文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
                 
-                # Create result data
+                # Create result data with location information
                 result_data = {
                     "file_key": source_path.name,
+                    "location": location,
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(table_file),
@@ -604,13 +635,15 @@ class ProcessUserInputAgent:
                     "analysis_response": analysis_response
                 }
                 
-                print(f"✅ 表格文件已分析: {source_path.name}")
+                print(f"✅ 表格文件已分析: {source_path.name} (位置: {location})")
                 return table_file, "table", result_data
                 
             except Exception as e:
                 print(f"❌ 处理表格文件出错 {table_file}: {e}")
+                default_location = available_locations[0] if available_locations else "默认位置"
                 return table_file, "table", {
                     "file_key": Path(table_file).name,
+                    "location": default_location,  # Default location on error
                     "new_entry": {
                         "summary": f"表格文件处理失败: {str(e)}",
                         "file_path": str(table_file),
@@ -630,6 +663,73 @@ class ProcessUserInputAgent:
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(document_file)
                 
+                # For document files, ask user to select location(s)
+                if len(available_locations) == 0:
+                    # If no locations exist, create a default one
+                    selected_locations = ["默认位置"]
+                    print(f"📍 没有可用位置，为文档文件创建默认位置: {selected_locations}")
+                elif len(available_locations) == 1:
+                    # If only one location exists, use it
+                    selected_locations = [available_locations[0]]
+                    print(f"📍 只有一个可用位置，文档文件使用: {selected_locations}")
+                else:
+                    # Multiple locations exist, ask user to choose
+                    try:
+                        locations_list = "\n".join([f"  {i+1}. {loc}" for i, loc in enumerate(available_locations)])
+                        question = f"""检测到文档文件: {source_path.name}
+
+📍 可选的存储位置：
+{locations_list}
+
+请选择要将此文档文件添加到哪个位置：
+  • 输入序号（如：1, 2, 3）选择单个位置
+  • 输入 "all" 添加到所有位置  
+  • 输入 "new [位置名]" 创建新位置（如：new 石龙村）"""
+                        
+                        user_choice = self.request_user_clarification.invoke(
+                            input = {"question": question,
+                                     "context" : "文档文件可以添加到多个位置，请选择合适的存储位置"
+                                    }
+                            )
+                
+                        print(f"👤 用户选择: {user_choice}")
+                        
+                        # Parse user choice
+                        choice = user_choice.strip().lower()
+                        selected_locations = []
+                        
+                        if choice == "all":
+                            selected_locations = available_locations.copy()
+                            print(f"📍 用户选择添加到所有位置: {selected_locations}")
+                        elif choice.startswith("new "):
+                            new_location = choice[4:].strip()
+                            if new_location:
+                                selected_locations = [new_location]
+                                print(f"📍 用户创建新位置: {new_location}")
+                            else:
+                                selected_locations = ["默认位置"]
+                                print(f"⚠️ 新位置名称无效，使用默认位置: {selected_locations[0]}")
+                        else:
+                            # Parse numbers
+                            try:
+                                indices = [int(x.strip()) - 1 for x in choice.split(',')]
+                                selected_locations = [available_locations[i] for i in indices if 0 <= i < len(available_locations)]
+                                if not selected_locations:
+                                    selected_locations = [available_locations[0]]
+                                print(f"📍 用户选择的位置: {selected_locations}")
+                            except (ValueError, IndexError):
+                                selected_locations = [available_locations[0]]
+                                print(f"⚠️ 输入格式错误，使用默认位置: {available_locations[0]}")
+                        
+                        # Handle multiple selected locations
+                        if not selected_locations:
+                            selected_locations = ["默认位置"]
+                        
+                    except Exception as e:
+                        print(f"❌ 用户选择过程出错: {e}")
+                        selected_locations = ["默认位置"]
+                        print(f"📍 使用默认位置: {selected_locations}")
+                
                 system_prompt = """你是一位专业的文档分析专家，具备法律与政策解读能力。你的任务是阅读用户提供的 HTML 格式文件，并从中提取出最重要的 1-2 条关键信息进行总结，无需提取全部内容。
 
 请遵循以下要求：
@@ -640,7 +740,7 @@ class ProcessUserInputAgent:
 
 3. 对提取的信息进行结构化总结，语言正式、逻辑清晰、简洁明了；
 
-4. 输出格式为严格的 JSON：
+4. 输出格式为严格的 JSON，但不要包裹在```json中，直接返回json格式即可：
    {{
      "{file_name}": "内容总结"
    }}
@@ -665,9 +765,10 @@ class ProcessUserInputAgent:
                     # Create fallback response
                     analysis_response = f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
 
-                # Create result data
+                # Create result data with multiple location information
                 result_data = {
                     "file_key": source_path.name,
+                    "selected_locations": selected_locations,  # Multiple locations
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(document_file),
@@ -677,13 +778,15 @@ class ProcessUserInputAgent:
                     "analysis_response": analysis_response
                 }
                 
-                print(f"✅ 文档文件已分析: {source_path.name}")
+                print(f"✅ 文档文件已分析: {source_path.name} (位置: {selected_locations})")
                 return document_file, "document", result_data
                 
             except Exception as e:
                 print(f"❌ 处理文档文件出错 {document_file}: {e}")
+                default_locations = [available_locations[0]] if available_locations else ["默认位置"]
                 return document_file, "document", {
                     "file_key": Path(document_file).name,
+                    "selected_locations": default_locations,  # Default locations on error
                     "new_entry": {
                         "summary": f"文档文件处理失败: {str(e)}",
                         "file_path": str(document_file),
@@ -703,7 +806,7 @@ class ProcessUserInputAgent:
             print("=" * 50)
             return {"process_user_input_messages": new_messages}
         
-        max_workers = min(total_files, 4)  # Limit to 4 concurrent requests for supplement processing
+        max_workers = min(total_files, 5)  # Limit to 4 concurrent requests for supplement processing
         print(f"🚀 开始并行处理补充文件，使用 {max_workers} 个工作线程")
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -725,32 +828,45 @@ class ProcessUserInputAgent:
                     # Add to new_messages
                     new_messages.append(AIMessage(content=result_data["analysis_response"]))
                     
-                    # Update data.json structure
+                    # Update data.json structure with location-based storage
                     file_key = result_data["file_key"]
                     new_entry = result_data["new_entry"]
                     
                     if processed_file_type == "table":
-                        if file_key in data["表格"]:
-                            print(f"⚠️ 表格文件 {file_key} 已存在，将更新其内容")
+                        # Table files have single location
+                        location = result_data["location"]
+                        # Ensure location structure exists in data
+                        data = ensure_location_structure(data, location)
+                        
+                        if file_key in data[location]["表格"]:
+                            print(f"⚠️ 表格文件 {file_key} 已存在于 {location}，将更新其内容")
                             # Preserve any additional fields that might exist
-                            existing_entry = data["表格"][file_key]
+                            existing_entry = data[location]["表格"][file_key]
                             for key, value in existing_entry.items():
                                 if key not in new_entry:
                                     new_entry[key] = value
                         else:
-                            print(f"📝 添加新的表格文件: {file_key}")
-                        data["表格"][file_key] = new_entry
-                    else:  # document
-                        if file_key in data["文档"]:
-                            print(f"⚠️ 文档文件 {file_key} 已存在，将更新其内容")
-                            # Preserve any additional fields that might exist
-                            existing_entry = data["文档"][file_key]
-                            for key, value in existing_entry.items():
-                                if key not in new_entry:
-                                    new_entry[key] = value
-                        else:
-                            print(f"📝 添加新的文档文件: {file_key}")
-                        data["文档"][file_key] = new_entry
+                            print(f"📝 添加新的表格文件: {file_key} 到 {location}")
+                        data[location]["表格"][file_key] = new_entry
+                    else:  # document - can have multiple locations
+                        selected_locations = result_data["selected_locations"]
+                        for location in selected_locations:
+                            # Ensure location structure exists in data
+                            data = ensure_location_structure(data, location)
+                            
+                            # Create a copy of new_entry for each location
+                            entry_copy = new_entry.copy()
+                            
+                            if file_key in data[location]["文档"]:
+                                print(f"⚠️ 文档文件 {file_key} 已存在于 {location}，将更新其内容")
+                                # Preserve any additional fields that might exist
+                                existing_entry = data[location]["文档"][file_key]
+                                for key, value in existing_entry.items():
+                                    if key not in entry_copy:
+                                        entry_copy[key] = value
+                            else:
+                                print(f"📝 添加新的文档文件: {file_key} 到 {location}")
+                            data[location]["文档"][file_key] = entry_copy
                     
                 except Exception as e:
                     print(f"❌ 并行处理文件任务失败 {file_path}: {e}")
@@ -769,13 +885,26 @@ class ProcessUserInputAgent:
             
             # Atomic rename to replace the original file
             temp_path.replace(data_json_path)
-            print(f"✅ 已更新 data.json，表格文件 {len(data['表格'])} 个，文档文件 {len(data['文档'])} 个")
+            
+            # Count total files across all locations
+            total_table_files = sum(len(data[location]["表格"]) for location in data.keys() if isinstance(data[location], dict))
+            total_document_files = sum(len(data[location]["文档"]) for location in data.keys() if isinstance(data[location], dict))
+            
+            print(f"✅ 已更新 data.json，表格文件 {total_table_files} 个，文档文件 {total_document_files} 个")
             
             # Log the files that were processed in this batch
             if table_files:
                 print(f"📊 本批次处理的表格文件: {[Path(f).name for f in table_files]}")
             if document_files:
                 print(f"📄 本批次处理的文档文件: {[Path(f).name for f in document_files]}")
+            
+            # Log current distribution by location
+            print("📍 当前数据分布:")
+            for location in data.keys():
+                if isinstance(data[location], dict):
+                    table_count = len(data[location]["表格"])
+                    doc_count = len(data[location]["文档"])
+                    print(f"  {location}: 表格 {table_count} 个, 文档 {doc_count} 个")
                 
         except Exception as e:
             print(f"❌ 保存 data.json 时出错: {e}")
@@ -843,13 +972,20 @@ class ProcessUserInputAgent:
         if len(template_files) > 1:
             print("⚠️ 检测到多个模板文件，需要用户选择")
             template_names = [Path(f).name for f in template_files]
-            question = f"检测到多个模板文件，请选择要使用的模板：\n" + \
-                      "\n".join([f"{i+1}. {name}" for i, name in enumerate(template_names)]) + \
-                      "\n请输入序号（如：1）："
+            template_list = "\n".join([f"  {i+1}. {name}" for i, name in enumerate(template_names)])
+            question = f"""检测到多个模板文件，请选择要使用的模板：
+
+📋 可用模板：
+{template_list}
+
+请输入序号（如：1）选择模板："""
             
             try:
                 print("🤝 正在请求用户确认模板选择...")
-                user_choice = self.request_user_clarification(question, "系统需要确定使用哪个模板文件进行后续处理")
+                user_choice = self.request_user_clarification.invoke(
+                    input = {"question": question,
+                             "context": "系统需要确定使用哪个模板文件进行后续处理"}
+                    )
                 
                 # Parse user choice
                 try:
@@ -911,7 +1047,7 @@ class ProcessUserInputAgent:
 
             print("📤 正在调用LLM进行模板复杂度分析...")
             
-            analysis_response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)])
+            analysis_response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
             
             # Extract the classification from the response
             if "[Complex]" in analysis_response:
@@ -920,13 +1056,16 @@ class ProcessUserInputAgent:
                 template_type = "[Simple]"
             else:
                 template_type = "[Simple]"  # Default fallback
-                
+            
+            # 将模板文件转存到conversations/files/user_uploaded_files/template_files
+            final_template_path = move_template_file_safely(template_file)
+
             print(f"📥 模板分析结果: {template_type}")
             print("✅ _process_template 执行完成")
             print("=" * 50)
 
             return {"template_complexity": template_type,
-                    "uploaded_template_files_path": [template_file]
+                    "uploaded_template_files_path": [final_template_path]
                     }
 
         except Exception as e:
@@ -934,12 +1073,16 @@ class ProcessUserInputAgent:
             # Default to Simple if analysis fails
             template_type = "[Simple]"
             print("⚠️ 模板分析失败，默认为简单模板")
+            
+            # Still try to move the template file even if LLM analysis fails
+            final_template_path = move_template_file_safely(template_file)
+            
             print("✅ _process_template 执行完成")
             print("=" * 50)
             
             return {
                 "template_complexity": template_type,
-                "uploaded_template_files_path": [template_file]
+                "uploaded_template_files_path": [final_template_path]
             }
         
 
@@ -1154,7 +1297,7 @@ class ProcessUserInputAgent:
         try:
             user_input = "【历史对话】\n" + process_user_input_messages_content
             print("📤 正在调用LLM生成总结...")
-            response = invoke_model(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
+            response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
             print(f"📥 LLM总结响应长度: {len(response)} 字符")
             
             # Clean the response to handle markdown code blocks and malformed JSON

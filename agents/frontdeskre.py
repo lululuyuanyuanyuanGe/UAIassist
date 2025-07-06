@@ -96,18 +96,18 @@ class FrontdeskAgent:
         graph.add_node("entry", self._entry_node)
         graph.add_node("collect_user_input", ToolNode(self.tools))
         graph.add_node("initial_collect_user_input", self._initial_collect_user_input)
-        graph.add_node("complex_template_handle", self._complex_template_analysis)
+        # graph.add_node("complex_template_handle", self._complex_template_analysis)  # Commented out as method is not implemented
         graph.add_node("simple_template_handle", self._simple_template_analysis)
         graph.add_node("chat_with_user_to_determine_template", self._chat_with_user_to_determine_template)
-        graph.add_node("recall_files_agnet", self._recall_files_agnet)
+        graph.add_node("recall_files_agent", self._recall_files_agent)
 
         graph.add_edge(START, "entry")
         graph.add_edge("entry", "initial_collect_user_input")
         graph.add_conditional_edges("initial_collect_user_input", self._route_after_initial_collect_user_input)
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
-        graph.add_conditional_edges("simple_template_handle", self._route_after_simple_template_analysis)
-        graph.add_edge("recall_files_agnet", END)
+        graph.add_edge("simple_template_handle", "recall_files_agent")
+        graph.add_edge("recall_files_agent", END)
 
         
         # Compile the graph to make it executable with stream() method
@@ -203,7 +203,9 @@ class FrontdeskAgent:
             print("=" * 50)
                 
             if next_node == "complex_template":
-                return "complex_template_handle"
+                # Complex template handling not implemented yet, fallback to simple template
+                print("⚠️ 复杂模板处理暂未实现，转为简单模板处理")
+                return "simple_template_handle"
             elif next_node == "simple_template":
                 return "simple_template_handle"
             else:
@@ -241,7 +243,9 @@ class FrontdeskAgent:
             print("=" * 50)
                 
             if next_node == "complex_template":
-                return "complex_template_handle"
+                # Complex template handling not implemented yet, fallback to simple template
+                print("⚠️ 复杂模板处理暂未实现，转为简单模板处理")
+                return "simple_template_handle"
             elif next_node == "simple_template":
                 return "simple_template_handle"
             else:
@@ -322,7 +326,7 @@ class FrontdeskAgent:
 """
 
         print("📤 正在调用LLM进行表格结构确定...")
-        response = invoke_model_with_tools(model_name="Qwen/Qwen3-32B", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
+        response = invoke_model_with_tools(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
         
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:
@@ -357,7 +361,7 @@ class FrontdeskAgent:
             print("✅ 无工具调用，路由到 END")
             print("✅ _route_after_chat_with_user_to_determine_template 执行完成")
             print("=" * 50)
-            return "recall_files_agnet"
+            return "recall_files_agent"
 
     def _simple_template_analysis(self, state: FrontdeskState) -> FrontdeskState:
         """处理用户上传的简单模板"""
@@ -410,64 +414,65 @@ class FrontdeskAgent:
 
         请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
 
+        【注意事项】
+        不要将输出格式用```json```包裹，直接返回json格式的文本
+
         下面是用户上传的模板表格内容:
         {template_file_content}
         """
 
         print("📤 正在调用LLM进行模板分析...")
-        response = invoke_model_with_tools(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=prompt)], tools=self.tools)
+        response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=prompt)])
         print("📥 LLM响应接收成功")
         
-        if response.content:
-            print(f"💬 响应内容: {response.content}")
-        print(f"📊 完整响应: {response}")
-        
-        # 创建AIMessage时需要保留tool_calls信息
-        if hasattr(response, 'tool_calls') and response.tool_calls:
-            # 如果有工具调用，创建包含tool_calls的AIMessage
-            ai_message = AIMessage(content=response.content or "", tool_calls=response.tool_calls)
-            print("🔧 检测到工具调用")
-        else:
-            # 如果没有工具调用，只包含内容
-            ai_message = AIMessage(content=str(response.content) if hasattr(response, 'content') else str(response))
-            print("💬 无工具调用，返回内容响应")
         
         print("✅ _simple_template_analysis 执行完成")
         print("=" * 50)
         
-        return {"template_structure": str(response),
+        return {"template_structure": response,
                 "previous_node": "simple_template_handle",
-                "messages": [ai_message]
+                "messages": [AIMessage(content=response)]
                 }
-        
-    def _route_after_simple_template_analysis(self, state: FrontdeskState) -> str:
-        """This node will route the agent to the next node based on the user's input"""
-        print("\n🔀 开始执行: _route_after_simple_template_analysis")
-        print("=" * 50)
-        
-        latest_message = state["messages"][-1]
-        if hasattr(latest_message, "tool_calls") and latest_message.tool_calls:
-            print("🔧 检测到工具调用，路由到 collect_user_input")
-            print("✅ _route_after_simple_template_analysis 执行完成")
-            print("=" * 50)
-            return "collect_user_input"
-        else:
-            print("✅ 无工具调用，路由到 END")
-            print("✅ _route_after_simple_template_analysis 执行完成")
-            print("=" * 50)
-            return "recall_files_agnet"
 
-    def _recall_files_agnet(self, state: FrontdeskState) -> FrontdeskState:
+    def _recall_files_agent(self, state: FrontdeskState) -> FrontdeskState:
         """This node will recall the files from the user"""
-        print("\n🔍 开始执行: _recall_files_agnet")
+        print("\n🔍 开始执行: _recall_files_agent")
         print("=" * 50)
-
-        template_structure = state["template_structure"]
+        
+        raw_template = state["template_structure"]
+        print(f"🔍 模板结构类型: {type(raw_template)}")
+        print(f"🔍 模板结构内容: {raw_template}")
+        
+        # Handle both string and dict types
+        if isinstance(raw_template, str):
+            try:
+                template_structure = json.loads(raw_template)
+                print("✅ 从JSON字符串解析模板结构")
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON解析失败: {e}")
+                return {"headers_mapping": {}}
+        elif isinstance(raw_template, dict):
+            template_structure = raw_template
+            print("✅ 直接使用字典类型模板结构")
+        else:
+            print(f"❌ 不支持的模板结构类型: {type(raw_template)}")
+            return {"headers_mapping": {}}
+        
+        # Extract table structure if it exists
+        if "表格结构" in template_structure:
+            table_structure = template_structure["表格结构"]
+            print("✅ 提取表格结构部分")
+        else:
+            table_structure = template_structure
+            print("⚠️ 直接使用整个结构作为表格结构")
+            
+        print(f"🔍 最终表格结构: {table_structure}")
 
         recallFilesAgent = RecallFilesAgent()
-        # return the final state of the recallFilesAgent
-        recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(template_structure=template_structure)
-        print(f"🔍 召回文件响应: {recallFilesAgent_final_state}")
+        # Pass as JSON string to ensure consistent format
+        recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(
+            template_structure=json.dumps(template_structure, ensure_ascii=False)
+        )
 
         headers_mapping = recallFilesAgent_final_state.get("headers_mapping")
         print(f"🔍 表头映射: {headers_mapping}")
@@ -482,7 +487,7 @@ class FrontdeskAgent:
         
         filloutTableAgent = FilloutTableAgent()
         filloutTableAgent_final_state = filloutTableAgent.run_fillout_table_agent(headers_mapping=state["headers_mapping"]
-                                        
+
                                                                                   
                                                                                   )
         print(f"🔍 填充表格响应: {filloutTableAgent_final_state}")

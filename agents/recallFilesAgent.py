@@ -24,7 +24,7 @@ from langchain_core.tools import tool
 
 from agents.processUserInput import ProcessUserInputAgent
 
-
+# Define tool as standalone function (not class method)
 @tool
 def request_user_clarification(question: str) -> str:
     """
@@ -48,17 +48,14 @@ def request_user_clarification(question: str) -> str:
         print("request_user_clarification 调用模型的输出: \n" + summary_message)
         return summary_message
 
-
-            
     except Exception as e:
         print(f"❌ 用户澄清请求失败: {e}")
         return f"无法获取用户回复: {str(e)}"
 
 
-
-
 class RecallFilesState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    chat_history: list[str]
     related_files_str: str
     related_files: list[str]
     headers_mapping: dict[str, str]
@@ -68,9 +65,8 @@ class RecallFilesState(TypedDict):
 
 class RecallFilesAgent:
     def __init__(self):
+        self.tools = [request_user_clarification]  # Reference the standalone function
         self.graph = self._build_graph()
-
-    tools = [request_user_clarification]
 
     def _build_graph(self):
         graph = StateGraph(RecallFilesState)
@@ -84,14 +80,55 @@ class RecallFilesAgent:
         graph.add_edge("determine_the_mapping_of_headers", END)
         return graph.compile(checkpointer = MemorySaver())
 
-    def _create_initial_state(self) -> RecallFilesState:
+    def _create_initial_state(self, template_structure: str) -> RecallFilesState:
+
+        def extract_summary_for_each_file(file_content: dict) -> str:
+            """提取文件内容的摘要信息"""
+            summary = ""
+            
+            # 提取表格summary
+            if "表格" in file_content and file_content["表格"]:
+                summary += "表格: \n"
+                tables = file_content["表格"]
+                for table_name in tables:
+                    if isinstance(tables[table_name], dict) and "summary" in tables[table_name]:
+                        summary += f"  {tables[table_name]['summary']}\n"
+                    else:
+                        summary += f"  {table_name}: [无摘要信息]\n"
+            
+            # 提取文档summary
+            if "文档" in file_content and file_content["文档"]:
+                summary += "\n文档: \n"
+                documents = file_content["文档"]
+                for doc_name in documents:
+                    if isinstance(documents[doc_name], dict) and "summary" in documents[doc_name]:
+                        summary += f"  {documents[doc_name]['summary']}\n"
+                    else:
+                        summary += f"  {doc_name}: [无摘要信息]\n"
+            
+            return summary
+        
+        # 只读取相关村的文件
         with open(r'agents\data.json', 'r', encoding = 'utf-8') as f:
             file_content = f.read()
+        #     print(template_structure)
+        # for key, value in json.loads(file_content).items():
+        #     print("key: \n", key)
+        #     if key in template_structure:
+        #         file_content = value
+        file_content = json.loads(file_content)
+
+        file_content = file_content["燕云村"]
+        file_content = extract_summary_for_each_file(file_content)
+        print(file_content)
+        
+
         return {
             "messages": [],
+            "chat_history": [],
             "related_files": [],
             "headers_mapping": {},
-            "template_structure": "",
+            "template_structure": template_structure,
             "headers_mapping_": {},
             "file_content": file_content
         }
@@ -101,67 +138,79 @@ class RecallFilesAgent:
         """根据要生成的表格模板，从向量库中召回相关文件"""
         print("\n🔍 开始执行: _recall_relative_files")
         print("=" * 50)
-        
-        previous_AI_summary = ""
-        for message in state["messages"]:
-            previous_AI_summary += message.content
+        if state["messages"]:   
+            previous_AI_message = state["messages"][-1]
+            previous_AI_message_content = previous_AI_message.content
+            state["chat_history"].append(previous_AI_message_content)
+        chat_history = "\n".join(state["chat_history"])
 
         print("=========历史对话记录==========")
-        print(previous_AI_summary)
+        print(chat_history)
         print("=========历史对话记录==========")
         
         system_prompt = f"""
 你是一位专业的文件分析专家，擅长从文件摘要中筛选出最适合用于填写模板表格的数据文件和辅助参考文件。
 
 【你的任务】
-根据我提供的表格模板结构、任务背景和文件摘要信息，从中挑选出可能用于填写模板的相关文件。请特别注意，**每一次文件召回后必须调用工具 `request_user_clarification` 与用户确认选择是否合适**，不得直接返回文件列表或跳过确认。
+根据我提供的表格模板结构、任务背景和文件摘要信息，从中挑选出可能用于填写模板的相关文件，表格或者文档文件。
 
-【执行标准】
-1. 分析模板的结构字段，判断填写所需的数据和可能的计算或解释依据；
-2. 从文件摘要中初步筛选 3~5 个高度相关的文件，可能包括：
-   - 含有原始数据字段的 Excel 或 CSV 文件；
-   - 含有字段说明、政策依据、计算规则的 Word 或 PDF 文件；
-3. 无论是否已有历史召回记录或用户反馈，**本轮都必须调用工具与用户确认筛选结果**；
-4. 如果用户反馈不满意，应根据其意见重新筛选并再次确认；
-5. 一旦用户确认，后续节点将使用该确认结果继续流程；
-6. 最终文件列表请以**严格的 JSON 数组格式**输出，内容示例如下：
-   ["基础信息表.xlsx", "补贴政策说明.docx"]
+【执行流程】
+你必须严格按照以下流程执行：
 
-【格式要求】
-- 仅输出 JSON 数组格式；
-- 不允许出现多余文字或 markdown 包裹（如 ```json）；
-- 不允许自行与用户对话，必须使用 `request_user_clarification` 工具发起确认；
-- 所有返回值仅包含文件名，不含路径或摘要内容；
+1. **分析阶段**：
+   - 分析模板的结构字段，判断填写所需的数据和可能的计算或解释依据
+   - 从文件摘要中初步筛选 3~5 个高度相关的文件，可能包括：
+     * 含有原始数据字段的 Excel 或 CSV 文件
+     * 含有字段说明、政策依据、计算规则的 Word 或 PDF 文件
 
-【输入上下文】
+2. **确认阶段**：
+   - **必须调用工具 `request_user_clarification` 与用户确认筛选结果**
+   - 在工具调用中，向用户展示你筛选的文件列表，并询问是否合适
+   - 等待用户反馈后，根据用户意见调整文件选择，如果用户给出了肯定的回答，则直接返回文件列表，不要重复调用工具
+
+3. **输出阶段**：
+   - 只有在用户确认后，才能输出最终的文件列表
+   - 输出格式必须是严格的 JSON 数组，例如：["基础信息表.xlsx", "补贴政策说明.docx"]，不要包裹在```json中，直接返回json格式即可
+   - 不要返回任何其他内容，不要返回任何其他内容，不要返回任何其他内容
+
+【重要说明】
+- 根据历史对话记录，判断是否需要调用工具，当得到用户确认后，再返回文件列表
+- 不允许跳过用户确认直接返回文件列表，但也不要重复调用工具
+- 不允许自行与用户对话，必须使用 `request_user_clarification` 工具
+- 文件名不含路径或摘要内容，仅包含文件名
+
 表格模板结构：
 {state["template_structure"]}
 
 文件摘要列表：
 {state["file_content"]}
 
-用户历史行为摘要：
-{previous_AI_summary}
-"""
+历史对话记录：
+{chat_history}
 
-        response = invoke_model_with_tools(model_name = "Pro/deepseek-ai/DeepSeek-V3", 
+请开始执行第一步：分析模板结构并初步筛选文件，然后调用工具与用户确认。
+"""
+        print("Garbage fed to our poor LLM: \n", system_prompt)
+        response = invoke_model_with_tools(model_name = "gpt-4o", 
                                            messages = [SystemMessage(content = system_prompt)], 
                                            tools=self.tools,
-                                           temperature = 0.2)
+                                           temperature = 1.3)
 
+        print("Garbage returned from our LLM: \n", response)
         # Extract response content properly
         if isinstance(response, str):
             response_content = response
             AI_message = AIMessage(content=response)
             print(f"📥 LLM响应(字符串): {response_content}")
         else:
+            question = response.tool_calls[0]['args']['question']
+            print("问题：")
+            print(question)
+            state["chat_history"].append(question)
             response_content = response.content if hasattr(response, 'content') else str(response)
             AI_message = response
             print(f"📥 LLM响应(对象): {response_content}")
         
-        # Always print the response content for debugging
-        print("💬 智能体回复内容:")
-        print(response_content)
         
         # Check for tool calls
         has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
@@ -279,19 +328,7 @@ class RecallFilesAgent:
         print("=" * 60)
 
         config = {"configurable": {"thread_id": session_id}}
-        initial_state = self._create_initial_state()
-        
-        # Set the template structure if provided
-        if template_structure:
-            initial_state["template_structure"] = template_structure
-            print(f"📋 已设置模板结构: {len(template_structure)} 字符")
-        elif hasattr(self, 'template_structure'):
-            initial_state["template_structure"] = self.template_structure
-            print(f"📋 使用预设模板结构: {len(self.template_structure)} 字符")
-        else:
-            print("⚠️ Warning: No template structure provided")
-            
-        print("🔄 正在执行图形工作流...")
+        initial_state = self._create_initial_state(template_structure)
         
         try:
             # Use invoke instead of stream
