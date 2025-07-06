@@ -1054,20 +1054,16 @@ def move_template_file_safely(source_file: str, dest_dir_name: str = "template_f
             source_file_path = Path(source_file)
             target_file_path = dest_dir / source_file_path.name
             
-            # Handle existing file case by generating unique filename
+            # Handle existing file case by deleting old file
             if target_file_path.exists():
                 print(f"⚠️ 目标文件已存在: {target_file_path.name}")
-                
-                counter = 1
-                base_name = target_file_path.stem
-                extension = target_file_path.suffix
-                
-                while target_file_path.exists():
-                    new_name = f"{base_name}_{counter}{extension}"
-                    target_file_path = dest_dir / new_name
-                    counter += 1
-                
-                print(f"📝 生成新文件名: {target_file_path.name}")
+                try:
+                    target_file_path.unlink()  # Delete the existing file
+                    print(f"🗑️ 已删除旧文件: {target_file_path.name}")
+                except Exception as delete_error:
+                    print(f"❌ 删除旧文件失败: {delete_error}")
+                    # If we can't delete the old file, we can't proceed
+                    return source_file
             
             # Move the file
             source_file_path.rename(target_file_path)

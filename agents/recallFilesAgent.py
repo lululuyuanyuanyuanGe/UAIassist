@@ -25,34 +25,6 @@ from langchain_core.tools import tool
 from agents.processUserInput import ProcessUserInputAgent
 
 
-@tool
-def request_user_clarification(question: str) -> str:
-    """
-    这个函数用于向用户请求澄清，例如询问用户召回的文件正确不正确，是否需要重新召回，
-    或者补充召回，也可询问用户影射关系是否正确，或者有些映射实在无法结局时可向用户询问
-
-    参数：question: 你的问题
-    返回：用户回答
-    """
-    try:
-        print("request_user_clarification 被调用=========================================\n", question)
-        process_user_input_agent = ProcessUserInputAgent()
-        response = process_user_input_agent.run_process_user_input_agent(previous_AI_messages=AIMessage(content=question))
-        
-        # Extract the summary message from response
-        summary_message = response[0]
-        print("request_user_clarification 调用模型的输入: \n" + summary_message)
-        summary_message = json.loads(summary_message)
-        print("request_user_clarification 调用模型的输入类型: \n" + str(type(summary_message)))
-        summary_message = summary_message["summary"]
-        print("request_user_clarification 调用模型的输出: \n" + summary_message)
-        return summary_message
-
-
-            
-    except Exception as e:
-        print(f"❌ 用户澄清请求失败: {e}")
-        return f"无法获取用户回复: {str(e)}"
 
 
 
@@ -67,16 +39,48 @@ class RecallFilesState(TypedDict):
     file_content: str
 
 class RecallFilesAgent:
+
+
+    @tool
+    def _request_user_clarification(question: str) -> str:
+        """
+        这个函数用于向用户请求澄清，例如询问用户召回的文件正确不正确，是否需要重新召回，
+        或者补充召回，也可询问用户影射关系是否正确，或者有些映射实在无法结局时可向用户询问
+
+        参数：question: 你的问题
+        返回：用户回答
+        """
+        try:
+            print("request_user_clarification 被调用=========================================\n", question)
+            process_user_input_agent = ProcessUserInputAgent()
+            response = process_user_input_agent.run_process_user_input_agent(previous_AI_messages=AIMessage(content=question))
+            
+            # Extract the summary message from response
+            summary_message = response[0]
+            print("request_user_clarification 调用模型的输入: \n" + summary_message)
+            summary_message = json.loads(summary_message)
+            print("request_user_clarification 调用模型的输入类型: \n" + str(type(summary_message)))
+            summary_message = summary_message["summary"]
+            print("request_user_clarification 调用模型的输出: \n" + summary_message)
+            return summary_message
+
+
+                
+        except Exception as e:
+            print(f"❌ 用户澄清请求失败: {e}")
+            return f"无法获取用户回复: {str(e)}"
+
+
+
     def __init__(self):
         self.graph = self._build_graph()
-
-    tools = [request_user_clarification]
+        self.tools = [self._request_user_clarification]
 
     def _build_graph(self):
         graph = StateGraph(RecallFilesState)
         graph.add_node("recall_relative_files", self._recall_relative_files)
         graph.add_node("determine_the_mapping_of_headers", self._determine_the_mapping_of_headers)
-        graph.add_node("request_user_clarification", ToolNode(self.tools))
+        graph.add_node("request_user_clarification", ToolNode([self._request_user_clarification]))
 
         graph.add_edge(START, "recall_relative_files")
         graph.add_conditional_edges("recall_relative_files", self._route_after_recall_relative_files)
@@ -91,8 +95,8 @@ class RecallFilesAgent:
         for key, value in json.loads(file_content).items():
             if key in template_structure:
                 file_content = value
-        print("模板结构: \n" + template_structure)
-        print("数据库文件内容: \n" + file_content)
+        print("模板结构: \n", template_structure)
+        print("数据库文件内容: \n", file_content)
 
         return {
             "messages": [],
@@ -118,43 +122,28 @@ class RecallFilesAgent:
         print("=========历史对话记录==========")
         
         system_prompt = f"""
-你是一位专业的文件分析专家，擅长从文件摘要中筛选出最适合用于填写模板表格的数据文件和辅助参考文件。
+        你是文件分析专家，负责从文件摘要中筛选出最合适的填表数据文件和辅助参考文件。
 
-【你的任务】
-根据我提供的表格模板结构、任务背景和文件摘要信息，从中挑选出可能用于填写模板的相关文件。请特别注意，**每一次文件召回后必须调用工具 `request_user_clarification` 与用户确认选择是否合适**，不得直接返回文件列表或跳过确认。
+        任务流程：
+        1. 根据以下模板结构定位所需数据：
+        {state["template_structure"]}
+        2. 从以下文件摘要中挑选可能相关的文件：
+        {state["file_content"]}
+        3. 每次筛选后，必须调用工具 `request_user_clarification` 向用户展示候选文件列表并征求确认。
+        4. 如果用户反馈不满意，按照他们的意见重新筛选并再次确认。
+        5. 用户一旦确认，即可将该文件列表输出并用于后续流程。
 
-【执行标准】
-1. 分析模板的结构字段，判断填写所需的数据和可能的计算或解释依据；
-2. 从文件摘要中初步筛选 3~5 个高度相关的文件，可能包括：
-   - 含有原始数据字段的 Excel 或 CSV 文件；
-   - 含有字段说明、政策依据、计算规则的 Word 或 PDF 文件；
-3. 无论是否已有历史召回记录或用户反馈，**本轮都必须调用工具与用户确认筛选结果**；
-4. 如果用户反馈不满意，应根据其意见重新筛选并再次确认；
-5. 一旦用户确认，后续节点将使用该确认结果继续流程；
-6. 最终文件列表请以**严格的 JSON 数组格式**输出，内容示例如下：
-   ["基础信息表.xlsx", "补贴政策说明.docx"]
+        输出要求：
+        - 最终返回用户确认通过的“文件名”数组；
+        - 严格只包含文件名，不带路径或摘要；
+        - 不要输出多余文字，也不要使用 Markdown 或其他格式包装。
+        """
 
-【格式要求】
-- 仅输出 JSON 数组格式；
-- 不允许出现多余文字或 markdown 包裹（如 ```json）；
-- 不允许自行与用户对话，必须使用 `request_user_clarification` 工具发起确认；
-- 所有返回值仅包含文件名，不含路径或摘要内容；
-
-【输入上下文】
-表格模板结构：
-{state["template_structure"]}
-
-文件摘要列表：
-{state["file_content"]}
-
-用户历史行为摘要：
-{previous_AI_summary}
-"""
 
         response = invoke_model_with_tools(model_name = "deepseek-ai/DeepSeek-V3", 
                                            messages = [SystemMessage(content = system_prompt)], 
                                            tools=self.tools,
-                                           temperature = 0.3)
+                                           temperature = 0.2)
 
         # Extract response content properly
         if isinstance(response, str):
