@@ -12,7 +12,7 @@ from utilities.modelRelated import invoke_model
 from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, 
                                     extract_filename, determine_location_from_content, 
                                     ensure_location_structure, check_file_exists_in_data,
-                                    get_available_locations, move_template_file_safely)
+                                    get_available_locations, move_template_file_safely, move_template_files_safely)
 
 
 import uuid
@@ -43,9 +43,11 @@ class ProcessUserInputState(TypedDict):
     upload_files_path: list[str] # Store all uploaded files
     new_upload_files_path: list[str] # Track the new uploaded files in this round
     new_upload_files_processed_path: list[str] # Store the processed new uploaded files
+    original_files_path: list[str] # Store the original files in original_file subfolder
     uploaded_template_files_path: list[str]
     supplement_files_path: dict[str, list[str]]
     irrelevant_files_path: list[str]
+    irrelevant_original_files_path: list[str] # Track original files to be deleted with irrelevant files
     all_files_irrelevant: bool  # Flag to indicate all files are irrelevant
     text_input_validation: str  # Store validation result [Valid] or [Invalid]
     previous_AI_messages: list[BaseMessage]
@@ -162,9 +164,11 @@ class ProcessUserInputAgent:
             "upload_files_path": [],
             "new_upload_files_path": [],
             "new_upload_files_processed_path": [],
+            "original_files_path": [],
             "uploaded_template_files_path": [],
             "supplement_files_path": {"表格": [], "文档": []},
             "irrelevant_files_path": [],
+            "irrelevant_original_files_path": [],
             "all_files_irrelevant": False,
             "text_input_validation": None,
             "previous_AI_messages": processed_messages,
@@ -268,10 +272,12 @@ class ProcessUserInputAgent:
         # Update state with new files
         # Safely handle the case where upload_files_path might not exist in state
         existing_files = state.get("upload_files_path", [])
+        existing_original_files = state.get("original_files_path", [])
         return {
             "new_upload_files_path": detected_files,
             "upload_files_path": existing_files + detected_files,
-            "new_upload_files_processed_path": result
+            "new_upload_files_processed_path": result["processed_files"],
+            "original_files_path": existing_original_files + result["original_files"]
         }
     
 
@@ -442,6 +448,25 @@ class ProcessUserInputAgent:
         supplement_files = classification_results.get("supplement", {"表格": [], "文档": []})
         irrelevant_files = classification_results.get("irrelevant", [])
         
+        # Create mapping of processed files to original files to track irrelevant originals
+        irrelevant_original_files = []
+        if irrelevant_files:
+            original_files = state.get("original_files_path", [])
+            processed_files = state.get("new_upload_files_processed_path", [])
+            
+            print("🔍 正在映射无关文件对应的原始文件...")
+            
+            # Create mapping based on filename (stem)
+            for irrelevant_file in irrelevant_files:
+                irrelevant_file_stem = Path(irrelevant_file).stem
+                # Find the corresponding original file
+                for original_file in original_files:
+                    original_file_stem = Path(original_file).stem
+                    if irrelevant_file_stem == original_file_stem:
+                        irrelevant_original_files.append(original_file)
+                        print(f"📋 映射无关文件: {Path(irrelevant_file).name} -> {Path(original_file).name}")
+                        break
+        
         # Check if all files are irrelevant
         # Safely handle the case where new_upload_files_processed_path might not exist in state
         new_files_processed_count = len(state.get("new_upload_files_processed_path", []))
@@ -460,6 +485,7 @@ class ProcessUserInputAgent:
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
                 "irrelevant_files_path": irrelevant_files,
+                "irrelevant_original_files_path": irrelevant_original_files,
                 "all_files_irrelevant": True,  # Flag for routing
             }
         else:
@@ -478,6 +504,7 @@ class ProcessUserInputAgent:
                 "uploaded_template_files_path": uploaded_template_files,
                 "supplement_files_path": supplement_files,
                 "irrelevant_files_path": irrelevant_files,
+                "irrelevant_original_files_path": irrelevant_original_files,
                 "all_files_irrelevant": False,  # Flag for routing
                 "process_user_input_messages": [SystemMessage(content=analysis_summary)]
             }
@@ -925,34 +952,56 @@ class ProcessUserInputAgent:
         
         
     def _process_irrelevant(self, state: ProcessUserInputState) -> ProcessUserInputState:
-        """This node will process the irrelevant files, it will delete the irrelevant files from the conversations folder"""
+        """This node will process the irrelevant files, it will delete the irrelevant files (both processed and original) from the conversations folder"""
         
         print("\n🔍 开始执行: _process_irrelevant")
         print("=" * 50)
         
         irrelevant_files = state["irrelevant_files_path"]
-        print(f"🗑️ 需要删除的无关文件数量: {len(irrelevant_files)}")
+        irrelevant_original_files = state.get("irrelevant_original_files_path", [])
+        
+        print(f"🗑️ 需要删除的无关处理文件数量: {len(irrelevant_files)}")
+        print(f"🗑️ 需要删除的无关原始文件数量: {len(irrelevant_original_files)}")
         
         deleted_files = []
         failed_deletes = []
         
+        # Delete processed files
         for file_path in irrelevant_files:
             try:
                 file_to_delete = Path(file_path)
-                print(f"🗑️ 正在删除: {file_to_delete.name}")
+                print(f"🗑️ 正在删除处理文件: {file_to_delete.name}")
                 
                 if file_to_delete.exists():
                     os.remove(file_to_delete)
                     deleted_files.append(file_to_delete.name)
-                    print(f"✅ 已删除无关文件: {file_to_delete.name}")
+                    print(f"✅ 已删除无关处理文件: {file_to_delete.name}")
                 else:
-                    print(f"⚠️ 文件不存在，跳过删除: {file_path}")
+                    print(f"⚠️ 处理文件不存在，跳过删除: {file_path}")
                     
             except Exception as e:
                 failed_deletes.append(Path(file_path).name)
-                print(f"❌ 删除文件时出错 {file_path}: {e}")
+                print(f"❌ 删除处理文件时出错 {file_path}: {e}")
+        
+        # Delete original files
+        for file_path in irrelevant_original_files:
+            try:
+                file_to_delete = Path(file_path)
+                print(f"🗑️ 正在删除原始文件: {file_to_delete.name}")
+                
+                if file_to_delete.exists():
+                    os.remove(file_to_delete)
+                    deleted_files.append(file_to_delete.name)
+                    print(f"✅ 已删除无关原始文件: {file_to_delete.name}")
+                else:
+                    print(f"⚠️ 原始文件不存在，跳过删除: {file_path}")
+                    
+            except Exception as e:
+                failed_deletes.append(Path(file_path).name)
+                print(f"❌ 删除原始文件时出错 {file_path}: {e}")
 
-        print(f"📊 删除结果: 成功 {len(deleted_files)} 个，失败 {len(failed_deletes)} 个")
+        total_files_to_delete = len(irrelevant_files) + len(irrelevant_original_files)
+        print(f"📊 删除结果: 成功 {len(deleted_files)} 个，失败 {len(failed_deletes)} 个 (总计 {total_files_to_delete} 个文件)")
         print("✅ _process_irrelevant 执行完成")
         print("=" * 50)
         
@@ -995,11 +1044,26 @@ class ProcessUserInputAgent:
                         # Remove non-selected templates
                         rejected_templates = [f for i, f in enumerate(template_files) if i != choice_index]
                         
-                        # Delete rejected template files
+                        # Delete rejected template files (both processed and original)
+                        original_files = state.get("original_files_path", [])
                         for rejected_file in rejected_templates:
                             try:
+                                # Delete processed template file
                                 Path(rejected_file).unlink()
-                                print(f"🗑️ 已删除未选中的模板: {Path(rejected_file).name}")
+                                print(f"🗑️ 已删除未选中的处理模板: {Path(rejected_file).name}")
+                                
+                                # Find and delete corresponding original file
+                                rejected_file_stem = Path(rejected_file).stem
+                                for original_file in original_files:
+                                    original_file_path = Path(original_file)
+                                    if original_file_path.stem == rejected_file_stem:
+                                        try:
+                                            original_file_path.unlink()
+                                            print(f"🗑️ 已删除未选中的原始模板: {original_file_path.name}")
+                                            break
+                                        except Exception as orig_error:
+                                            print(f"❌ 删除原始模板文件出错: {orig_error}")
+                                
                             except Exception as e:
                                 print(f"❌ 删除模板文件出错: {e}")
                         
@@ -1057,8 +1121,15 @@ class ProcessUserInputAgent:
             else:
                 template_type = "[Simple]"  # Default fallback
             
-            # 将模板文件转存到conversations/files/user_uploaded_files/template_files
-            final_template_path = move_template_file_safely(template_file)
+            # 将模板文件（包括原始文件）转存到conversations/files/user_uploaded_files/template_files
+            original_files = state.get("original_files_path", [])
+            move_result = move_template_files_safely(template_file, original_files)
+            final_template_path = move_result["processed_template_path"]
+            
+            if move_result["original_template_path"]:
+                print(f"📁 模板原始文件已移动到: {move_result['original_template_path']}")
+            else:
+                print("⚠️ 未找到对应的原始模板文件")
 
             print(f"📥 模板分析结果: {template_type}")
             print("✅ _process_template 执行完成")
@@ -1074,8 +1145,15 @@ class ProcessUserInputAgent:
             template_type = "[Simple]"
             print("⚠️ 模板分析失败，默认为简单模板")
             
-            # Still try to move the template file even if LLM analysis fails
-            final_template_path = move_template_file_safely(template_file)
+            # Still try to move the template file (including original) even if LLM analysis fails
+            original_files = state.get("original_files_path", [])
+            move_result = move_template_files_safely(template_file, original_files)
+            final_template_path = move_result["processed_template_path"]
+            
+            if move_result["original_template_path"]:
+                print(f"📁 模板原始文件已移动到: {move_result['original_template_path']}")
+            else:
+                print("⚠️ 未找到对应的原始模板文件")
             
             print("✅ _process_template 执行完成")
             print("=" * 50)
@@ -1287,7 +1365,7 @@ class ProcessUserInputAgent:
 - 总结中请不要包含用户上传的无关信息内容，以及有效性验证
 
 【输出格式】
-仅返回以下 JSON 对象，不得包含任何额外解释或文本：
+仅返回以下 JSON 对象，不得包含任何额外解释或文本,不要包裹在```json中，直接返回json格式即可：
 {{
   "summary": "对本轮用户提供的信息进行总结"
 }}

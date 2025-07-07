@@ -90,14 +90,21 @@ def convert_2_markdown(file_path: str) -> str:
     
 
 
-def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: str = None) -> list[str]:
+def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: str = None) -> dict[str, list[str]]:
     """This function will retrieve the content of the file and store them in the conversation folder
     and with the subfolder be the session_id, then it should be stored inside another subfolder named
     user_uploaded_files, it shuld be able to handle various different files types, but the strategy are
     very similar, if the file type is a spreadsheet, then use the conver_excel2html function and store the result
     in the corresponding txt file, the name should be the same as the file name which is revealed in the
     file path, secondly if the file will contain plain text, then simply copy the text and stored in the corresponding
-    txt file, finally if the file is an image then simply just store it as the image file in the right place"""
+    txt file, finally if the file is an image then simply just store it as the image file in the right place
+    
+    Returns:
+        dict: {
+            "processed_files": list[str],  # List of processed .txt file paths
+            "original_files": list[str]    # List of original file paths in original_file subfolder
+        }
+    """
     
     import shutil
     from pathlib import Path
@@ -105,13 +112,20 @@ def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: st
     if output_dir:
         conversation_dir = Path(output_dir)
         conversation_dir.mkdir(parents=True, exist_ok=True)
+        original_files_dir = conversation_dir / "original_file"
+        original_files_dir.mkdir(parents=True, exist_ok=True)
     else:
         # Create the conversation folder structure
         project_root = Path.cwd()  # Use current directory instead of parent
         conversation_dir = project_root / "conversations" / session_id / "user_uploaded_files"
         conversation_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create original_file subfolder
+        original_files_dir = conversation_dir / "original_file"
+        original_files_dir.mkdir(parents=True, exist_ok=True)
     
     processed_files = []
+    original_files = []
     
     for file_path in file_paths:
         try:
@@ -122,28 +136,55 @@ def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: st
                 
             print(f"🔄 Processing file: {source_path.name}")
             
-            # Use the new efficient processing function
+            # First, save the original file in the original_file subfolder
+            original_file_path = original_files_dir / source_path.name
+            
+            # Handle duplicate original files by updating content
+            if original_file_path.exists():
+                print(f"⚠️ Original file already exists, updating content: {source_path.name}")
+                try:
+                    original_file_path.unlink()  # Remove the existing original file
+                    print(f"🗑️ Removed existing original file: {source_path.name}")
+                except Exception as e:
+                    print(f"❌ Failed to remove existing original file: {e}")
+            
+            # Copy the original file to the original_file subfolder
+            try:
+                shutil.copy2(source_path, original_file_path)
+                original_files.append(str(original_file_path))
+                print(f"💾 Original file saved: {original_file_path}")
+            except Exception as e:
+                print(f"❌ Failed to save original file: {e}")
+                continue
+            
+            # Now process the file content
             processed_content = process_file_to_text(source_path)
             
             if processed_content is not None:
                 # Write the processed content to final destination file
                 txt_file_path = conversation_dir / f"{source_path.stem}.txt"
+                
+                # Handle duplicate processed files by updating content
+                if txt_file_path.exists():
+                    print(f"⚠️ Processed file already exists, updating content: {txt_file_path.name}")
+                
                 txt_file_path.write_text(processed_content, encoding='utf-8')
                 processed_files.append(str(txt_file_path))
                 print(f"✅ File processed and saved: {txt_file_path}")
             else:
-                # Fallback: copy original file if processing failed
-                destination = conversation_dir / source_path.name
-                shutil.copy2(source_path, destination)
-                processed_files.append(str(destination))
-                print(f"⚠️ File copied as-is (processing failed): {destination}")
+                print(f"❌ Failed to process file content: {source_path.name}")
+                # Even if processing failed, we still keep the original file
                 
         except Exception as e:
             print(f"❌ Unexpected error processing {file_path}: {e}")
             continue
     
-    print(f"🎉 Successfully processed {len(processed_files)} out of {len(file_paths)} files")
-    return processed_files
+    print(f"🎉 Successfully processed {len(processed_files)} files and saved {len(original_files)} original files")
+    
+    return {
+        "processed_files": processed_files,
+        "original_files": original_files
+    }
 
 
 def process_file_to_text(file_path: str | Path) -> str | None:
@@ -1076,125 +1117,114 @@ def move_template_file_safely(source_file: str, dest_dir_name: str = "template_f
             return source_file
 
 
-def convert_html_to_excel(html_file_path: str, output_dir: str = "agents/output") -> str:
+def move_template_files_safely(processed_template_file: str, original_files_list: list[str], dest_dir_name: str = "template_files") -> dict[str, str]:
     """
-    Convert HTML file to Excel format using LibreOffice and save to output directory.
+    Safely move both processed and original template files to the template_files directory.
     
-    This function uses LibreOffice's headless mode to convert HTML files to Excel format.
-    The converted file will be saved in the specified output directory with the same
-    base name but with .xlsx extension.
+    This function handles moving both the processed template file (.txt) and its corresponding
+    original file to the template_files folder, with proper error handling and logging.
     
     Args:
-        html_file_path: Path to the HTML file to convert
-        output_dir: Directory where the Excel file should be saved (default: "agents/output")
+        processed_template_file: Path to the processed template file (.txt)
+        original_files_list: List of original file paths to search for the corresponding original file
+        dest_dir_name: Name of the destination directory under conversations/files/user_uploaded_files/
         
     Returns:
-        str: Path to the converted Excel file
-        
-    Raises:
-        FileNotFoundError: If the source HTML file doesn't exist
-        subprocess.CalledProcessError: If LibreOffice conversion fails
-        Exception: For other conversion errors
+        dict: {
+            "processed_template_path": str,  # Path to moved processed template file
+            "original_template_path": str    # Path to moved original template file (or empty if not found)
+        }
     """
+    import shutil
+    
     try:
-        # Validate input file
-        html_path = Path(html_file_path)
-        if not html_path.exists():
-            raise FileNotFoundError(f"HTML file not found: {html_file_path}")
+        # Create destination directories
+        dest_dir = Path(f"conversations/files/user_uploaded_files/{dest_dir_name}")
+        dest_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"🔄 Converting HTML to Excel: {html_path.name}")
+        # Create original_file subdirectory within template_files
+        original_dest_dir = dest_dir / "original_file"
+        original_dest_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create output directory
-        output_directory = Path(output_dir)
-        output_directory.mkdir(parents=True, exist_ok=True)
+        processed_template_path = Path(processed_template_file)
+        result = {
+            "processed_template_path": "",
+            "original_template_path": ""
+        }
         
-        # LibreOffice executable path
-        soffice = r"D:\LibreOffice\program\soffice.exe"
+        print(f"📁 正在移动模板文件: {processed_template_path.name}")
         
-        # Convert HTML to Excel using LibreOffice
-        # --headless: run without GUI
-        # --convert-to xlsx: convert to Excel format
-        # --outdir: specify output directory
-        conversion_command = [
-            soffice, 
-            "--headless", 
-            "--convert-to", "xlsx", 
-            str(html_path),
-            "--outdir", str(output_directory)
-        ]
+        # Move the processed template file
+        processed_target_path = dest_dir / processed_template_path.name
         
-        print(f"📋 Running LibreOffice conversion: {' '.join(conversion_command)}")
+        # Handle existing processed file
+        if processed_target_path.exists():
+            print(f"⚠️ 处理模板文件已存在: {processed_target_path.name}")
+            try:
+                processed_target_path.unlink()
+                print(f"🗑️ 已删除旧的处理模板文件: {processed_target_path.name}")
+            except Exception as delete_error:
+                print(f"❌ 删除旧的处理模板文件失败: {delete_error}")
+                result["processed_template_path"] = processed_template_file
+                return result
         
-        # Execute the conversion
-        result = subprocess.run(
-            conversion_command,
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        # Move processed template file
+        try:
+            shutil.move(str(processed_template_path), str(processed_target_path))
+            result["processed_template_path"] = str(processed_target_path)
+            print(f"✅ 处理模板文件已移动到: {processed_target_path}")
+        except Exception as move_error:
+            print(f"❌ 移动处理模板文件失败: {move_error}")
+            result["processed_template_path"] = processed_template_file
+            return result
         
-        # Construct expected output file path
-        excel_file_path = output_directory / f"{html_path.stem}.xlsx"
+        # Find and move the corresponding original file
+        template_file_stem = processed_template_path.stem
+        original_file_found = False
         
-        # Verify the conversion was successful
-        if excel_file_path.exists():
-            print(f"✅ Successfully converted HTML to Excel: {excel_file_path}")
-            return str(excel_file_path)
-        else:
-            # Sometimes LibreOffice creates files with slightly different names
-            # Look for any .xlsx files with similar names
-            potential_files = list(output_directory.glob(f"{html_path.stem}*.xlsx"))
-            if potential_files:
-                actual_file = potential_files[0]
-                print(f"✅ Conversion successful, found file: {actual_file}")
-                return str(actual_file)
-            else:
-                raise Exception(f"LibreOffice conversion completed but Excel file not found at: {excel_file_path}")
+        print(f"🔍 正在寻找对应的原始模板文件: {template_file_stem}")
+        
+        for original_file in original_files_list:
+            original_file_path = Path(original_file)
+            if original_file_path.stem == template_file_stem:
+                print(f"📋 找到对应的原始文件: {original_file_path.name}")
                 
-    except subprocess.CalledProcessError as e:
-        print(f"❌ LibreOffice conversion failed: {e}")
-        print(f"   Command: {' '.join(conversion_command)}")
-        print(f"   Return code: {e.returncode}")
-        print(f"   stdout: {e.stdout}")
-        print(f"   stderr: {e.stderr}")
-        raise Exception(f"LibreOffice conversion failed with return code {e.returncode}: {e.stderr}")
+                # Move the original file to the original_file subdirectory
+                original_target_path = original_dest_dir / original_file_path.name
+                
+                # Handle existing original file
+                if original_target_path.exists():
+                    print(f"⚠️ 原始模板文件已存在: {original_target_path.name}")
+                    try:
+                        original_target_path.unlink()
+                        print(f"🗑️ 已删除旧的原始模板文件: {original_target_path.name}")
+                    except Exception as delete_error:
+                        print(f"❌ 删除旧的原始模板文件失败: {delete_error}")
+                        # Continue with moving even if deletion failed
+                
+                # Move original file
+                try:
+                    shutil.move(str(original_file_path), str(original_target_path))
+                    result["original_template_path"] = str(original_target_path)
+                    print(f"✅ 原始模板文件已移动到: {original_target_path}")
+                    original_file_found = True
+                    break
+                except Exception as move_error:
+                    print(f"❌ 移动原始模板文件失败: {move_error}")
+                    # Continue searching for other matching files
         
-    except FileNotFoundError as e:
-        print(f"❌ File not found error: {e}")
-        raise
+        if not original_file_found:
+            print(f"⚠️ 未找到对应的原始模板文件: {template_file_stem}")
+            result["original_template_path"] = ""
+        
+        return result
         
     except Exception as e:
-        print(f"❌ Unexpected error during HTML to Excel conversion: {e}")
-        raise
+        print(f"❌ 移动模板文件过程中出错: {e}")
+        return {
+            "processed_template_path": processed_template_file,
+            "original_template_path": ""
+        }
 
-
-def batch_convert_html_to_excel(html_files: list[str], output_dir: str = "agents/output") -> list[str]:
-    """
-    Convert multiple HTML files to Excel format in batch.
-    
-    This function processes multiple HTML files and converts them to Excel format
-    using the convert_html_to_excel function. It handles errors gracefully and
-    provides detailed logging for each conversion.
-    
-    Args:
-        html_files: List of HTML file paths to convert
-        output_dir: Directory where Excel files should be saved
-        
-    Returns:
-        list[str]: List of paths to successfully converted Excel files
-    """
-    converted_files = []
-    
-    print(f"🔄 Starting batch conversion of {len(html_files)} HTML files")
-    
-    for html_file in html_files:
-        try:
-            excel_file = convert_html_to_excel(html_file, output_dir)
-            converted_files.append(excel_file)
-            print(f"✅ Batch conversion success: {Path(html_file).name} -> {Path(excel_file).name}")
-        except Exception as e:
-            print(f"❌ Batch conversion failed for {html_file}: {e}")
-            continue
-    
-    print(f"🎉 Batch conversion completed: {len(converted_files)} out of {len(html_files)} files converted successfully")
-    return converted_files
+def convert_html_to_excel(html_file_path: str, output_dir: str = "agents/output") -> str:
+    """use python"""

@@ -7,10 +7,13 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 from typing import Dict, TypedDict, Annotated
-from utilities.file_process import fetch_related_files_content, extract_file_from_recall, convert_html_to_excel
+from utilities.file_process import fetch_related_files_content, extract_file_from_recall
 from utilities.modelRelated import invoke_model, invoke_model_with_tools
 
 import json
+import tempfile
+import hashlib
+import time
 # Create an interactive chatbox using gradio
 import re
 
@@ -183,6 +186,10 @@ class RecallFilesAgent:
 - 不允许自行与用户对话，必须使用 `request_user_clarification` 工具
 - 文件名不含路径或摘要内容，仅包含文件名
 
+【严格遵守】
+- 不要返回任何其他内容，不要返回任何其他内容，不要返回任何其他内容
+- 返回的必须是文件数组，且必须与文件摘要中的文件名一致，不要将序列号包含在内
+
 表格模板结构：
 {state["template_structure"]}
 
@@ -336,59 +343,6 @@ class RecallFilesAgent:
             print(self.files_under_location)
             table_files = self.files_under_location["表格"]
             converted_excel_files = []
-            
-            for file in final_state["related_files"]:
-                if file in table_files:
-                    # Convert HTML file to Excel using LibreOffice
-                    try:
-                        # Get the file info from the table files mapping
-                        file_info = table_files[file]
-                        
-                        # Extract the actual file path from the dictionary
-                        if isinstance(file_info, dict) and "file_path" in file_info:
-                            source_file_path = file_info["file_path"]
-                        else:
-                            source_file_path = file_info  # fallback if it's already a string
-                        
-                        print(f"🔍 Source file path: {source_file_path}")
-                        
-                        # Check if this is actually an HTML file or if we need to find the corresponding HTML file
-                        if source_file_path.endswith('.txt'):
-                            # Look for corresponding HTML file in the output directory
-                            file_stem = Path(source_file_path).stem
-                            potential_html_files = [
-                                f"agents/output/{file_stem}.html",
-                                f"agents/output/{file_stem}_结果.html",
-                                f"agents/output/{file_stem}_filled.html"
-                            ]
-                            
-                            html_file_path = None
-                            for potential_file in potential_html_files:
-                                if Path(potential_file).exists():
-                                    html_file_path = potential_file
-                                    break
-                            
-                            if html_file_path is None:
-                                print(f"⚠️ No corresponding HTML file found for {file}")
-                                continue
-                        else:
-                            html_file_path = source_file_path
-                        
-                        print(f"🔄 Converting HTML file: {html_file_path}")
-                        
-                        # Verify the HTML file exists before conversion
-                        if not Path(html_file_path).exists():
-                            print(f"❌ HTML file does not exist: {html_file_path}")
-                            continue
-                        
-                        # Convert HTML to Excel and save to output folder
-                        excel_file_path = convert_html_to_excel(html_file_path, "agents/output")
-                        converted_excel_files.append(excel_file_path)
-                        
-                        print(f"✅ Successfully converted {file} to Excel: {excel_file_path}")
-                    except Exception as e:
-                        print(f"❌ Failed to convert {file} to Excel: {e}")
-                        continue
                     
             
             print("\n🎉 RecallFilesAgent 执行完成！")
