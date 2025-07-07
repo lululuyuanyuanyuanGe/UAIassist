@@ -1,3 +1,0 @@
-1.SpreadSheetLLM encode the excel, vanilla serialization
-
-2. use pandas.read_excel()

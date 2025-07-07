@@ -90,42 +90,92 @@ def convert_2_markdown(file_path: str) -> str:
     
 
 
-def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: str = None) -> dict[str, list[str]]:
-    """This function will retrieve the content of the file and store them in the conversation folder
-    and with the subfolder be the session_id, then it should be stored inside another subfolder named
-    user_uploaded_files, it shuld be able to handle various different files types, but the strategy are
-    very similar, if the file type is a spreadsheet, then use the conver_excel2html function and store the result
-    in the corresponding txt file, the name should be the same as the file name which is revealed in the
-    file path, secondly if the file will contain plain text, then simply copy the text and stored in the corresponding
-    txt file, finally if the file is an image then simply just store it as the image file in the right place
+def save_original_file(source_path: Path, original_files_dir: Path) -> str:
+    """
+    Save the original file to the original_file subfolder.
     
+    Args:
+        source_path: Path to the source file
+        original_files_dir: Path to the original_file directory
+        
     Returns:
-        dict: {
-            "processed_files": list[str],  # List of processed .txt file paths
-            "original_files": list[str]    # List of original file paths in original_file subfolder
-        }
+        str: Path to the saved original file, empty string if failed
+    """
+    import shutil
+    
+    try:
+        if not source_path.exists():
+            print(f"❌ Source file not found: {source_path}")
+            return ""
+            
+        print(f"📁 正在保存原始文件: {source_path.name}")
+        
+        # Create target path for original file
+        original_file_path = original_files_dir / source_path.name
+        
+        # Handle duplicate original files by updating content
+        if original_file_path.exists():
+            print(f"⚠️ 原始文件已存在，正在更新: {source_path.name}")
+            try:
+                # Try to remove existing file
+                original_file_path.unlink()
+                print(f"🗑️ 已删除旧的原始文件: {source_path.name}")
+            except Exception as e:
+                print(f"❌ 删除旧原始文件失败: {e}")
+                # Check for permission errors
+                if "WinError 5" in str(e) or "Access is denied" in str(e) or "Permission denied" in str(e):
+                    print(f"💡 文件 '{source_path.name}' 可能被其他应用程序锁定")
+                    print(f"📝 请关闭相关应用程序后重试，或使用不同的文件名")
+                    return ""
+                else:
+                    print(f"⚠️ 其他错误: {e}")
+                    return ""
+        
+        # Copy the original file to the original_file subfolder
+        try:
+            shutil.copy2(source_path, original_file_path)
+            print(f"💾 原始文件已保存: {original_file_path}")
+            return str(original_file_path)
+        except Exception as e:
+            print(f"❌ 保存原始文件失败: {e}")
+            # Check for permission errors
+            if "WinError 5" in str(e) or "Access is denied" in str(e) or "Permission denied" in str(e):
+                print(f"💡 目标文件 '{original_file_path}' 可能被其他应用程序锁定")
+                print(f"📝 请关闭相关应用程序后重试")
+            else:
+                print(f"⚠️ 其他错误: {e}")
+            return ""
+            
+    except Exception as e:
+        print(f"❌ 保存原始文件时发生意外错误: {e}")
+        return ""
+
+
+def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: str = None) -> list[str]:
+    """Process files and store them as .txt files in the staging area: conversations/session_id/user_uploaded_files
+    This function only handles file processing, not original file saving.
+    
+    Args:
+        file_paths: List of file paths to process
+        session_id: Session identifier for folder structure
+        output_dir: Optional output directory override
+        
+    Returns:
+        list[str]: List of processed .txt file paths in staging area
     """
     
-    import shutil
     from pathlib import Path
     
     if output_dir:
-        conversation_dir = Path(output_dir)
-        conversation_dir.mkdir(parents=True, exist_ok=True)
-        original_files_dir = conversation_dir / "original_file"
-        original_files_dir.mkdir(parents=True, exist_ok=True)
+        staging_dir = Path(output_dir)
+        staging_dir.mkdir(parents=True, exist_ok=True)
     else:
-        # Create the conversation folder structure
-        project_root = Path.cwd()  # Use current directory instead of parent
-        conversation_dir = project_root / "conversations" / session_id / "user_uploaded_files"
-        conversation_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create original_file subfolder
-        original_files_dir = conversation_dir / "original_file"
-        original_files_dir.mkdir(parents=True, exist_ok=True)
+        # Create the staging area: conversations/session_id/user_uploaded_files
+        project_root = Path.cwd()
+        staging_dir = project_root / "conversations" / session_id / "user_uploaded_files"
+        staging_dir.mkdir(parents=True, exist_ok=True)
     
     processed_files = []
-    original_files = []
     
     for file_path in file_paths:
         try:
@@ -136,55 +186,29 @@ def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: st
                 
             print(f"🔄 Processing file: {source_path.name}")
             
-            # First, save the original file in the original_file subfolder
-            original_file_path = original_files_dir / source_path.name
-            
-            # Handle duplicate original files by updating content
-            if original_file_path.exists():
-                print(f"⚠️ Original file already exists, updating content: {source_path.name}")
-                try:
-                    original_file_path.unlink()  # Remove the existing original file
-                    print(f"🗑️ Removed existing original file: {source_path.name}")
-                except Exception as e:
-                    print(f"❌ Failed to remove existing original file: {e}")
-            
-            # Copy the original file to the original_file subfolder
-            try:
-                shutil.copy2(source_path, original_file_path)
-                original_files.append(str(original_file_path))
-                print(f"💾 Original file saved: {original_file_path}")
-            except Exception as e:
-                print(f"❌ Failed to save original file: {e}")
-                continue
-            
-            # Now process the file content
+            # Process the file content
             processed_content = process_file_to_text(source_path)
             
             if processed_content is not None:
-                # Write the processed content to final destination file
-                txt_file_path = conversation_dir / f"{source_path.stem}.txt"
+                # Save processed content as .txt file in staging area
+                txt_file_path = staging_dir / f"{source_path.stem}.txt"
                 
-                # Handle duplicate processed files by updating content
                 if txt_file_path.exists():
-                    print(f"⚠️ Processed file already exists, updating content: {txt_file_path.name}")
+                    print(f"⚠️ 处理文件已存在，正在更新内容: {txt_file_path.name}")
                 
                 txt_file_path.write_text(processed_content, encoding='utf-8')
                 processed_files.append(str(txt_file_path))
-                print(f"✅ File processed and saved: {txt_file_path}")
+                print(f"✅ 文件处理并保存到暂存区: {txt_file_path}")
             else:
-                print(f"❌ Failed to process file content: {source_path.name}")
-                # Even if processing failed, we still keep the original file
+                print(f"❌ 文件内容处理失败: {source_path.name}")
                 
         except Exception as e:
-            print(f"❌ Unexpected error processing {file_path}: {e}")
+            print(f"❌ 处理文件时发生意外错误 {file_path}: {e}")
             continue
     
-    print(f"🎉 Successfully processed {len(processed_files)} files and saved {len(original_files)} original files")
+    print(f"🎉 成功处理 {len(processed_files)} 个文件到暂存区")
     
-    return {
-        "processed_files": processed_files,
-        "original_files": original_files
-    }
+    return processed_files
 
 
 def process_file_to_text(file_path: str | Path) -> str | None:
@@ -474,7 +498,28 @@ def extract_filename(file_path: str) -> str:
     return filename
 
 
-def fetch_related_files_content(related_files: List[str], base_path: str = "D:/asianInfo/ExcelAssist/conversations/files/user_uploaded_files") -> Dict[str, str]:
+def fetch_related_files_content(related_files: dict[str], base_path: str = r"D:\asianInfo\ExcelAssist\files") -> ict[str, str]:
+    """
+    Wrapper fucntion that receives a dictionary of classified related files, and invoke fetch_related_files_content
+    to fetch the actual content
+    """
+    print("related_files:  aaaaaaaaaa", related_files)
+    table_files = related_files["表格"]
+    base_path = r"D:\asianInfo\ExcelAssist\files\table_files\html_content"
+    table_files_content = fetch_files_content(table_files, base_path)
+
+    # document_files = related_files["文档"]
+    # base_path = r"D:\asianInfo\ExcelAssist\files\document_files\html_content"
+    # document_files_content = fetch_files_content(document_files, base_path)
+
+    # file_content = {**table_files_content, **document_files_content}
+
+    return table_files_content
+
+
+    
+
+def fetch_files_content(related_files: List[str], base_path: str = r"D:\asianInfo\ExcelAssist\files") -> Dict[str, str]:
         """
         Fetch the content of related files from the specified directory
         
@@ -1228,3 +1273,208 @@ def move_template_files_safely(processed_template_file: str, original_files_list
 
 def convert_html_to_excel(html_file_path: str, output_dir: str = "agents/output") -> str:
     """use python"""
+    pass
+
+def move_template_files_to_final_destination(processed_file_path: str, original_file_path: str, session_id: str) -> dict[str, str]:
+    """Move template files from staging area to final destination.
+    
+    Destination: conversations/session_id/user_uploaded_files/template/
+    
+    Args:
+        processed_file_path: Path to processed template file in staging area
+        original_file_path: Path to original template file in staging area
+        session_id: Session identifier
+        
+    Returns:
+        dict: {
+            "processed_template_path": str,  # Final path of processed template
+            "original_template_path": str    # Final path of original template
+        }
+    """
+    import shutil
+    from pathlib import Path
+    
+    try:
+        # Create destination directory
+        project_root = Path.cwd()
+        dest_dir = project_root / "conversations" / session_id / "user_uploaded_files" / "template"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        
+        result = {
+            "processed_template_path": "",
+            "original_template_path": ""
+        }
+        
+        # Move processed template file
+        if processed_file_path and Path(processed_file_path).exists():
+            processed_source = Path(processed_file_path)
+            processed_target = dest_dir / processed_source.name
+            
+            # Handle existing file
+            if processed_target.exists():
+                print(f"⚠️ 模板文件已存在，正在更新: {processed_target.name}")
+                processed_target.unlink()
+            
+            shutil.move(str(processed_source), str(processed_target))
+            result["processed_template_path"] = str(processed_target)
+            print(f"✅ 模板文件已移动到: {processed_target}")
+        
+        # Move original template file
+        if original_file_path and Path(original_file_path).exists():
+            original_source = Path(original_file_path)
+            original_target = dest_dir / original_source.name
+            
+            # Handle existing file
+            if original_target.exists():
+                print(f"⚠️ 原始模板文件已存在，正在更新: {original_target.name}")
+                original_target.unlink()
+            
+            shutil.move(str(original_source), str(original_target))
+            result["original_template_path"] = str(original_target)
+            print(f"✅ 原始模板文件已移动到: {original_target}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ 移动模板文件时出错: {e}")
+        return {
+            "processed_template_path": processed_file_path,
+            "original_template_path": original_file_path
+        }
+
+
+
+def move_supplement_files_to_final_destination(processed_file_path: str, original_file_path: str, file_type: str) -> dict[str, str]:
+    """Move supplement files from staging area to final destination with simple override strategy.
+    
+    Destinations:
+    - Table files: conversations/files/table_files/html_content/ and conversations/files/table_files/original/
+    - Document files: conversations/files/document_files/html_content/ and conversations/files/document_files/original/
+    
+    Args:
+        processed_file_path: Path to processed supplement file in staging area
+        original_file_path: Path to original supplement file in staging area
+        file_type: Either "table" or "document"
+        
+    Returns:
+        dict: {
+            "processed_supplement_path": str,  # Final path of processed supplement
+            "original_supplement_path": str    # Final path of original supplement
+        }
+    """
+    import shutil
+    import stat
+    from pathlib import Path
+    
+    def remove_readonly_and_delete(target_path: Path):
+        """Remove read-only attribute and delete file"""
+        try:
+            if target_path.exists():
+                # Remove read-only attribute
+                target_path.chmod(stat.S_IWRITE | stat.S_IREAD)
+                target_path.unlink()
+                print(f"🗑️ 已删除只读文件: {target_path.name}")
+        except Exception as e:
+            print(f"⚠️ 删除文件时出错: {e}")
+            raise
+    
+    try:
+        # Determine destination based on file type
+        project_root = Path.cwd()
+        
+        if file_type == "table":
+            html_content_dir = project_root / "files" / "table_files" / "html_content"
+            original_dir = project_root / "files" / "table_files" / "original"
+        elif file_type == "document":
+            html_content_dir = project_root / "files" / "document_files" / "html_content"
+            original_dir = project_root / "files" / "document_files" / "original"
+        else:
+            print(f"❌ 无效的文件类型: {file_type}")
+            return {
+                "processed_supplement_path": processed_file_path,
+                "original_supplement_path": original_file_path
+            }
+        
+        # Create destination directories
+        html_content_dir.mkdir(parents=True, exist_ok=True)
+        original_dir.mkdir(parents=True, exist_ok=True)
+        
+        result = {
+            "processed_supplement_path": "",
+            "original_supplement_path": ""
+        }
+        
+        # Move processed supplement file
+        if processed_file_path and Path(processed_file_path).exists():
+            processed_source = Path(processed_file_path)
+            processed_target = html_content_dir / processed_source.name
+            
+            # Handle existing file with read-only attribute
+            if processed_target.exists():
+                print(f"⚠️ 补充文件已存在，正在覆盖: {processed_target.name}")
+                remove_readonly_and_delete(processed_target)
+            
+            shutil.move(str(processed_source), str(processed_target))
+            result["processed_supplement_path"] = str(processed_target)
+            print(f"✅ 补充文件已移动到: {processed_target}")
+        
+        # Move original supplement file
+        if original_file_path and Path(original_file_path).exists():
+            original_source = Path(original_file_path)
+            original_target = original_dir / original_source.name
+            
+            # Handle existing file with read-only attribute
+            if original_target.exists():
+                print(f"⚠️ 原始补充文件已存在，正在覆盖: {original_target.name}")
+                remove_readonly_and_delete(original_target)
+            
+            shutil.move(str(original_source), str(original_target))
+            result["original_supplement_path"] = str(original_target)
+            print(f"✅ 原始补充文件已移动到: {original_target}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ 移动补充文件时出错: {e}")
+        return {
+            "processed_supplement_path": processed_file_path,
+            "original_supplement_path": original_file_path
+        }
+
+
+def delete_files_from_staging_area(file_paths: list[str]) -> dict[str, list[str]]:
+    """Delete irrelevant files from staging area.
+    
+    Args:
+        file_paths: List of file paths to delete
+        
+    Returns:
+        dict: {
+            "deleted_files": list[str],  # Successfully deleted files
+            "failed_deletes": list[str]  # Files that failed to delete
+        }
+    """
+    from pathlib import Path
+    
+    deleted_files = []
+    failed_deletes = []
+    
+    for file_path in file_paths:
+        try:
+            file_to_delete = Path(file_path)
+            if file_to_delete.exists():
+                file_to_delete.unlink()
+                deleted_files.append(str(file_to_delete))
+                print(f"🗑️ 已删除无关文件: {file_to_delete.name}")
+            else:
+                print(f"⚠️ 文件不存在，跳过删除: {file_path}")
+        except Exception as e:
+            failed_deletes.append(file_path)
+            print(f"❌ 删除文件失败 {file_path}: {e}")
+    
+    print(f"📊 删除结果: 成功 {len(deleted_files)} 个，失败 {len(failed_deletes)} 个")
+    
+    return {
+        "deleted_files": deleted_files,
+        "failed_deletes": failed_deletes
+    }

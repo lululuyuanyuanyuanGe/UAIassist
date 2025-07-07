@@ -71,6 +71,7 @@ class FrontdeskState(TypedDict):
     template_file_path: str
     table_summary: str
     headers_mapping: dict[str, str]
+    recalled_xls_files: list[str]
 
 
 class FrontdeskAgent:
@@ -100,6 +101,7 @@ class FrontdeskAgent:
         graph.add_node("simple_template_handle", self._simple_template_analysis)
         graph.add_node("chat_with_user_to_determine_template", self._chat_with_user_to_determine_template)
         graph.add_node("recall_files_agent", self._recall_files_agent)
+        graph.add_node("fillout_table_agent", self._fillout_table_agent)
 
         graph.add_edge(START, "entry")
         graph.add_edge("entry", "initial_collect_user_input")
@@ -107,7 +109,8 @@ class FrontdeskAgent:
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
         graph.add_edge("simple_template_handle", "recall_files_agent")
-        graph.add_edge("recall_files_agent", END)
+        graph.add_edge("recall_files_agent", "fillout_table_agent")
+        graph.add_edge("fillout_table_agent", END)
 
         
         # Compile the graph to make it executable with stream() method
@@ -126,7 +129,8 @@ class FrontdeskAgent:
             "table_structure": "",
             "session_id": session_id,
             "previous_node": "",
-            "headers_mapping": {}
+            "headers_mapping": {},
+            "recalled_xls_files": []
         }
 
 
@@ -279,19 +283,21 @@ class FrontdeskAgent:
         # Check if we have tool results from previous interaction
         if state.get("messages") and len(state["messages"]) > 0:
             latest_message = state["messages"][-1]
-            if isinstance(latest_message, ToolMessage):
-                # Process tool result
-                tool_result = latest_message.content
-                print(f"🔧 处理工具结果: {tool_result}")
-                
-                # Use tool result to build context for the next interaction
-                user_context = f"用户提供的信息: {tool_result}"
+            user_context = latest_message.content
+            print(f"📋 用户上下文: {user_context}")
+            user_context = json.loads(user_context)
+            if isinstance(user_context, list):
+                print("🔍 用户上下文是列表:" , user_context[0])
+                user_context = user_context[0]
+                # Fix: Parse the JSON string again since user_context[0] is still a string
+                if isinstance(user_context, str):
+                    user_context = json.loads(user_context)
+                user_context = user_context["summary"]
             else:
-                user_context = state["chat_history"][-1] if state.get("chat_history") else "用户需要确定表格结构"
+                user_context = user_context["summary"]
         else:
             user_context = "用户需要确定表格结构"
-            
-        print(f"📋 用户上下文: {user_context}")
+        print(f"🔍 用户上下文: {user_context}")
 
         system_prompt = f"""你是一个智能 Excel 表格生成助手，现在你需要和用户进行对话，来确认用户想要生成的表格结构内容。
 表格可能涉及到复杂的多级表头，因此你需要弄清楚所有的结构层级，不断询问用户，直到你搞清楚全部需求，并返回以下格式：
@@ -324,10 +330,13 @@ class FrontdeskAgent:
 
 当前情况: {user_context}
 """
-
+        print("system_prompt和用户交互确定表格结构:\n ", system_prompt)
         print("📤 正在调用LLM进行表格结构确定...")
-        response = invoke_model_with_tools(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)], tools=self.tools)
+        response = invoke_model_with_tools(model_name="gpt-4o", 
+                                           messages=[SystemMessage(content=system_prompt)], tools=self.tools)
         
+        print("返回结果：", response)
+
         # 创建AIMessage时需要保留tool_calls信息
         if hasattr(response, 'tool_calls') and response.tool_calls:
             # 如果有工具调用，创建包含tool_calls的AIMessage
@@ -473,7 +482,8 @@ class FrontdeskAgent:
         recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(
             template_structure=json.dumps(template_structure, ensure_ascii=False)
         )
-
+        print(type(recallFilesAgent_final_state))
+        print("recallFilesAgent_final_state: ", recallFilesAgent_final_state)
         headers_mapping = recallFilesAgent_final_state.get("headers_mapping")
         print(f"🔍 表头映射: {headers_mapping}")
         return {"headers_mapping": headers_mapping}
@@ -486,9 +496,11 @@ class FrontdeskAgent:
         print("=" * 50)
         
         filloutTableAgent = FilloutTableAgent()
-        filloutTableAgent_final_state = filloutTableAgent.run_fillout_table_agent(headers_mapping=state["headers_mapping"]
-
-                                                                                  
+        filloutTableAgent_final_state = filloutTableAgent.run_fillout_table_agent(
+            session_id=state["session_id"],
+            headers_mapping=state["headers_mapping"],
+            data_file_path=state["recalled_xls_files"],
+            template_file=state["template_file_path"]                                                                       
                                                                                   )
         print(f"🔍 填充表格响应: {filloutTableAgent_final_state}")
 

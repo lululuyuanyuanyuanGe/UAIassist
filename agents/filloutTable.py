@@ -45,7 +45,6 @@ load_dotenv()
 class FilloutTableState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     data_file_path: list[str]
-    supplement_files_path: list[str]
     supplement_files_summary: str
     template_file: str
     template_file_completion_code: str
@@ -111,26 +110,8 @@ class FilloutTableAgent:
         return {
             "messages": [],
             "data_file_path": data_file_path, # excel files(xls) that has raw data
-            "supplement_files_path": supplement_files_path,
             "template_file": template_file, # txt file of template file in html format
-            "supplement_files_summary": """
-1. **享受面积计算逻辑**：
-   - 必须满足条件：`承包地面积 ≥ (撂荒地面积 + 改变用途面积)`
-   - 若计算结果为负值，需在备注栏标注"数据异常"并人工复核
-
-2. **补贴金额示例**（需根据2025年政策更新）：
-   ```python
-   def calculate_subsidy(row):
-       if row["享受面积"] > 0:
-           return row["享受面积"] * 100  # 假设2023年标准为100元/亩
-       else:
-           return 0
-   ```
-
-3. **数据筛选规则**：
-   - 自动排除：身份证号无效、承包地面积为零的农户
-   - 人工复核：享受面积超过50亩的大户（需附加土地流转协议证明）
-""",
+            "supplement_files_summary": "",
             "template_file_completion_code": "",
             "fill_CSV_2_template_code": "",
             "combined_data": "",
@@ -1122,63 +1103,21 @@ th {
     #         print(f"❌ 转换过程中发生错误: {e}")
     #         return {"error_message": f"转换失败: {str(e)}"}
 
-    def run_fillout_table_agent(self, session_id: str = "1",
-                                template_file: str = r"D:\asianInfo\ExcelAssist\agents\output\老党员补贴.html",
-                                data_file_path: list[str] = [r"D:\asianInfo\ExcelAssist\燕云村case\燕云村2024年度党员名册.xlsx"],
-                                supplement_files_path: list[str] = [r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_files\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.txt"],
-                                headers_mapping: dict[str, str] = {}
+    def run_fillout_table_agent(self, session_id: str,
+                                template_file: str,
+                                data_file_path: list[str],
+                                headers_mapping: dict[str, str]
                                 ) -> None:
         """This function will run the fillout table agent using invoke method with manual debug printing"""
         print("\n🚀 启动 FilloutTableAgent")
         print("=" * 60)
         
         initial_state = self.create_initialize_state(
-            template_file = r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_files\2025年巴南区耕地地力保护补贴面积清理登记表.txt",
-            data_file_path = [r"D:\asianInfo\ExcelAssist\燕云村case\村委助手智填样例(1)\2025年巴南区耕地地力保护补贴面积清理登记表\2023年巴南区耕地地力保护补贴面积清理登记表.xlsx"],
-            supplement_files_path = [],
-            headers_mapping={
-    "表格结构": {
-    "2025年巴南区耕地地力保护补贴面积清理登记表": {
-      "序号": ["2023年巴南区耕地地力保护补贴面积清理登记表.txt: 序号"],
-      "农户编号": ["2023年巴南区耕地地力保护补贴面积清理登记表.txt: 农户编号"],
-      "户主姓名": ["2023年巴南区耕地地力保护补贴面积清理登记表.txt: 户主姓名"],
-      "家庭住址": ["2023年巴南区耕地地力保护补贴面积清理登记表.txt: 家庭住址"],
-      "身份证号": ["2023年巴南区耕地地力保护补贴面积清理登记表.txt: 身份证号"],
-      "耕地信息": [
-        {
-          "承包地面积": [
-            "2023年巴南区耕地地力保护补贴面积清理登记表.txt: 承包地面积",
-            "填写规则：以土地承包合同或确权登记面积为依据（单位：亩）"
-          ]
-        },
-        {
-          "撂荒地面积": [
-            "2023年巴南区耕地地力保护补贴面积清理登记表.txt: 撂荒地面积",
-            "填写规则：连续荒芜1年以上的耕地面积（单位：亩）"
-          ]
-        },
-        {
-          "改变用途面积": [
-            "2023年巴南区耕地地力保护补贴面积清理登记表.txt: 改变用途面积",
-            "填写规则：已转为林地/养殖场等非耕用途的面积（单位：亩）"
-          ]
-        },
-        {
-          "享受面积": [
-            "推理规则：享受面积 = 承包地面积 - 撂荒地面积 - 改变用途面积",
-            "补贴标准：按当地当年公布标准执行（示例：2023年为100元/亩）"
-          ]
-        }
-      ],
-      "备注": [
-        "推理规则：需人工填写以下情况备注",
-        "1. 承包地存在争议的农户",
-        "2. 身份证号与户籍系统不一致的",
-        "3. 整户消亡或迁出的特殊说明"
-      ]
-    }
-  }
-})
+            template_file = template_file,
+            data_file_path = data_file_path,
+            headers_mapping=headers_mapping
+        )
+
         config = {"configurable": {"thread_id": session_id}}
         
         print(f"📋 初始状态创建完成，会话ID: {session_id}")

@@ -9,16 +9,16 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.modelRelated import invoke_model
-from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, 
+from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, save_original_file,
                                     extract_filename, determine_location_from_content, 
                                     ensure_location_structure, check_file_exists_in_data,
-                                    get_available_locations, move_template_file_safely, move_template_files_safely)
+                                    get_available_locations, move_template_files_to_final_destination,
+                                    move_supplement_files_to_final_destination, delete_files_from_staging_area)
 
 
 import uuid
 import json
 import os
-from pathlib import Path
 # Create an interactive chatbox using gradio
 import gradio as gr
 from dotenv import load_dotenv
@@ -262,10 +262,29 @@ class ProcessUserInputAgent:
         
         print(f"🔄 正在处理 {len(detected_files)} 个新文件...")
         
-        # Process the files using the correct session_id
-        result = retrieve_file_content(detected_files, "files")
+        # Create staging area for original files
+        project_root = Path.cwd()
+        staging_dir = project_root / "conversations" / "files" / "user_uploaded_files"
+        staging_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"✅ 文件上传完成: {result}")
+        # Process the files to get .txt versions
+        processed_files = retrieve_file_content(detected_files, "files")
+        
+        # Save original files separately
+        original_files = []
+        for file_path in detected_files:
+            try:
+                source_path = Path(file_path)
+                original_file_saved_path = save_original_file(source_path, staging_dir)
+                if original_file_saved_path:
+                    original_files.append(original_file_saved_path)
+                    print(f"💾 原始文件已保存: {Path(original_file_saved_path).name}")
+                else:
+                    print(f"⚠️ 原始文件保存失败: {source_path.name}")
+            except Exception as e:
+                print(f"❌ 保存原始文件时出错 {file_path}: {e}")
+        
+        print(f"✅ 文件处理完成: {len(processed_files)} 个处理文件, {len(original_files)} 个原始文件")
         print("✅ _file_upload 执行完成")
         print("=" * 50)
         
@@ -276,8 +295,8 @@ class ProcessUserInputAgent:
         return {
             "new_upload_files_path": detected_files,
             "upload_files_path": existing_files + detected_files,
-            "new_upload_files_processed_path": result["processed_files"],
-            "original_files_path": existing_original_files + result["original_files"]
+            "new_upload_files_processed_path": processed_files,
+            "original_files_path": existing_original_files + original_files
         }
     
 
@@ -353,7 +372,7 @@ class ProcessUserInputAgent:
                 文件内容:
                 {analysis_content}
 
-                请严格按照以下JSON格式回复，只返回这一个文件的分类结果（不要添加任何其他文字）：
+                请严格按照以下JSON格式回复，只返回这一个文件的分类结果（不要添加任何其他文字），不要将返回内容包裹在```json```中：
                 {{
                     "classification": "template" | "supplement-表格" | "supplement-文档" | "irrelevant"
                 }}"""
@@ -650,12 +669,14 @@ class ProcessUserInputAgent:
                     analysis_response = f"表格文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
                 
                 # Create result data with location information
+                # Note: file_path will be updated after moving to final destination
                 result_data = {
                     "file_key": source_path.name,
                     "location": location,
                     "new_entry": {
                         "summary": analysis_response,
-                        "file_path": str(table_file),
+                        "file_path": str(table_file),  # This will be updated after moving
+                        "original_file_path": str(source_path),  # This will be updated after moving
                         "timestamp": datetime.now().isoformat(),
                         "file_size": source_path.stat().st_size
                     },
@@ -793,12 +814,14 @@ class ProcessUserInputAgent:
                     analysis_response = f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
 
                 # Create result data with multiple location information
+                # Note: file_path will be updated after moving to final destination
                 result_data = {
                     "file_key": source_path.name,
                     "selected_locations": selected_locations,  # Multiple locations
                     "new_entry": {
                         "summary": analysis_response,
-                        "file_path": str(document_file),
+                        "file_path": str(document_file),  # This will be updated after moving
+                        "original_file_path": str(source_path),  # This will be updated after moving
                         "timestamp": datetime.now().isoformat(),
                         "file_size": source_path.stat().st_size
                     },
@@ -903,6 +926,81 @@ class ProcessUserInputAgent:
         
         print(f"🎉 并行文件处理完成，共处理 {total_files} 个文件")
         
+        # Move supplement files to their final destinations and update data.json with new paths
+        original_files = state.get("original_files_path", [])
+        
+        # Track moved files to update data.json paths
+        moved_files_info = {}
+        
+        # Move table files to their final destination
+        for table_file in table_files:
+            # Find corresponding original file
+            table_file_stem = Path(table_file).stem
+            corresponding_original_file = ""
+            
+            for original_file in original_files:
+                if Path(original_file).stem == table_file_stem:
+                    corresponding_original_file = original_file
+                    break
+            
+            try:
+                move_result = move_supplement_files_to_final_destination(
+                    table_file, corresponding_original_file, "table"
+                )
+                print(f"✅ 表格文件已移动到最终位置: {Path(table_file).name}")
+                
+                # Store moved file info for later data.json update
+                moved_files_info[Path(table_file).name] = {
+                    "new_processed_path": move_result["processed_supplement_path"],
+                    "new_original_path": move_result["original_supplement_path"]
+                }
+            except Exception as e:
+                print(f"❌ 移动表格文件失败 {table_file}: {e}")
+        
+        # Move document files to their final destination
+        for document_file in document_files:
+            # Find corresponding original file
+            document_file_stem = Path(document_file).stem
+            corresponding_original_file = ""
+            
+            for original_file in original_files:
+                if Path(original_file).stem == document_file_stem:
+                    corresponding_original_file = original_file
+                    break
+            
+            try:
+                move_result = move_supplement_files_to_final_destination(
+                    document_file, corresponding_original_file, "document"
+                )
+                print(f"✅ 文档文件已移动到最终位置: {Path(document_file).name}")
+                
+                # Store moved file info for later data.json update
+                moved_files_info[Path(document_file).name] = {
+                    "new_processed_path": move_result["processed_supplement_path"],
+                    "new_original_path": move_result["original_supplement_path"]
+                }
+            except Exception as e:
+                print(f"❌ 移动文档文件失败 {document_file}: {e}")
+        
+        # Update data.json entries with new file paths
+        for location in data.keys():
+            if isinstance(data[location], dict):
+                # Update table file paths
+                for file_key in data[location].get("表格", {}):
+                    if file_key in moved_files_info:
+                        if moved_files_info[file_key]["new_processed_path"]:
+                            data[location]["表格"][file_key]["file_path"] = moved_files_info[file_key]["new_processed_path"]
+                        if moved_files_info[file_key]["new_original_path"]:
+                            data[location]["表格"][file_key]["original_file_path"] = moved_files_info[file_key]["new_original_path"]
+                
+                # Update document file paths
+                for file_key in data[location].get("文档", {}):
+                    if file_key in moved_files_info:
+                        if moved_files_info[file_key]["new_processed_path"]:
+                            data[location]["文档"][file_key]["file_path"] = moved_files_info[file_key]["new_processed_path"]
+                        if moved_files_info[file_key]["new_original_path"]:
+                            data[location]["文档"][file_key]["original_file_path"] = moved_files_info[file_key]["new_original_path"]
+        
         # Save updated data.json with atomic write
         try:
             # Write to a temporary file first to prevent corruption
@@ -952,7 +1050,7 @@ class ProcessUserInputAgent:
         
         
     def _process_irrelevant(self, state: ProcessUserInputState) -> ProcessUserInputState:
-        """This node will process the irrelevant files, it will delete the irrelevant files (both processed and original) from the conversations folder"""
+        """This node will process the irrelevant files, it will delete the irrelevant files (both processed and original) from the staging area"""
         
         print("\n🔍 开始执行: _process_irrelevant")
         print("=" * 50)
@@ -963,45 +1061,24 @@ class ProcessUserInputAgent:
         print(f"🗑️ 需要删除的无关处理文件数量: {len(irrelevant_files)}")
         print(f"🗑️ 需要删除的无关原始文件数量: {len(irrelevant_original_files)}")
         
-        deleted_files = []
-        failed_deletes = []
+        # Combine all files to delete
+        all_files_to_delete = irrelevant_files + irrelevant_original_files
         
-        # Delete processed files
-        for file_path in irrelevant_files:
-            try:
-                file_to_delete = Path(file_path)
-                print(f"🗑️ 正在删除处理文件: {file_to_delete.name}")
-                
-                if file_to_delete.exists():
-                    os.remove(file_to_delete)
-                    deleted_files.append(file_to_delete.name)
-                    print(f"✅ 已删除无关处理文件: {file_to_delete.name}")
-                else:
-                    print(f"⚠️ 处理文件不存在，跳过删除: {file_path}")
-                    
-            except Exception as e:
-                failed_deletes.append(Path(file_path).name)
-                print(f"❌ 删除处理文件时出错 {file_path}: {e}")
+        if all_files_to_delete:
+            delete_result = delete_files_from_staging_area(all_files_to_delete)
+            
+            deleted_count = len(delete_result["deleted_files"])
+            failed_count = len(delete_result["failed_deletes"])
+            
+            print(f"📊 删除结果: 成功 {deleted_count} 个，失败 {failed_count} 个 (总计 {len(all_files_to_delete)} 个文件)")
+            
+            if delete_result["failed_deletes"]:
+                print("❌ 删除失败的文件:")
+                for failed_file in delete_result["failed_deletes"]:
+                    print(f"  - {failed_file}")
+        else:
+            print("⚠️ 没有无关文件需要删除")
         
-        # Delete original files
-        for file_path in irrelevant_original_files:
-            try:
-                file_to_delete = Path(file_path)
-                print(f"🗑️ 正在删除原始文件: {file_to_delete.name}")
-                
-                if file_to_delete.exists():
-                    os.remove(file_to_delete)
-                    deleted_files.append(file_to_delete.name)
-                    print(f"✅ 已删除无关原始文件: {file_to_delete.name}")
-                else:
-                    print(f"⚠️ 原始文件不存在，跳过删除: {file_path}")
-                    
-            except Exception as e:
-                failed_deletes.append(Path(file_path).name)
-                print(f"❌ 删除原始文件时出错 {file_path}: {e}")
-
-        total_files_to_delete = len(irrelevant_files) + len(irrelevant_original_files)
-        print(f"📊 删除结果: 成功 {len(deleted_files)} 个，失败 {len(failed_deletes)} 个 (总计 {total_files_to_delete} 个文件)")
         print("✅ _process_irrelevant 执行完成")
         print("=" * 50)
         
@@ -1121,9 +1198,29 @@ class ProcessUserInputAgent:
             else:
                 template_type = "[Simple]"  # Default fallback
             
-            # 将模板文件（包括原始文件）转存到conversations/files/user_uploaded_files/template_files
+            # 将模板文件（包括原始文件）移动到最终位置
+            # Find corresponding original file
             original_files = state.get("original_files_path", [])
-            move_result = move_template_files_safely(template_file, original_files)
+            template_file_stem = Path(template_file).stem
+            corresponding_original_file = ""
+            
+            for original_file in original_files:
+                if Path(original_file).stem == template_file_stem:
+                    corresponding_original_file = original_file
+                    break
+            
+            # Move template files to final destination using session ID
+            # Extract session ID from one of the file paths
+            session_id = "files"  # Default session ID
+            if template_file:
+                # Extract session ID from the file path: conversations/session_id/user_uploaded_files/...
+                template_path_parts = Path(template_file).parts
+                if len(template_path_parts) >= 3 and template_path_parts[0] == "conversations":
+                    session_id = template_path_parts[1]
+            
+            move_result = move_template_files_to_final_destination(
+                template_file, corresponding_original_file, session_id
+            )
             final_template_path = move_result["processed_template_path"]
             
             if move_result["original_template_path"]:
@@ -1147,7 +1244,24 @@ class ProcessUserInputAgent:
             
             # Still try to move the template file (including original) even if LLM analysis fails
             original_files = state.get("original_files_path", [])
-            move_result = move_template_files_safely(template_file, original_files)
+            template_file_stem = Path(template_file).stem
+            corresponding_original_file = ""
+            
+            for original_file in original_files:
+                if Path(original_file).stem == template_file_stem:
+                    corresponding_original_file = original_file
+                    break
+            
+            # Extract session ID from file path
+            session_id = "files"  # Default session ID
+            if template_file:
+                template_path_parts = Path(template_file).parts
+                if len(template_path_parts) >= 3 and template_path_parts[0] == "conversations":
+                    session_id = template_path_parts[1]
+            
+            move_result = move_template_files_to_final_destination(
+                template_file, corresponding_original_file, session_id
+            )
             final_template_path = move_result["processed_template_path"]
             
             if move_result["original_template_path"]:
@@ -1363,6 +1477,7 @@ class ProcessUserInputAgent:
 - 注意：有时你被作为“确认节点”调用，任务是让用户判断文件是否相关，此时你需要总结的是“用户的判断结果”，而不是文件本身。
 - 请基于上下文灵活判断哪些内容构成有价值的信息。
 - 总结中请不要包含用户上传的无关信息内容，以及有效性验证
+- 但是一定不要忽略曲解用户的意图
 
 【输出格式】
 仅返回以下 JSON 对象，不得包含任何额外解释或文本,不要包裹在```json中，直接返回json格式即可：

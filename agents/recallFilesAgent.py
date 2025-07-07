@@ -61,10 +61,12 @@ class RecallFilesState(TypedDict):
     chat_history: list[str]
     related_files_str: str
     related_files: list[str]
+    classified_files: dict[str, list[str]]
     headers_mapping: dict[str, str]
     template_structure: str
     headers_mapping_: dict[any, any]
-    file_content: str
+    file_content: str # 把文件摘要里面的相关村子的文件全部提取出来，并按照表格，模板进行分类
+    document_files_content: str # 把文件摘要里面的相关村子的文件全部提取出来，并按照表格，模板进行分类
 
 
 class RecallFilesAgent:
@@ -73,6 +75,7 @@ class RecallFilesAgent:
         self.graph = self._build_graph()
         self.location: str # 村子名字
         self.files_under_location: str # 村子下的文件
+        self.related_files_classified: dict
 
     def _build_graph(self):
         graph = StateGraph(RecallFilesState)
@@ -127,6 +130,7 @@ class RecallFilesAgent:
         self.location = "燕云村"
         self.files_under_location = file_content["燕云村"]
         file_content = extract_summary_for_each_file(self.files_under_location)
+        print("===========================")
         print(self.files_under_location)
         
 
@@ -134,10 +138,12 @@ class RecallFilesAgent:
             "messages": [],
             "chat_history": [],
             "related_files": [],
+            "classified_files": {"表格": [], "文档": []},  # Add default classified files
             "headers_mapping": {},
             "template_structure": template_structure,
             "headers_mapping_": {},
-            "file_content": self.files_under_location,
+            "file_content": file_content,
+            "document_files_content": ""
         }
     
 
@@ -254,27 +260,54 @@ class RecallFilesAgent:
             print("=" * 50)
             return "determine_the_mapping_of_headers"
 
+    def _classify_files_by_type(self, file_list: list[str], file_content:str ) -> dict[str, list[str]]:
+        """Classify the files as 表格 or 文档"""
+        print(type(file_content))
+        print("内容：", file_content)
+        print(type(file_content))
+        print("文件摘要内容如", file_content)
+        classified_files = {
+            "表格": [],
+            "文档": []
+        }
 
+        for file in file_list:
+            if file in file_content["文档"]:
+                classified_files["文档"].append(file)
+            elif file in file_content["表格"]:
+                classified_files["表格"].append(file)
+        print("Classified files: \n", classified_files)
+        return classified_files
+        
 
     def _determine_the_mapping_of_headers(self, state: RecallFilesState) -> RecallFilesState:
         """确认模板表头和数据文件表头的映射关系"""
         print("\n🔍 开始执行: _determine_the_mapping_of_headers")
         print("=" * 50)
         
+        
         # Extract related files from response
         related_files = extract_file_from_recall(state["related_files_str"])
         print(f"📋 需要处理的相关文件: {related_files}")
+        classified_files = self._classify_files_by_type(related_files, self.files_under_location)
+        print("dEBUGBUGBBUBUGB", classified_files)
         
         # 获取所有相关文件的内容
         print("📖 正在读取相关文件内容...")
-        files_content = fetch_related_files_content(related_files)
+        files_content = fetch_related_files_content(classified_files)
+
+        # 获取文档内容：
+        document_files_content = ""
+        for file in classified_files["文档"]:
+            document_files_content += self.files_under_location["文档"][file]["summary"] + "\n"
+            print("document_files_content: \n", document_files_content)
         
         # 构建用于分析表头映射的提示
         files_content_str = ""
         for filename, content in files_content.items():
             if content:  # 只包含成功读取的文件
                 files_content_str += f"\n\n=== {filename} ===\n{content[:1000]}..."  # 限制内容长度避免过长
-        
+        files_content_str += '\n' + document_files_content
         print(f"📝 构建了 {len(files_content)} 个文件的内容摘要")
         
         system_prompt = f"""
@@ -305,7 +338,7 @@ class RecallFilesAgent:
 3. **输出格式要求**：  
    返回结果应保持与原模板表格结构一致，但每个表头需扩展为以下形式之一：
    - `来源文件名: 数据字段名`（表示该字段来自数据文件）
-   - `推理规则: ...`（表示该字段通过逻辑推导得出）
+   - `推理规则: ...`（表示该字段通过逻辑推导得出），你需要把具体的推理结果写出来，不要遗漏
    - 不要将返回结果包裹在```json中，直接返回json格式即可
 
 
@@ -314,7 +347,7 @@ class RecallFilesAgent:
         """
         print("提示词：\n", system_prompt)
         print("📤 正在调用LLM进行表头映射分析...")
-        response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
+        response = invoke_model(model_name="gpt-4o", messages=[SystemMessage(content=system_prompt)])
         print("📥 LLM映射分析完成")
         print("💬 智能体回复:")
         print(response)
@@ -324,7 +357,9 @@ class RecallFilesAgent:
         return {
             "messages": [AIMessage(content=response)],
             "headers_mapping": response,
-            "related_files": related_files
+            "related_files": related_files,
+            "classified_files": classified_files,  # Store classified files in state
+            "document_files_content": document_files_content
         }
     
     def run_recall_files_agent(self, template_structure: str, session_id: str = "1") -> Dict:
@@ -339,11 +374,19 @@ class RecallFilesAgent:
             # Use invoke instead of stream
             final_state = self.graph.invoke(initial_state, config=config)
 
-            # 将数据的html转换成excel
-            print(self.files_under_location)
-            table_files = self.files_under_location["表格"]
-            converted_excel_files = []
+            # 提取对应的原始xls文件
+            def extract_original_xls_file(files_under_location: dict[str, dict[str, str]], related_files: list[str]) -> list[str]:
+                """Extract the original xls table file from the related files"""
+                table_file = files_under_location["表格"]
+                extract_original_xls_file = []
+                for file in related_files:
+                    if file in table_file:
+                        extract_original_xls_file.append(table_file[file]["original_file_path"])
+                return extract_original_xls_file
                     
+            
+            original_xls_files = extract_original_xls_file(self.files_under_location, final_state.get('related_files', []))
+            print("original_xls_files有这些: \n", original_xls_files)
             
             print("\n🎉 RecallFilesAgent 执行完成！")
             print("=" * 60)
@@ -351,11 +394,11 @@ class RecallFilesAgent:
             print(f"- 召回文件数量: {len(final_state.get('related_files', []))}")
             print(f"- 相关文件: {final_state.get('related_files', [])}")
             print(f"- 表头映射已生成: {'是' if final_state.get('headers_mapping') else '否'}")
-            print(f"- 转换的Excel文件数量: {len(converted_excel_files)}")
-            print(f"- 转换的Excel文件: {converted_excel_files}")
+            print(f"- 转换的Excel文件数量: {len(original_xls_files)}")
+            print(f"- 转换的Excel文件: {original_xls_files}")
             
             # Add converted Excel files to the final state
-            final_state["converted_excel_files"] = converted_excel_files
+            final_state["original_xls_files"] = original_xls_files
             
             return final_state
             
