@@ -1,0 +1,6 @@
+D:\LibreOffice\program\soffice.exe --headless --convert-to "txt:Text (encoded):UTF8" D:\asianInfo\ExcelAssist燕云村case\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc --outdir D:\asianInfo\ExcelAssist\agents\output
+"D:\LibreOffice\program\soffice.exe" --headless --convert-to "txt:Text (encoded):UTF8" "D:\asianInfo\ExcelAssist燕云村case\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc" --outdir "D:\asianInfo\ExcelAssist\agents\output"
+
+
+D:\LibreOffice\program\soffice.exe --headless --convert-to html D:\asianInfo\ExcelAssist\燕云村case\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc --outdir D:\asianInfo\ExcelAssist\agents\output
+"D:\LibreOffice\program\soffice.exe" --headless --convert-to html "D:\asianInfo\ExcelAssist\燕云村case\[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.doc" --outdir "D:\asianInfo\ExcelAssist\agents\output"

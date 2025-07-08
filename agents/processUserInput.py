@@ -708,7 +708,7 @@ class ProcessUserInputAgent:
                 print(f"🔍 正在处理文档文件: {source_path.name}")
                 
                 file_content = source_path.read_text(encoding='utf-8')
-                file_content = file_content[:2000] if len(file_content) > 2000 else file_content
+                # file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(document_file)
                 
                 # For document files, ask user to select location(s)
@@ -784,7 +784,7 @@ class ProcessUserInputAgent:
 
 1. 忽略所有 HTML 标签（如 <p>、<div>、<table> 等），只关注文本内容；
 
-2. 从文件中提取你认为最重要的一到两项核心政策信息（例如补贴金额、适用对象、审批流程等），或者其他你觉得重要的信息，避免包含次要或重复内容；
+2. 从文件中提取重要的项核心政策信息（例如补贴金额、适用对象、审批流程等），或者其他你觉得重要的信息；
 
 3. 对提取的信息进行结构化总结，语言正式、逻辑清晰、简洁明了；
 
@@ -797,6 +797,8 @@ class ProcessUserInputAgent:
 
 6. 输出语言应与输入文档保持一致（若文档为中文，则输出中文）；
 
+7. 输出文件名和提供的文件名一致，不许有任何更改
+
 请根据上述要求，对提供的 HTML 文件内容进行分析并返回结果。
 
 文件内容:
@@ -804,6 +806,7 @@ class ProcessUserInputAgent:
 """.format(file_name=file_name, file_content=file_content)
 
                 print("📤 正在调用LLM进行文档分析...")
+                print("确认文档分析提示词：\n", system_prompt)
                 
                 try:
                     analysis_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])

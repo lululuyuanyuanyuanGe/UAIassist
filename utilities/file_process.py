@@ -150,6 +150,12 @@ def save_original_file(source_path: Path, original_files_dir: Path) -> str:
         print(f"❌ 保存原始文件时发生意外错误: {e}")
         return ""
 
+def convert_document_to_txt(file_path: str) -> str:
+    """Convert document to txt file"""
+    soffice = r"D:\LibreOffice\program\soffice.exe"
+    subprocess.run(
+        [soffice, "--headless", "--convert-to", "txt:Text (encoded):UTF8", file_path, "--outdir", "D:\asianInfo\ExcelAssist\agents\output"], check=True)
+    return file_path
 
 def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: str = None) -> list[str]:
     """Process files and store them as .txt files in the staging area: conversations/session_id/user_uploaded_files

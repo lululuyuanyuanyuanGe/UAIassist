@@ -338,14 +338,14 @@ class RecallFilesAgent:
 3. **输出格式要求**：  
    返回结果应保持与原模板表格结构一致，但每个表头需扩展为以下形式之一：
    - `来源文件名: 数据字段名`（表示该字段来自数据文件）
-   - `推理规则: ...`（表示该字段通过逻辑推导得出），你需要把具体的推理结果写出来，不要遗漏
+   - `推理规则: ...`告诉模型该字段需要通过什么逻辑推导出来，必须把详细的规则，或者计算公式写出来，不要遗漏
    - 不要将返回结果包裹在```json中，直接返回json格式即可
 
 
 ---
 请返回最终的模板表格结构，确保准确反映字段来源与生成逻辑，格式与上面一致，便于后续程序解析和处理。
         """
-        print("提示词：\n", system_prompt)
+        print("确认表头映射提示词：\n", system_prompt)
         print("📤 正在调用LLM进行表头映射分析...")
         response = invoke_model(model_name="gpt-4o", messages=[SystemMessage(content=system_prompt)])
         print("📥 LLM映射分析完成")
