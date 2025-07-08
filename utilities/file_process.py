@@ -706,7 +706,7 @@ def find_largest_file(excel_file_paths: list[str]) -> str:
 
 def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
                                       data_json_path: str = "agents/data.json", session_id: str = "1", 
-                                      headers_mapping: str = {}, chunk_nums: int = 5) -> list[str]:
+                                      headers_mapping: str = {}, chunk_nums: int = 5, largest_file: str = None) -> list[str]:
     """
     Process Excel files by finding the one with most rows, converting to CSV,
     adding detailed structure information, chunking the largest file, and combining everything.
@@ -724,22 +724,10 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         print(f"📄 Also processing supplement files content")
     
     # Step 1: Count data rows in each Excel file to find the largest
-    file_row_counts = {}
-    for file_path in excel_file_paths:
-        try:
-            df = pd.read_excel(file_path)
-            # Count actual data rows (excluding header)
-            data_rows = len(df.dropna(how='all'))  # Remove completely empty rows
-            file_row_counts[file_path] = data_rows
-            print(f"📊 {Path(file_path).name}: {data_rows} data rows")
-        except Exception as e:
-            print(f"❌ Error reading {file_path}: {e}")
-            file_row_counts[file_path] = 0
-    
-    # Find file with most rows
-    largest_file = max(file_row_counts, key=file_row_counts.get)
-    largest_row_count = file_row_counts[largest_file]
-    print(f"🎯 Largest file: {Path(largest_file).name} with {largest_row_count} rows")
+    if largest_file is None:
+        largest_file = list(find_largest_file(excel_file_paths).keys())[0]
+    else:
+        largest_file = largest_file
     
     # Step 2: Load structure information from data.json
     try:

@@ -12,7 +12,8 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 from utilities.message_process import build_BaseMessage_type, filter_out_system_messages
-from utilities.file_process import detect_and_process_file_paths, retrieve_file_content, read_txt_file, process_excel_files_with_chunking
+from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, read_txt_file, 
+                                    process_excel_files_with_chunking, find_largest_file)
 from utilities.modelRelated import invoke_model
 
 import uuid
@@ -60,6 +61,7 @@ class FilloutTableState(TypedDict):
     combined_data_array: list[str]
     headers_mapping: str
     CSV_data: list[str]
+    largest_file_row_num: int
 
 
 
@@ -126,7 +128,8 @@ class FilloutTableAgent:
             "retry": 0,
             "combined_data_array": [],
             "headers_mapping": headers_mapping,
-            "CSV_data": []
+            "CSV_data": [],
+            "largest_file_row_num": 0
         }
     
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
@@ -177,10 +180,15 @@ class FilloutTableAgent:
             
             print("🔄 正在调用process_excel_files_with_chunking函数...")
             print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
+            print("Find the largest row count in the excel files")
+            largest_file = find_largest_file(excel_file_paths)
+            largest_file_path = list(largest_file.keys())[0]
+            larges_file_row_num = list(largest_file.values())[0]
+            print(f"🎯 Largest file: {Path(largest_file_path).name} with {larges_file_row_num} rows")
             chunked_data = process_excel_files_with_chunking(data_json_path="agents/data.json", 
                                                              excel_file_paths=excel_file_paths, 
                                                              headers_mapping=state["headers_mapping"],
-                                                             chunk_nums=15)
+                                                             chunk_nums=5, largest_file=largest_file_path)
             print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
             for chunk in chunked_data:
                 print(f"==================🔍 数据块 ==================:")
@@ -189,7 +197,8 @@ class FilloutTableAgent:
             print("=" * 50)
             
             return {
-                "combined_data_array": chunked_data
+                "combined_data_array": chunked_data,
+                "largest_file_row_num": larges_file_row_num
             }
             
         except Exception as e:
@@ -226,39 +235,40 @@ class FilloutTableAgent:
         print("=" * 50)
         
         system_prompt = f"""
-你是一位专业的结构化数据填报专家，任务是根据提供的数据集和模板表头映射，生成符合结构的纯 CSV 格式数据。
+你是一位专业的结构化数据填报专家，任务是根据用户提供的【数据集】和【字段映射规则】，生成符合【模板结构要求】的标准 CSV 数据行。
 
-请严格遵循以下规范执行：
+🔧【工作流程】
+1. 首先，你需要根据数据表格的“表头结构”确定每个字段在数据行中的准确位置及其语义；
+2. 然后，逐列对照模板字段与字段映射，严格查找原始数据中的对应值；
+3. 对每个字段都必须完成必要的：字段提取、格式转换、计算推理或规则填充；
+4. 如果某些字段在原始数据中不存在，但字段映射中已定义了生成规则，你必须按照该规则进行推理，**不得忽略或空缺**；
+5. 每条输出为一行完整记录，必须符合模板字段顺序，格式为可导入的纯 CSV 数据行。
 
-【任务目标】
-1. 分析数据集与模板字段映射（字段对应、计算逻辑、推理要求等）；
-2. 对所有字段执行必要的数据转换、计算或推理操作；
-3. 生成符合模板结构要求的纯数据行，每一行代表一条完整记录；
-4. 输出结果必须严格为纯粹的 CSV 格式，不包含任何表头、注释或解释性文字。
-
-【输出格式】
-- 每一行是一条数据记录；
-- 所有列顺序必须严格按照模板定义；
+📌【输出格式要求】
+- 每行是独立的数据记录；
 - 使用英文逗号 `,` 分隔字段；
 - 每行以换行符结尾；
-- **禁止输出表头（字段名）**；
-- 输出结果应可直接导入 Excel，无需额外处理。
+- 严禁输出字段名、注释或额外说明；
+- 严禁输出 Markdown、JSON、表格、代码框等包装内容；
+- 输出应为纯文本 CSV 内容，直接可粘贴至 Excel 使用；
+- 所有列必须**严格按照模板字段的顺序输出**，**一个都不能缺失**。
 
-【字段处理要求】
-- 日期格式：`yyyy-mm-dd`）；
-- 清除无效或占位时间格式，如 `00.00.00.00`，直接替换为空；
-- 对于像"备注"等可能没有明确来源字段的列，可根据上下文推理填写补充内容；
-- 计算字段（如"党龄"、"补贴标准"）必须提供实际计算结果，不能省略；
-- 若某字段无数据但允许为空，请保持空值（两个逗号之间留空）。
+📐【字段处理规则】
+- 所有日期必须统一为 `yyyy-mm-dd` 格式；
+- 无效日期（如 `00.00.00.00` 或空格）请填为留空（即两个逗号之间留空）；
+- 计算字段（如“党龄”“补贴金额”）必须根据规则进行计算并填写具体数值，不得跳过；
+- 若字段允许为空但无可推理信息，则保留空值；
+- 若字段依赖补充信息或上下文逻辑，请严格遵循字段映射中给出的逻辑推理方式，不得凭空编造或假设；
 
-【禁止事项】
-- 禁止输出任何解释、总结、注释或标签；
-- 禁止输出非结构化内容；
-- 禁止跳过映射或计算逻辑；
-- 禁止输出表头或无关内容；
-
-请立即开始数据处理，并**只返回纯 CSV 格式的数据记录**，每一行为一条记录，**不包含字段名**。
+🚫【禁止事项】
+- 禁止输出字段名或表头；
+- 禁止输出任何非结构化内容、注释、解释或说明；
+- 禁止跳过任何字段的映射、计算或推理；
+- 禁止输出 JSON、Markdown 或代码格式；
+- **禁止模型自由发挥或假设未知字段内容**，一切仅以数据与规则为依据。
 """
+
+
 
 
         
@@ -277,9 +287,9 @@ class FilloutTableAgent:
                 print("用户输入提示词", user_input)
                 print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
                 response = invoke_model(
-                    model_name="deepseek-ai/DeepSeek-V3", 
+                    model_name="Pro/deepseek-ai/DeepSeek-V3", 
                     messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                    temperature=0.3
+                    temperature=0.2
                 )
                 print(f"✅ Completed chunk {index + 1}")
                 return (index, response)
@@ -302,7 +312,7 @@ class FilloutTableAgent:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         results = {}
-        with ThreadPoolExecutor(max_workers=15) as executor:  # Limit to 5 concurrent requests
+        with ThreadPoolExecutor(max_workers=5) as executor:  # Limit to 5 concurrent requests
             # Submit all tasks
             future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                               for chunk_data in chunks_with_indices}
@@ -678,7 +688,7 @@ import copy
 
 input_path = ""
 output_path = ""
-num_rows_to_generate = 100
+num_rows_to_generate = {state["largest_file_row_num"]}
 
 with open(input_path, 'r', encoding='utf-8') as f:
     soup = BeautifulSoup(f, 'html.parser')

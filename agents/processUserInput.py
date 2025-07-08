@@ -878,6 +878,7 @@ class ProcessUserInputAgent:
             for file_path, file_type in all_files:
                 if file_type == "table":
                     future = executor.submit(process_table_file, file_path)
+                    # Implement the logic for 
                 else:  # document
                     future = executor.submit(process_document_file, file_path)
                 future_to_file[future] = (file_path, file_type)

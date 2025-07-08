@@ -492,8 +492,7 @@ class FrontdeskAgent:
         recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(
             template_structure=json.dumps(template_structure, ensure_ascii=False)
         )
-        print(type(recallFilesAgent_final_state))
-        print("recallFilesAgent_final_state: ", recallFilesAgent_final_state)
+
         headers_mapping = recallFilesAgent_final_state.get("headers_mapping")
         return {"headers_mapping": headers_mapping,
                 "recalled_xls_files": recallFilesAgent_final_state.get("original_xls_files")

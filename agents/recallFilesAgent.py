@@ -211,7 +211,7 @@ class RecallFilesAgent:
         response = invoke_model_with_tools(model_name = "gpt-4o", 
                                            messages = [SystemMessage(content = system_prompt)], 
                                            tools=self.tools,
-                                           temperature = 0.5)
+                                           temperature = 0.2)
         response_content = ""
         print("Garbage returned from our LLM: \n", response)
         # invoke_maodel_with_tools永远不会返回str
@@ -262,10 +262,7 @@ class RecallFilesAgent:
 
     def _classify_files_by_type(self, file_list: list[str], file_content:str ) -> dict[str, list[str]]:
         """Classify the files as 表格 or 文档"""
-        print(type(file_content))
-        print("内容：", file_content)
-        print(type(file_content))
-        print("文件摘要内容如", file_content)
+
         classified_files = {
             "表格": [],
             "文档": []
@@ -297,6 +294,7 @@ class RecallFilesAgent:
         files_content = fetch_related_files_content(classified_files)
 
         # 获取文档内容：
+        print("classified_files有什么: \n", classified_files)
         document_files_content = ""
         for file in classified_files["文档"]:
             document_files_content += self.files_under_location["文档"][file]["summary"] + "\n"
@@ -308,7 +306,7 @@ class RecallFilesAgent:
             if content:  # 只包含成功读取的文件
                 table_files_content_str += f"\n\n=== {filename} ===\n{content[:1000]}..."  # 限制内容长度避免过长
 
-        files_content_str = table_files_content_str + "\n" + document_files_content
+        files_content_str = table_files_content_str + "\n\n" + document_files_content
         print(f"📝 构建了 {len(files_content)} 个文件的内容摘要")
 
         
