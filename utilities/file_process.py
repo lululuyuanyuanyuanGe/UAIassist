@@ -298,28 +298,28 @@ def _process_spreadsheet_in_memory(source_path: Path) -> str:
 
 
 def _process_document_in_memory(source_path: Path) -> str:
-    """Process document file in memory using LibreOffice"""
+    """Process document file in memory using LibreOffice to convert to txt"""
     import tempfile
     
     # Create a temporary directory for LibreOffice processing
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir_path = Path(temp_dir)
         
-        # LibreOffice export to temp directory
+        # LibreOffice export to temp directory as txt
         soffice = r"D:\LibreOffice\program\soffice.exe"
         subprocess.run(
-            [soffice, "--headless", "--convert-to", "html", str(source_path),
+            [soffice, "--headless", "--convert-to", "txt:Text (encoded):UTF8", str(source_path),
              "--outdir", str(temp_dir_path)],
             check=True
         )
         
-        # Read the generated HTML file
-        raw_html_path = temp_dir_path / f"{source_path.stem}.html"
-        if not raw_html_path.exists():
-            raise FileNotFoundError(f"LibreOffice did not create {raw_html_path}")
+        # Read the generated TXT file
+        raw_txt_path = temp_dir_path / f"{source_path.stem}.txt"
+        if not raw_txt_path.exists():
+            raise FileNotFoundError(f"LibreOffice did not create {raw_txt_path}")
         
-        # Clean HTML in memory and return the result
-        return _clean_html_in_memory(raw_html_path)
+        # Read and return the txt content directly
+        return _read_text_auto(raw_txt_path)
 
 
 def _clean_html_in_memory(raw_html_path: Path) -> str:
@@ -506,9 +506,9 @@ def extract_filename(file_path: str) -> str:
     return filename
 
 
-def fetch_related_files_content(related_files: dict[str], base_path: str = r"D:\asianInfo\ExcelAssist\files") -> ict[str, str]:
+def fetch_related_files_content(related_files: dict[str], base_path: str = r"D:\asianInfo\ExcelAssist\files") -> dict[str, str]:
     """
-    Wrapper fucntion that receives a dictionary of classified related files, and invoke fetch_related_files_content
+    Wrapper function that receives a dictionary of classified related files, and invoke fetch_related_files_content
     to fetch the actual content
     """
     print("related_files:  aaaaaaaaaa", related_files)
@@ -517,12 +517,13 @@ def fetch_related_files_content(related_files: dict[str], base_path: str = r"D:\
     table_files_content = fetch_files_content(table_files, base_path)
 
     # document_files = related_files["文档"]
-    # base_path = r"D:\asianInfo\ExcelAssist\files\document_files\html_content"
+    # base_path = r"D:\asianInfo\ExcelAssist\files\document_files\txt_content"
     # document_files_content = fetch_files_content(document_files, base_path)
 
-    # file_content = {**table_files_content, **document_files_content}
+    file_content = table_files_content
 
-    return table_files_content
+    return file_content
+
 
 
     
@@ -1382,7 +1383,7 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
     
     Destinations:
     - Table files: conversations/files/table_files/html_content/ and conversations/files/table_files/original/
-    - Document files: conversations/files/document_files/html_content/ and conversations/files/document_files/original/
+    - Document files: conversations/files/document_files/txt_content/ and conversations/files/document_files/original/
     
     Args:
         processed_file_path: Path to processed supplement file in staging area
@@ -1416,10 +1417,10 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         project_root = Path.cwd()
         
         if file_type == "table":
-            html_content_dir = project_root / "files" / "table_files" / "html_content"
+            processed_content_dir = project_root / "files" / "table_files" / "html_content"
             original_dir = project_root / "files" / "table_files" / "original"
         elif file_type == "document":
-            html_content_dir = project_root / "files" / "document_files" / "html_content"
+            processed_content_dir = project_root / "files" / "document_files" / "txt_content"
             original_dir = project_root / "files" / "document_files" / "original"
         else:
             print(f"❌ 无效的文件类型: {file_type}")
@@ -1429,7 +1430,7 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
             }
         
         # Create destination directories
-        html_content_dir.mkdir(parents=True, exist_ok=True)
+        processed_content_dir.mkdir(parents=True, exist_ok=True)
         original_dir.mkdir(parents=True, exist_ok=True)
         
         result = {
@@ -1440,7 +1441,7 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         # Move processed supplement file
         if processed_file_path and Path(processed_file_path).exists():
             processed_source = Path(processed_file_path)
-            processed_target = html_content_dir / processed_source.name
+            processed_target = processed_content_dir / processed_source.name
             
             # Handle existing file with read-only attribute
             if processed_target.exists():

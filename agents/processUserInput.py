@@ -53,6 +53,7 @@ class ProcessUserInputState(TypedDict):
     previous_AI_messages: list[BaseMessage]
     summary_message: str  # Add the missing field
     template_complexity: str
+    session_id: str
 
     
 class ProcessUserInputAgent:
@@ -142,7 +143,7 @@ class ProcessUserInputAgent:
 
 
 
-    def create_initial_state(self, previous_AI_messages = None) -> ProcessUserInputState:
+    def create_initial_state(self, session_id: str, previous_AI_messages = None) -> ProcessUserInputState:
         """This function initializes the state of the process user input agent"""
         
         # Handle both single BaseMessage and list[BaseMessage] input
@@ -173,7 +174,8 @@ class ProcessUserInputAgent:
             "text_input_validation": None,
             "previous_AI_messages": processed_messages,
             "summary_message": "",
-            "template_complexity": ""
+            "template_complexity": "",
+            "session_id": session_id
         }
 
 
@@ -264,7 +266,7 @@ class ProcessUserInputAgent:
         
         # Create staging area for original files
         project_root = Path.cwd()
-        staging_dir = project_root / "conversations" / "files" / "user_uploaded_files"
+        staging_dir = project_root / "conversations" / state["session_id"] / "user_uploaded_files"
         staging_dir.mkdir(parents=True, exist_ok=True)
         
         # Process the files to get .txt versions
@@ -710,6 +712,7 @@ class ProcessUserInputAgent:
                 file_content = source_path.read_text(encoding='utf-8')
                 # file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(document_file)
+                print(f"🔍 文档文件名: {file_name}")
                 
                 # For document files, ask user to select location(s)
                 if len(available_locations) == 0:
@@ -790,7 +793,7 @@ class ProcessUserInputAgent:
 
 4. 输出格式为严格的 JSON，但不要包裹在```json中，直接返回json格式即可：
    {{
-     "{file_name}": "内容总结"
+     "文件名": "内容总结"
    }}
 
 5. 若提供多个文件，需分别处理并合并输出为一个 JSON 对象；
@@ -809,8 +812,15 @@ class ProcessUserInputAgent:
                 print("确认文档分析提示词：\n", system_prompt)
                 
                 try:
-                    analysis_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
+                    analysis_response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
                     print("📥 文档分析响应接收成功")
+                    analysis_response_dict = json.loads(analysis_response)
+                    keys = list(analysis_response_dict.keys())
+                    old_key = keys[0]
+                    new_key = file_name
+                    analysis_response_dict[new_key] = analysis_response_dict.pop(old_key)
+                    analysis_response = json.dumps(analysis_response_dict, ensure_ascii=False)
+                    print("📥 文档分析响应转换成功:", analysis_response)
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
                     # Create fallback response
@@ -1214,7 +1224,7 @@ class ProcessUserInputAgent:
             
             # Move template files to final destination using session ID
             # Extract session ID from one of the file paths
-            session_id = "files"  # Default session ID
+            session_id = state["session_id"]  # Default session ID
             if template_file:
                 # Extract session ID from the file path: conversations/session_id/user_uploaded_files/...
                 template_path_parts = Path(template_file).parts
@@ -1256,7 +1266,7 @@ class ProcessUserInputAgent:
                     break
             
             # Extract session ID from file path
-            session_id = "files"  # Default session ID
+            session_id = state["session_id"]  # Default session ID
             if template_file:
                 template_path_parts = Path(template_file).parts
                 if len(template_path_parts) >= 3 and template_path_parts[0] == "conversations":
@@ -1561,7 +1571,7 @@ class ProcessUserInputAgent:
         print("\n🚀 开始运行 ProcessUserInputAgent")
         print("=" * 60)
         
-        initial_state = self.create_initial_state(previous_AI_messages)
+        initial_state = self.create_initial_state(session_id = session_id, previous_AI_messages = previous_AI_messages)
         config = {"configurable": {"thread_id": session_id}}
         
         print(f"📋 会话ID: {session_id}")

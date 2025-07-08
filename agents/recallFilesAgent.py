@@ -303,12 +303,14 @@ class RecallFilesAgent:
             print("document_files_content: \n", document_files_content)
         
         # 构建用于分析表头映射的提示
-        files_content_str = ""
+        table_files_content_str = ""
         for filename, content in files_content.items():
             if content:  # 只包含成功读取的文件
-                files_content_str += f"\n\n=== {filename} ===\n{content[:1000]}..."  # 限制内容长度避免过长
-        files_content_str += '\n' + document_files_content
+                table_files_content_str += f"\n\n=== {filename} ===\n{content[:1000]}..."  # 限制内容长度避免过长
+
+        files_content_str = table_files_content_str + "\n" + document_files_content
         print(f"📝 构建了 {len(files_content)} 个文件的内容摘要")
+
         
         system_prompt = f"""
         你是一位专业的表格分析专家，任务是分析模板表格与多个数据文件之间的表头映射关系。
@@ -347,7 +349,7 @@ class RecallFilesAgent:
         """
         print("确认表头映射提示词：\n", system_prompt)
         print("📤 正在调用LLM进行表头映射分析...")
-        response = invoke_model(model_name="gpt-4o", messages=[SystemMessage(content=system_prompt)])
+        response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
         print("📥 LLM映射分析完成")
         print("💬 智能体回复:")
         print(response)

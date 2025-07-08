@@ -110,6 +110,7 @@ class FrontdeskAgent:
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
         graph.add_edge("simple_template_handle", "recall_files_agent")
         graph.add_edge("recall_files_agent", "fillout_table_agent")
+        # graph.add_edge("recall_files_agent", END)
         graph.add_edge("fillout_table_agent", END)
 
         
@@ -238,7 +239,6 @@ class FrontdeskAgent:
         try:
             summary_message_json = json.loads(summary_message_str)
             summary_message = json.loads(summary_message_json[0])
-            state["template_file_path"] = summary_message_json[1]
             print(f"📊 summary_message测试: {summary_message}")
             next_node = summary_message.get("next_node", "previous_node")
             print(f"🔄 路由决定: {next_node}")
@@ -327,7 +327,7 @@ class FrontdeskAgent:
 请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
 
 如果用户信息不够详细，你可以调用工具来收集更多用户输入。如果用户信息已经足够详细，请直接返回表格结构JSON，不要再调用工具。
-
+当前会话ID: {state["session_id"]}
 当前情况: {user_context}
 """
         print("system_prompt和用户交互确定表格结构:\n ", system_prompt)
@@ -377,18 +377,23 @@ class FrontdeskAgent:
         print("\n📋 开始执行: _simple_template_analysis")
         print("=" * 50)
         
+        latest_message = state["messages"][-1]
+        summary_message_str = latest_message.content
+        template_file_path = json.loads(summary_message_str)[1]
+        state["template_file_path"] = template_file_path
         # Handle the case where template_file_path might be a list
-        template_file_path_raw = state["template_file_path"]
-        print(f"🔍 Debug - template_file_path_raw: {template_file_path_raw} (type: {type(template_file_path_raw)})")
+
+        print(f"🔍 Debug - template_file_path_raw: {template_file_path} (type: {type(template_file_path)})")
+        print(f"template_file_path_raw: {template_file_path}")
         
-        if isinstance(template_file_path_raw, list):
-            if len(template_file_path_raw) > 0:
-                template_file_path = Path(template_file_path_raw[0])  # Take the first file
+        if isinstance(template_file_path, list):
+            if len(template_file_path) > 0:
+                template_file_path = Path(template_file_path[0])  # Take the first file
                 print(f"🔍 Debug - Using first file from list: {template_file_path}")
             else:
                 raise ValueError("template_file_path list is empty")
         else:
-            template_file_path = Path(template_file_path_raw)
+            template_file_path = Path(template_file_path)
             print(f"🔍 Debug - Using single file path: {template_file_path}")
         
         print(f"📄 正在读取模板文件: {template_file_path.name}")
@@ -485,8 +490,6 @@ class FrontdeskAgent:
         print(type(recallFilesAgent_final_state))
         print("recallFilesAgent_final_state: ", recallFilesAgent_final_state)
         headers_mapping = recallFilesAgent_final_state.get("headers_mapping")
-        print(f"🔍 表头映射: {headers_mapping}")
-        print(f"🔍 召回的文件: {recallFilesAgent_final_state.get('original_xls_files')}")
         return {"headers_mapping": headers_mapping,
                 "recalled_xls_files": recallFilesAgent_final_state.get("original_xls_files")
                 }
