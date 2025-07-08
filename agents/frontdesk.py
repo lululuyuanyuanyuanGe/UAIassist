@@ -176,17 +176,19 @@ class FrontdeskAgent:
             print("=" * 50)
             return {
                 "messages": [AIMessage(content=error_msg)],
-                "template_file_path": ""
+                "template_file_path": "",
+                "previous_node": "initial_collect_user_input"
             }
             
         print(f"📊 返回信息JSON dump：{json.dumps(summary_message[0])}")
         
         print("✅ _initial_collect_user_input 执行完成")
         print("=" * 50)
-        
+        print("tempalte_file_paath初始化: ", summary_message[1])
         return {
             "messages": [AIMessage(content=summary_message[0])],
-            "template_file_path": summary_message[1]
+            "template_file_path": summary_message[1],
+            "previous_node": "initial_collect_user_input"
         }
         
     def _route_after_initial_collect_user_input(self, state: FrontdeskState) -> str:
@@ -377,10 +379,13 @@ class FrontdeskAgent:
         print("\n📋 开始执行: _simple_template_analysis")
         print("=" * 50)
         
-        latest_message = state["messages"][-1]
-        summary_message_str = latest_message.content
-        template_file_path = json.loads(summary_message_str)[1]
-        state["template_file_path"] = template_file_path
+        if state["previous_node"] == "chat_with_user_to_determine_template":
+            latest_message = state["messages"][-1]
+            summary_message_str = latest_message.content
+            print(f"summary_message_str验证: {summary_message_str}")
+            template_file_path = json.loads(summary_message_str)[1]
+        else:
+            template_file_path = state["template_file_path"]
         # Handle the case where template_file_path might be a list
 
         print(f"🔍 Debug - template_file_path_raw: {template_file_path} (type: {type(template_file_path)})")

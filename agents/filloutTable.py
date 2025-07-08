@@ -179,7 +179,8 @@ class FilloutTableAgent:
             print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
             chunked_data = process_excel_files_with_chunking(data_json_path="agents/data.json", 
                                                              excel_file_paths=excel_file_paths, 
-                                                             headers_mapping=state["headers_mapping"])
+                                                             headers_mapping=state["headers_mapping"],
+                                                             chunk_nums=15)
             print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
             for chunk in chunked_data:
                 print(f"==================🔍 数据块 ==================:")
@@ -301,7 +302,7 @@ class FilloutTableAgent:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         results = {}
-        with ThreadPoolExecutor(max_workers=5) as executor:  # Limit to 5 concurrent requests
+        with ThreadPoolExecutor(max_workers=15) as executor:  # Limit to 5 concurrent requests
             # Submit all tasks
             future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                               for chunk_data in chunks_with_indices}

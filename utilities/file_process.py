@@ -681,10 +681,32 @@ def read_relative_files_from_data_json(data_json_path: str = "agents/data.json",
             if key in headers_mapping:
                 return value
     return None
+def find_largest_file(excel_file_paths: list[str]) -> str:
+    """
+    Find the largest file in the list of Excel file paths
+    return a dictionary with the file path and the number of rows
+    """
+    file_row_counts = {}
+    for file_path in excel_file_paths:
+        try:
+            df = pd.read_excel(file_path)
+            # Count actual data rows (excluding header)
+            data_rows = len(df.dropna(how='all'))  # Remove completely empty rows
+            file_row_counts[file_path] = data_rows
+            print(f"📊 {Path(file_path).name}: {data_rows} data rows")
+        except Exception as e:
+            print(f"❌ Error reading {file_path}: {e}")
+            file_row_counts[file_path] = 0
+    
+    # Find file with most rows
+    largest_file = max(file_row_counts, key=file_row_counts.get)
+    largest_row_count = file_row_counts[largest_file]
+    print(f"🎯 Largest file: {Path(largest_file).name} with {largest_row_count} rows")
+    return {largest_file: largest_row_count}
 
 def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
                                       data_json_path: str = "agents/data.json", session_id: str = "1", 
-                                      headers_mapping: str = {}) -> list[str]:
+                                      headers_mapping: str = {}, chunk_nums: int = 5) -> list[str]:
     """
     Process Excel files by finding the one with most rows, converting to CSV,
     adding detailed structure information, chunking the largest file, and combining everything.
@@ -841,7 +863,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         largest_data_lines.pop(0)
     
     # Calculate chunk size (equal number of rows)
-    chunk_size = max(1, len(largest_data_lines) // 5)
+    chunk_size = max(1, len(largest_data_lines) // 15)
     print(f"📏 Dividing {len(largest_data_lines)} data lines into chunks of ~{chunk_size} lines each")
     
     # Step 5: Separate structure and data from other files
@@ -882,9 +904,9 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     # Step 6: Create 5 chunks with proper order
     combined_chunks = []
     
-    for chunk_index in range(5):
+    for chunk_index in range(chunk_nums):
         start_idx = chunk_index * chunk_size
-        if chunk_index == 4:  # Last chunk gets remaining lines
+        if chunk_index == chunk_nums - 1:  # Last chunk gets remaining lines
             end_idx = len(largest_data_lines)
         else:
             end_idx = start_idx + chunk_size
