@@ -23,6 +23,8 @@ import os
 import gradio as gr
 from dotenv import load_dotenv
 import re
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.constants import Send
@@ -36,6 +38,222 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 
 load_dotenv()
+
+def reconstruct_csv_with_headers(table_file_path: str, analysis_response: str, original_filename: str, original_excel_file_path: str = None) -> str:
+    """
+    Reconstruct CSV file with headers using the analyzed table structure.
+    
+    Args:
+        table_file_path: Path to the processed table file (.txt with HTML content)
+        analysis_response: JSON response from LLM containing table structure
+        original_filename: Original filename for the output CSV
+        original_excel_file_path: Path to the original Excel file for CSV conversion
+        
+    Returns:
+        str: Path to the reconstructed CSV file
+    """
+    try:
+        # Create output directory
+        project_root = Path.cwd()
+        csv_output_dir = project_root / "files" / "table_files" / "CSV_files"
+        csv_output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Parse the analysis response to extract table structure
+        try:
+            if analysis_response.startswith('{') and analysis_response.endswith('}'):
+                structure_data = json.loads(analysis_response)
+            else:
+                # Try to find JSON within the response
+                import re
+                json_match = re.search(r'\{.*\}', analysis_response, re.DOTALL)
+                if json_match:
+                    structure_data = json.loads(json_match.group())
+                else:
+                    raise ValueError("No valid JSON found in analysis response")
+        except json.JSONDecodeError as e:
+            print(f"❌ 解析表格结构JSON失败: {e}")
+            return ""
+        
+        # Extract the table structure from the first key (should be filename)
+        table_key = list(structure_data.keys())[0]
+        table_structure = structure_data[table_key].get("表格结构", {})
+        
+        # Determine the Excel file path to use
+        if original_excel_file_path and Path(original_excel_file_path).exists():
+            excel_file_path = Path(original_excel_file_path)
+        else:
+            print("❌ 未提供原始Excel文件路径或文件不存在")
+            return ""
+        
+        # Convert the original Excel file to CSV using helper function
+        temp_csv_path = csv_output_dir / f"temp_{excel_file_path.stem}.csv"
+        
+        # Import the helper function
+        from utilities.file_process import excel_to_csv
+        
+        try:
+            # Use the existing helper function to convert Excel to CSV
+            excel_to_csv(str(excel_file_path), str(temp_csv_path))
+            print(f"📊 Excel文件已转换为CSV: {temp_csv_path}")
+        except Exception as e:
+            print(f"❌ Excel转CSV失败: {e}")
+            return ""
+        
+        # Read the CSV data (skip header row)
+        try:
+            with open(temp_csv_path, 'r', encoding='utf-8') as f:
+                csv_lines = f.readlines()
+            
+            # Skip the header row and get data rows
+            data_rows = [line.strip() for line in csv_lines[1:] if line.strip()]
+            
+            if not data_rows:
+                print("❌ CSV文件中未找到数据行")
+                return ""
+            
+            # Clean up temporary CSV file
+            temp_csv_path.unlink()
+            
+        except Exception as e:
+            print(f"❌ 读取CSV文件失败: {e}")
+            return ""
+        
+        print(f"📊 提取到 {len(data_rows)} 行数据")
+        
+        # Partition data into 15 chunks
+        chunk_size = max(1, len(data_rows) // 15)
+        chunks = []
+        for i in range(0, len(data_rows), chunk_size):
+            chunk = data_rows[i:i + chunk_size]
+            chunks.append(chunk)
+        
+        print(f"📏 数据分为 {len(chunks)} 个块进行处理")
+        
+        # Process chunks with multi-threading
+        def process_chunk(chunk_data: list, chunk_index: int) -> tuple[int, str]:
+            """Process a single chunk with LLM"""
+            try:
+                system_prompt = f"""
+你是一位专业的表格结构分析与数据重构专家。
+
+【任务说明】
+我将依次提供以下两部分内容：
+1. 表格的**结构化表头信息**，已经按照层级关系整理好；
+2. 一组对应该表头的**CSV数据行**（数据本身为纯数据，无表头）；
+
+【你的目标】
+请根据提供的表头结构，为每一行 CSV 数据补上一行其对应的表头信息，从而生成一个新的 CSV 文件，满足如下要求：
+
+【输出要求】
+- 每一行数据的**上一行必须是该行对应的完整表头**；
+- 表头应严格按照原始结构中的**最底层字段顺序**排列；
+- 表头与数据的列数、顺序完全一致；
+- 输出结果为纯净的 CSV 格式（英文逗号分隔，每行以换行符结尾）；
+- 不要添加任何额外注释或解释性文本；
+
+【输入示例】
+表头结构格式如下：
+{{
+    "{{file_name}}": {{
+        "表格结构": {{
+            "顶层表头名称": {{
+                "二级表头名称": [
+                    "字段1",
+                    "字段2",
+                    ...
+                ],
+                "更多子表头": [
+                    "字段A",
+                    "字段B"
+                ]
+            }}
+        }},
+        "表格总结": "该表格的主要用途及内容说明..."
+    }}
+}}
+
+CSV数据示例如下：
+csv数据1，csv数据2，csv数据3，...，csv数据10
+
+【输出示例】
+字段1,字段2,字段3,...,字段10  
+数据1,数据2,数据3,...,数据10  
+字段1,字段2,字段3,...,字段10  
+数据11,数据12,数据13,...,数据20  
+（如此类推）
+
+请注意：
+- 只需要处理"最底层字段"，无需在输出中包含中间层级表头；
+- 生成的表头行应保持一致性，始终与原始字段顺序匹配。
+"""
+                
+                # Prepare input for this chunk
+                chunk_input = f"""
+=== 表格结构 ===
+{json.dumps(structure_data, ensure_ascii=False, indent=2)}
+
+=== CSV数据 ===
+{chr(10).join(chunk_data)}
+"""
+                
+                print(f"📤 处理块 {chunk_index + 1} ({len(chunk_data)} 行)")
+                
+                # Call LLM
+                response = invoke_model(
+                    model_name="Pro/deepseek-ai/DeepSeek-V3",
+                    messages=[SystemMessage(content=system_prompt), HumanMessage(content=chunk_input)],
+                    temperature=0.2
+                )
+                
+                print(f"📥 块 {chunk_index + 1} 处理完成")
+                return chunk_index, response
+                
+            except Exception as e:
+                print(f"❌ 处理块 {chunk_index + 1} 失败: {e}")
+                return chunk_index, ""
+        
+        # Process all chunks in parallel
+        chunk_results = {}
+        max_workers = min(len(chunks), 15)  # Limit concurrent requests
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_chunk = {
+                executor.submit(process_chunk, chunk, i): i 
+                for i, chunk in enumerate(chunks)
+            }
+            
+            for future in as_completed(future_to_chunk):
+                chunk_index = future_to_chunk[future]
+                try:
+                    idx, result = future.result()
+                    chunk_results[idx] = result
+                except Exception as e:
+                    print(f"❌ 块 {chunk_index} 处理出错: {e}")
+                    chunk_results[chunk_index] = ""
+        
+        # Combine results in order
+        combined_csv = []
+        for i in range(len(chunks)):
+            if i in chunk_results and chunk_results[i]:
+                combined_csv.append(chunk_results[i])
+        
+        # Join all chunks
+        final_csv_content = '\n'.join(combined_csv)
+        
+        # Save to CSV file
+        csv_filename = Path(original_filename).stem + ".csv"
+        csv_output_path = csv_output_dir / csv_filename
+        
+        with open(csv_output_path, 'w', encoding='utf-8', newline='') as f:
+            f.write(final_csv_content)
+        
+        print(f"💾 重构的CSV文件已保存: {csv_output_path}")
+        return str(csv_output_path)
+        
+    except Exception as e:
+        print(f"❌ CSV重构过程出错: {e}")
+        return ""
+
 
 class ProcessUserInputState(TypedDict):
     process_user_input_messages: Annotated[list[BaseMessage], add_messages]
@@ -686,6 +904,29 @@ class ProcessUserInputAgent:
                 }
                 
                 print(f"✅ 表格文件已分析: {source_path.name} (位置: {location})")
+                
+                # Find the corresponding original Excel file
+                original_excel_file = None
+                table_file_stem = Path(table_file).stem
+                original_files = state.get("original_files_path", [])
+                
+                for original_file in original_files:
+                    if Path(original_file).stem == table_file_stem:
+                        original_excel_file = original_file
+                        break
+                
+                # Reconstruct CSV with headers using the analyzed structure
+                try:
+                    reconstructed_csv_path = reconstruct_csv_with_headers(
+                        table_file, analysis_response, source_path.name, original_excel_file
+                    )
+                    if reconstructed_csv_path:
+                        result_data["reconstructed_csv_path"] = reconstructed_csv_path
+                        print(f"📊 CSV重构完成: {reconstructed_csv_path}")
+                except Exception as csv_error:
+                    print(f"❌ CSV重构失败: {csv_error}")
+                    result_data["reconstructed_csv_path"] = ""
+                
                 return table_file, "table", result_data
                 
             except Exception as e:
@@ -1365,7 +1606,7 @@ class ProcessUserInputAgent:
 
 【无效输入 [Invalid]】符合以下任一情况即视为无效：
 - 内容与表格/Excel 完全无关（如闲聊、情绪表达、与上下文跳脱）
-- 明显为测试文本、随机字符或系统调试输入（如 “123”、“测试一下”、“哈啊啊啊” 等）
+- 明显为测试文本、随机字符或系统调试输入（如 "123"、"测试一下"、"哈啊啊啊" 等）
 - 仅包含空白、表情符号、标点符号等无实际内容
 
 【输出要求】
@@ -1488,7 +1729,7 @@ class ProcessUserInputAgent:
   - 文件上传（如数据文件、模板文件等）；
   - 文本输入（如填写说明、政策信息、计算规则等）；
   - 对召回文件的判断（例如用户确认某些文件是否相关）；
-- 注意：有时你被作为“确认节点”调用，任务是让用户判断文件是否相关，此时你需要总结的是“用户的判断结果”，而不是文件本身。
+- 注意：有时你被作为"确认节点"调用，任务是让用户判断文件是否相关，此时你需要总结的是"用户的判断结果"，而不是文件本身。
 - 请基于上下文灵活判断哪些内容构成有价值的信息。
 - 总结中请不要包含用户上传的无关信息内容，以及有效性验证
 - 但是一定不要忽略曲解用户的意图

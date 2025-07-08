@@ -705,64 +705,91 @@ def find_largest_file(excel_file_paths: list[str]) -> str:
     return {largest_file: largest_row_count}
 
 def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
-                                      data_json_path: str = "agents/data.json", session_id: str = "1", 
-                                      headers_mapping: str = {}, chunk_nums: int = 5, largest_file: str = None) -> list[str]:
+                                      session_id: str = "1", chunk_nums: int = 5, largest_file: str = None,
+                                      data_json_path: str = "agents/data.json") -> list[str]:
     """
-    Process Excel files by finding the one with most rows, converting to CSV,
-    adding detailed structure information, chunking the largest file, and combining everything.
+    Process Excel files by reading their corresponding pre-generated CSV files,
+    finding the one with most rows, chunking the largest file, and combining everything.
     
     Args:
-        excel_file_paths: List of Excel file paths
+        excel_file_paths: List of Excel file paths (used to find corresponding CSV files)
         supplement_files_summary: String containing supplement file content (not a list)
-        data_json_path: Path to data.json file containing structure information
+        session_id: Session identifier for folder structure
+        chunk_nums: Number of chunks to create (default 5)
+        largest_file: Optional pre-specified largest file path
     
     Returns:
-        List of 5 strings, each containing combined content of one chunk with other files
+        List of strings, each containing combined content of one chunk with other files
     """
     print(f"🔄 Processing {len(excel_file_paths)} Excel files...")
     if supplement_files_summary:
         print(f"📄 Also processing supplement files content")
     
-    # Step 1: Count data rows in each Excel file to find the largest
-    if largest_file is None:
-        largest_file = list(find_largest_file(excel_file_paths).keys())[0]
-    else:
-        largest_file = largest_file
+    # Map Excel file paths to corresponding CSV files in CSV_files directory
+    csv_files = []
+    row_counts = []
+    csv_base_dir = Path("files/table_files/CSV_files")
+    
+    if not csv_base_dir.exists():
+        print(f"❌ CSV files directory not found: {csv_base_dir}")
+        return [f"Error: CSV files directory not found: {csv_base_dir}"]
+    
+    # Step 1: Find corresponding CSV files and count rows
+    file_contents = {}  # {original_excel_path: csv_content}
+    
+    for excel_path in excel_file_paths:
+        excel_filename = Path(excel_path).stem  # Get filename without extension
+        csv_file_path = csv_base_dir / f"{excel_filename}.csv"
+        
+        if csv_file_path.exists():
+            try:
+                # Read CSV content
+                with open(csv_file_path, 'r', encoding='utf-8') as f:
+                    csv_content = f.read()
+                
+                # Count data rows (excluding header)
+                csv_lines = csv_content.strip().split('\n')
+                data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
+                
+                csv_files.append(excel_path)  # Keep original Excel path as key
+                row_counts.append(data_rows)
+                
+                # Store content with proper headers
+                combined_content = f"=== {Path(excel_path).name} 的表格数据 ===\n{csv_content}"
+                file_contents[excel_path] = combined_content
+                
+                print(f"✅ Found CSV for {Path(excel_path).name}: {data_rows} data rows")
+                
+            except Exception as e:
+                print(f"❌ Error reading CSV for {Path(excel_path).name}: {e}")
+                file_contents[excel_path] = f"Error reading CSV file: {e}"
+                csv_files.append(excel_path)
+                row_counts.append(0)
+        else:
+            print(f"⚠️ No corresponding CSV found for {Path(excel_path).name}, skipping...")
+    
+    if not csv_files:
+        print("❌ No CSV files found for processing")
+        return ["Error: No CSV files found for processing"]
     
     # Step 2: Load structure information from data.json
-    try:
-        print("headers_mapping的类型: ", type(headers_mapping))
-        print("headers_mapping的值: ", headers_mapping)
-        print("data_json_path的类型: ", type(data_json_path))
-        print("data_json_path的值: ", data_json_path)
-        table_structure_info = read_relative_files_from_data_json(data_json_path, headers_mapping)["表格"]
-        print(f"📋 Loaded structure info: {len(table_structure_info)} tables")
-        print("table_structure_info的类型: ", type(table_structure_info))
-        print("table_structure_info的值: ", table_structure_info)
-    except Exception as e:
-        print(f"❌ Error loading data.json: {e}")
-        table_structure_info = {}
-    
-    # Step 3: Convert all Excel files to CSV and add detailed structure info
-    file_contents = {}  # {file_path: content}
-    
-    for file_path in excel_file_paths:
+    table_structure_info = {}
+    if Path(data_json_path).exists():
         try:
-            # Create CSV file path
-            csv_folder = Path(f"D:\\asianInfo\\ExcelAssist\\conversations\\{session_id}\\CSV_files")
-            csv_folder.mkdir(parents=True, exist_ok=True)
-            csv_file_path = csv_folder / f"{Path(file_path).stem}.csv"
-            
-            # Convert Excel to CSV using the simple function
-            # ========函数当前存在问题，没有处理好日期，并且保留了一级表头
-            excel_to_csv(file_path, str(csv_file_path))
-            
-            # Read CSV content
-            with open(csv_file_path, 'r', encoding='utf-8') as f:
-                csv_content = f.read()
-            
-            # Get detailed structure information from table section
-            file_name = Path(file_path).stem + ".txt"
+            with open(data_json_path, 'r', encoding='utf-8') as f:
+                data_content = json.load(f)
+                # Get table structure info from all locations
+                for location_key, location_data in data_content.items():
+                    if isinstance(location_data, dict) and "表格" in location_data:
+                        table_structure_info.update(location_data["表格"])
+                print(f"📋 Loaded structure info for {len(table_structure_info)} tables")
+        except Exception as e:
+            print(f"⚠️ Failed to load structure info: {e}")
+    
+    # Step 3: Add structure information to file contents
+    for excel_path in file_contents.keys():
+        if excel_path in file_contents:
+            file_name = Path(excel_path).stem + ".txt"
             structure_info = ""
             
             if file_name in table_structure_info:
@@ -809,28 +836,40 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
                     structure_info += "=== 完整分析 ===\n"
                     structure_info += file_structure["summary"] + "\n\n"
             
-            # Combine structure + CSV content
-            combined_content = f"=== {Path(file_path).name} 的表格结构 ===\n{structure_info}\n=== {Path(file_path).name} 的表格数据 ===\n{csv_content}"
-            
-            file_contents[file_path] = combined_content
-            print(f"✅ Processed Excel: {Path(file_path).name}")
-            
-        except Exception as e:
-            print(f"❌ Error processing {file_path}: {e}")
-            file_contents[file_path] = f"Error processing file: {e}"
+            # Update file content to include structure information
+            if structure_info:
+                original_content = file_contents[excel_path]
+                # Replace the simple header with structured header
+                filename = Path(excel_path).name
+                new_content = f"=== {filename} 的表格结构 ===\n{structure_info}=== {filename} 的表格数据 ===\n"
+                # Extract the CSV data part
+                csv_data = original_content.split(f"=== {filename} 的表格数据 ===\n", 1)[1] if f"=== {filename} 的表格数据 ===" in original_content else original_content
+                file_contents[excel_path] = new_content + csv_data
+                print(f"✅ Added structure info for {filename}")
     
-    # Step 4: Handle the largest file - divide into 5 chunks
+    # Step 4: Find the largest file by row count
+    if largest_file is None:
+        max_rows_idx = row_counts.index(max(row_counts))
+        largest_file = csv_files[max_rows_idx]
+        print(f"📊 Largest file: {Path(largest_file).name} with {row_counts[max_rows_idx]} rows")
+    else:
+        # Validate the specified largest file exists in our CSV files
+        if largest_file not in csv_files:
+            print(f"⚠️ Specified largest file not found in CSV files, using automatic selection")
+            max_rows_idx = row_counts.index(max(row_counts))
+            largest_file = csv_files[max_rows_idx]
+    
+    # Step 5: Handle the largest file - divide into chunks
     largest_file_content = file_contents[largest_file]
     other_files_content = [content for path, content in file_contents.items() if path != largest_file]
     
-    # Split the largest file content into structure and data parts
+    # Extract data from the largest file content
     largest_file_lines = largest_file_content.split('\n')
-    data_section_start = -1
-    
-    # Look for the correct pattern: "=== filename 的表格数据 ==="
     largest_filename = Path(largest_file).name
     data_header_pattern = f"=== {largest_filename} 的表格数据 ==="
     
+    # Find where the actual CSV data starts and extract structure info
+    data_section_start = -1
     for i, line in enumerate(largest_file_lines):
         if line.strip() == data_header_pattern:
             data_section_start = i
@@ -838,93 +877,69 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     
     if data_section_start == -1:
         print(f"⚠️ Could not find data section separator '{data_header_pattern}', using full content")
-        largest_structure = ""
+        largest_structure_info = ""
         largest_data_lines = largest_file_lines
     else:
         # Structure is everything before the data header
-        largest_structure = '\n'.join(largest_file_lines[:data_section_start])
+        largest_structure_info = '\n'.join(largest_file_lines[:data_section_start])
         # Data is everything after the data header (excluding the header itself)
         largest_data_lines = largest_file_lines[data_section_start + 1:]
     
-    # Remove empty lines at the beginning of data
+    # Remove empty lines at the beginning and end of data
     while largest_data_lines and not largest_data_lines[0].strip():
         largest_data_lines.pop(0)
+    while largest_data_lines and not largest_data_lines[-1].strip():
+        largest_data_lines.pop()
     
-    # Calculate chunk size (equal number of rows)
-    chunk_size = max(1, len(largest_data_lines) // 15)
-    print(f"📏 Dividing {len(largest_data_lines)} data lines into chunks of ~{chunk_size} lines each")
+    # Calculate chunk sizes for even distribution
+    total_lines = len(largest_data_lines)
+    base_chunk_size = total_lines // chunk_nums
+    remainder = total_lines % chunk_nums
     
-    # Step 5: Separate structure and data from other files
-    other_files_structure = []
-    other_files_data = []
+    print(f"📏 Dividing {total_lines} data lines into {chunk_nums} chunks")
+    print(f"   Base chunk size: {base_chunk_size}, Extra lines to distribute: {remainder}")
     
-    for other_content in other_files_content:
-        lines = other_content.split('\n')
-        other_filename = None
-        
-        # Find the filename from the structure header
-        for line in lines:
-            if line.startswith("=== ") and " 的表格结构 ===" in line:
-                other_filename = line.replace("=== ", "").replace(" 的表格结构 ===", "")
-                break
-        
-        if other_filename:
-            other_data_header = f"=== {other_filename} 的表格数据 ==="
-            other_data_start = -1
-            
-            for i, line in enumerate(lines):
-                if line.strip() == other_data_header:
-                    other_data_start = i
-                    break
-            
-            if other_data_start != -1:
-                structure_part = '\n'.join(lines[:other_data_start])
-                data_part = '\n'.join(lines[other_data_start:])
-                other_files_structure.append(structure_part)
-                other_files_data.append(data_part)
-            else:
-                # If no data section found, treat as structure only
-                other_files_structure.append(other_content)
-        else:
-            # If no filename found, treat as structure
-            other_files_structure.append(other_content)
-    
-    # Step 6: Create 5 chunks with proper order
+    # Step 6: Create evenly distributed chunks
     combined_chunks = []
+    current_idx = 0
     
     for chunk_index in range(chunk_nums):
-        start_idx = chunk_index * chunk_size
-        if chunk_index == chunk_nums - 1:  # Last chunk gets remaining lines
-            end_idx = len(largest_data_lines)
+        # First 'remainder' chunks get one extra line
+        if chunk_index < remainder:
+            chunk_size = base_chunk_size + 1
         else:
-            end_idx = start_idx + chunk_size
+            chunk_size = base_chunk_size
+        
+        start_idx = current_idx
+        end_idx = current_idx + chunk_size
         
         chunk_data_lines = largest_data_lines[start_idx:end_idx]
+        current_idx = end_idx
         
-        # Create chunk following the required order:
-        # 1. All structure information first
-        # 2. All data information second  
+        # Create chunk with structure information:
+        # 1. Other files' complete content (including structure)
+        # 2. Largest file structure + chunk data
         # 3. Supplement information last
         
         chunk_combined = []
         
-        # 1. Add all structure information first
-        for structure_content in other_files_structure:
-            if structure_content.strip():
-                chunk_combined.append(structure_content)
+        # 1. Add other files' complete content (already includes structure)
+        for other_content in other_files_content:
+            if other_content.strip():
+                chunk_combined.append(other_content)
         
-        # Add largest file structure
-        if largest_structure.strip():
-            chunk_combined.append(largest_structure)
-        
-        # 2. Add all data information second
-        for data_content in other_files_data:
-            if data_content.strip():
-                chunk_combined.append(data_content)
-        
-        # Add largest file data chunk
+        # 2. Add largest file structure + data chunk
         if chunk_data_lines:
-            chunk_combined.append(f"=== {largest_filename} 的表格数据 ===\n" + '\n'.join(chunk_data_lines))
+            largest_file_chunk_content = ""
+            
+            # Add structure information if available
+            if largest_structure_info.strip():
+                largest_file_chunk_content += largest_structure_info.strip() + "\n\n"
+            
+            # Add data header and chunk data
+            largest_file_chunk_content += f"=== {largest_filename} 的表格数据 ===\n" + '\n'.join(chunk_data_lines)
+            
+            chunk_combined.append(largest_file_chunk_content)
         
         # 3. Add supplement information last
         if supplement_files_summary:
@@ -938,7 +953,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         final_combined = "\n\n".join(chunk_combined)
         combined_chunks.append(final_combined)
         
-        print(f"✅ Created chunk {chunk_index + 1}/5 with {len(chunk_data_lines)} data lines")
+        print(f"✅ Created chunk {chunk_index + 1}/{chunk_nums} with {len(chunk_data_lines)} data lines")
     
     print(f"🎉 Successfully created {len(combined_chunks)} combined chunks")
     return combined_chunks

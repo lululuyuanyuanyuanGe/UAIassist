@@ -185,10 +185,10 @@ class FilloutTableAgent:
             largest_file_path = list(largest_file.keys())[0]
             larges_file_row_num = list(largest_file.values())[0]
             print(f"🎯 Largest file: {Path(largest_file_path).name} with {larges_file_row_num} rows")
-            chunked_data = process_excel_files_with_chunking(data_json_path="agents/data.json", 
-                                                             excel_file_paths=excel_file_paths, 
-                                                             headers_mapping=state["headers_mapping"],
-                                                             chunk_nums=5, largest_file=largest_file_path)
+            chunked_data = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
+                                                             session_id=state["session_id"],
+                                                             chunk_nums=5, largest_file=largest_file_path,
+                                                             data_json_path="agents/data.json")
             print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
             for chunk in chunked_data:
                 print(f"==================🔍 数据块 ==================:")
@@ -235,61 +235,59 @@ class FilloutTableAgent:
         print("=" * 50)
         
         system_prompt = f"""
-你是一位专业的结构化数据填报专家，任务是根据用户提供的【数据集】和【字段映射规则】，生成符合【模板结构要求】的标准 CSV 数据行。
+你是一位专业且严谨的结构化数据填报专家，负责将原始数据集准确映射并填充到目标模板中，输出标准化的 CSV 数据行。
 
-🔧【工作流程】
-1. 首先，你需要根据数据表格的“表头结构”确定每个字段在数据行中的准确位置及其语义；
-2. 然后，逐列对照模板字段与字段映射，严格查找原始数据中的对应值；
-3. 对每个字段都必须完成必要的：字段提取、格式转换、计算推理或规则填充；
-4. 如果某些字段在原始数据中不存在，但字段映射中已定义了生成规则，你必须按照该规则进行推理，**不得忽略或空缺**；
-5. 每条输出为一行完整记录，必须符合模板字段顺序，格式为可导入的纯 CSV 数据行。
+【输入内容】
+1. 原始“数据集”：包含多条记录的表格数据（含表头与数据行）。
+2. “字段映射规则”：定义模板字段与原始数据字段或推理规则之间的对应关系。
+3. “模板结构”：目标 CSV 的字段顺序及格式要求，已通过 headers_mapping 变量提供：
+{state["headers_mapping"]}
 
-📌【输出格式要求】
-- 每行是独立的数据记录；
-- 使用英文逗号 `,` 分隔字段；
-- 每行以换行符结尾；
-- 严禁输出字段名、注释或额外说明；
-- 严禁输出 Markdown、JSON、表格、代码框等包装内容；
-- 输出应为纯文本 CSV 内容，直接可粘贴至 Excel 使用；
-- 所有列必须**严格按照模板字段的顺序输出**，**一个都不能缺失**。
+【处理流程】
+1. **解析表头结构**  
+   - 一定要先搞清楚数据源结构，和模板结构，搞清楚映射关系
+   - 读取模板字段顺序；  
+   - 确定每个模板字段在原始数据中的来源列或推理规则。
 
-📐【字段处理规则】
-- 所有日期必须统一为 `yyyy-mm-dd` 格式；
-- 无效日期（如 `00.00.00.00` 或空格）请填为留空（即两个逗号之间留空）；
-- 计算字段（如“党龄”“补贴金额”）必须根据规则进行计算并填写具体数值，不得跳过；
-- 若字段允许为空但无可推理信息，则保留空值；
-- 若字段依赖补充信息或上下文逻辑，请严格遵循字段映射中给出的逻辑推理方式，不得凭空编造或假设；
+2. **提取与转换**  
+   - 对照映射规则，从原始数据中提取对应值；  
+   - 按需进行格式转换（日期格式、数值精度等）；  
+   - 对于缺失字段，按映射规则严格执行推理或计算，**严禁自行添加无据数据**。
+   - 对于推理内容严格遵守映射规则，不得自行编造数据
 
-🚫【禁止事项】
-- 禁止输出字段名或表头；
-- 禁止输出任何非结构化内容、注释、解释或说明；
-- 禁止跳过任何字段的映射、计算或推理；
-- 禁止输出 JSON、Markdown 或代码格式；
-- **禁止模型自由发挥或假设未知字段内容**，一切仅以数据与规则为依据。
+3. **校验与补全**  
+   - 确保每个字段均有合法值；  
+   - 遵循映射规则中所有条件与约束。
+
+4. **生成输出**  
+   - 每条记录输出一行，字段顺序必须与模板一致；  
+   - 仅输出 CSV 数据行（英文逗号分隔，不含表头、注释或其他说明）；  
+   - 直接返回纯文本格式的多行 CSV。
+   - 不要将输出包裹在任何```中
+
+请严格按照以上规范执行，不要输出任何额外信息或解释
 """
-
 
 
 
         
         print("📋 系统提示准备完成")
+        print("系统提示词：", system_prompt)
         
         def process_single_chunk(chunk_data):
             """处理单个chunk的函数"""
             chunk, index = chunk_data
             try:
                 user_input = f"""
+                数据级：
                 {chunk}
-
-                "模板表格结构和数据表格的映射关系："
-                {state["headers_mapping"]}
                 """             
-                print("用户输入提示词", user_input)
+                print("用户输入提示词", system_prompt)
                 print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
                 response = invoke_model(
-                    model_name="Pro/deepseek-ai/DeepSeek-V3", 
+                    model_name="gpt-3.5-turbo", 
                     messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                    temperature=0.2
+                    temperature=0.1
                 )
                 print(f"✅ Completed chunk {index + 1}")
                 return (index, response)
