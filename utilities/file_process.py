@@ -174,6 +174,8 @@ def retrieve_file_content(file_paths: list[str], session_id: str, output_dir: st
         project_root = Path.cwd()
         staging_dir = project_root / "conversations" / session_id / "user_uploaded_files"
         staging_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = project_root / "conversations" / session_id / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
     
     processed_files = []
     
@@ -662,8 +664,20 @@ def clean_date_string(value):
     
     return value  # Return original if no date pattern matched
 
+def read_relative_files_from_data_json(data_json_path: str = "agents/data.json", headers_mapping: str = None) -> str:
+    """
+    Read the relative files from data.json file
+    """
+    with open(data_json_path, 'r', encoding='utf-8') as f:
+        data_json = json.load(f)
+        for key, value in data_json.items():
+            if key in headers_mapping:
+                return value
+    return None
 
-def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", data_json_path: str = "agents/data.json") -> list[str]:
+def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
+                                      data_json_path: str = "agents/data.json", session_id: str = "1", 
+                                      headers_mapping: str = {}) -> list[str]:
     """
     Process Excel files by finding the one with most rows, converting to CSV,
     adding detailed structure information, chunking the largest file, and combining everything.
@@ -700,10 +714,14 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     
     # Step 2: Load structure information from data.json
     try:
-        with open(data_json_path, 'r', encoding='utf-8') as f:
-            data_json = json.load(f)
-        table_structure_info = data_json.get("表格", {})
+        print("headers_mapping的类型: ", type(headers_mapping))
+        print("headers_mapping的值: ", headers_mapping)
+        print("data_json_path的类型: ", type(data_json_path))
+        print("data_json_path的值: ", data_json_path)
+        table_structure_info = read_relative_files_from_data_json(data_json_path, headers_mapping)["表格"]
         print(f"📋 Loaded structure info: {len(table_structure_info)} tables")
+        print("table_structure_info的类型: ", type(table_structure_info))
+        print("table_structure_info的值: ", table_structure_info)
     except Exception as e:
         print(f"❌ Error loading data.json: {e}")
         table_structure_info = {}
@@ -714,7 +732,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     for file_path in excel_file_paths:
         try:
             # Create CSV file path
-            csv_folder = Path(r"D:\asianInfo\ExcelAssist\conversations\files\user_uploaded_csv")
+            csv_folder = Path(f"D:\\asianInfo\\ExcelAssist\\conversations\\{session_id}\\CSV_files")
             csv_folder.mkdir(parents=True, exist_ok=True)
             csv_file_path = csv_folder / f"{Path(file_path).stem}.csv"
             
@@ -954,13 +972,13 @@ def extract_file_from_recall(response: str) -> list:
     return related_files
 
 
-def save_csv_to_output(csv_data_list: list[str], filename_prefix: str = "generated_table") -> str:
+def save_csv_to_output(csv_data_list: list[str], session_id: str = "1") -> str:
     """
-    Save CSV data to agents/output folder
+    Save CSV data to session-specific CSV_files folder
     
     Args:
         csv_data_list: List of CSV strings from concurrent processing
-        filename_prefix: Prefix for the output filename
+        session_id: Session identifier for folder structure
     
     Returns:
         str: Full path to the saved CSV file
@@ -970,8 +988,7 @@ def save_csv_to_output(csv_data_list: list[str], filename_prefix: str = "generat
     from pathlib import Path
     
     # Create output directory
-    current_dir = Path(__file__).parent
-    output_dir = current_dir.parent / "agents" / "output"
+    output_dir = Path(f"D:\\asianInfo\\ExcelAssist\\conversations\\{session_id}\\CSV_files")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Generate filename with timestamp
@@ -1271,8 +1288,18 @@ def move_template_files_safely(processed_template_file: str, original_files_list
             "original_template_path": ""
         }
 
-def convert_html_to_excel(html_file_path: str, output_dir: str = "agents/output") -> str:
-    """use python"""
+def convert_html_to_excel(html_file_path: str, output_dir: str = None) -> str:
+    """
+    Convert HTML file to Excel format using session-specific output directory
+    
+    Args:
+        html_file_path: Path to the HTML file to convert
+        output_dir: Output directory path (should be session-specific)
+    
+    Returns:
+        str: Path to the converted Excel file
+    """
+    # Function implementation placeholder
     pass
 
 def move_template_files_to_final_destination(processed_file_path: str, original_file_path: str, session_id: str) -> dict[str, str]:

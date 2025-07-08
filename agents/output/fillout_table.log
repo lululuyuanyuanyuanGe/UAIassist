@@ -1,7 +1,0 @@
-2025-07-03 19:50:02,617 - __main__ - INFO - FilloutTableAgent initialized with enhanced features
-2025-07-03 19:50:02,617 - __main__ - INFO - Configuration: {'parallel_processing': {'max_workers_data': 3, 'max_workers_supplement': 4}, 'error_handling': {'max_retries': 5, 'content_truncation': 8000}, 'performance': {'warning_threshold': 60}, 'features': {'backup_enabled': True, 'validation_enabled': True, 'excel_conversion_enabled': True}, 'directories': {'output_dir': 'agents\\output', 'backup_dir': 'agents\\output\\backups'}}
-2025-07-03 19:50:02,645 - __main__ - INFO - FilloutTableAgent initialized with enhanced features
-2025-07-03 19:50:02,645 - __main__ - INFO - Configuration: {'parallel_processing': {'max_workers_data': 3, 'max_workers_supplement': 4}, 'error_handling': {'max_retries': 5, 'content_truncation': 8000}, 'performance': {'warning_threshold': 60}, 'features': {'backup_enabled': True, 'validation_enabled': True, 'excel_conversion_enabled': True}, 'directories': {'output_dir': 'agents\\output', 'backup_dir': 'agents\\output\\backups'}}
-2025-07-03 19:50:02,770 - __main__ - INFO - Starting parallel data processing with 1 workers for 1 files
-2025-07-03 19:50:04,934 - httpx - INFO - HTTP Request: POST https://api.siliconflow.cn/v1/chat/completions "HTTP/1.1 200 OK"
-2025-07-03 19:50:36,900 - httpx - INFO - HTTP Request: POST https://api.siliconflow.cn/v1/chat/completions "HTTP/1.1 200 OK"

@@ -44,6 +44,7 @@ load_dotenv()
 
 class FilloutTableState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    session_id: str
     data_file_path: list[str]
     supplement_files_summary: str
     template_file: str
@@ -103,12 +104,14 @@ class FilloutTableAgent:
         return graph.compile()
 
     
-    def create_initialize_state(self, template_file: str = None,
+    def create_initialize_state(self, session_id: str,
+                                 template_file: str = None,
                                  data_file_path: list[str] = None, supplement_files_path: list[str] = None,
                                  headers_mapping: dict[str, str] = None) -> FilloutTableState:
         """This node will initialize the state of the graph"""
         return {
             "messages": [],
+            "session_id": session_id,
             "data_file_path": data_file_path, # excel files(xls) that has raw data
             "template_file": template_file, # txt file of template file in html format
             "supplement_files_summary": "",
@@ -173,7 +176,10 @@ class FilloutTableAgent:
                 print(f"📚 补充内容长度: {len(supplement_content)} 字符")
             
             print("🔄 正在调用process_excel_files_with_chunking函数...")
-            chunked_data = process_excel_files_with_chunking(excel_file_paths, supplement_content)
+            print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
+            chunked_data = process_excel_files_with_chunking(data_json_path="agents/data.json", 
+                                                             excel_file_paths=excel_file_paths, 
+                                                             headers_mapping=state["headers_mapping"])
             print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
             for chunk in chunked_data:
                 print(f"==================🔍 数据块 ==================:")
@@ -240,8 +246,8 @@ class FilloutTableAgent:
 【字段处理要求】
 - 日期格式：`yyyy-mm-dd`）；
 - 清除无效或占位时间格式，如 `00.00.00.00`，直接替换为空；
-- 对于像“备注”等可能没有明确来源字段的列，可根据上下文推理填写补充内容；
-- 计算字段（如“党龄”、“补贴标准”）必须提供实际计算结果，不能省略；
+- 对于像"备注"等可能没有明确来源字段的列，可根据上下文推理填写补充内容；
+- 计算字段（如"党龄"、"补贴标准"）必须提供实际计算结果，不能省略；
 - 若某字段无数据但允许为空，请保持空值（两个逗号之间留空）。
 
 【禁止事项】
@@ -262,10 +268,12 @@ class FilloutTableAgent:
             chunk, index = chunk_data
             try:
                 user_input = f"""
-{chunk}
+                {chunk}
 
-{state["headers_mapping"]}
-"""
+                "模板表格结构和数据表格的映射关系："
+                {state["headers_mapping"]}
+                """             
+                print("用户输入提示词", user_input)
                 print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
                 response = invoke_model(
                     model_name="deepseek-ai/DeepSeek-V3", 
@@ -320,7 +328,7 @@ class FilloutTableAgent:
         # Save CSV data to output folder using helper function
         try:
             from utilities.file_process import save_csv_to_output
-            saved_file_path = save_csv_to_output(sorted_results, "generated_table")
+            saved_file_path = save_csv_to_output(sorted_results, state["session_id"])
             print(f"✅ CSV数据已保存到输出文件夹: {saved_file_path}")
         except Exception as e:
             print(f"❌ 保存CSV文件时发生错误: {e}")
@@ -340,69 +348,34 @@ class FilloutTableAgent:
         print("=" * 50)
         
         system_prompt = f"""
-你是一位专业的 Python 表格处理工程师，擅长使用 BeautifulSoup 和 pandas 将结构化数据自动填入 HTML 表格模板中。
+你是一位专业的 Python 表格处理工程师，擅长使用 pandas 和 BeautifulSoup 将结构化 CSV 数据填入 HTML 表格模板中。
 
-【任务目标】
-请根据我提供的 HTML 表格代码（字符串或路径）和 CSV 数据路径，编写一段完整可执行的 Python 脚本，实现以下功能：
+【任务描述】
+用户会提供两个文件：
+1. 一个 HTML 格式的表格模板，其中包括表头、样式（CSS）、部分空白的数据行；
+2. 一个 CSV 文件，包含需要填入 HTML 表格中的数据。
 
-1. 使用 `pandas.read_csv(csv_path, header=None)` 读取 CSV 文件，CSV 文件中不包含列名；
-2. 自动分析 HTML 表格中的 `<tr>` 表头行，提取每一列字段的名称；
-3. HTML 表头从左到右与 CSV 的列顺序严格一一对应（第一列对第一列，第二列对第二列……），不需要通过字段名模糊匹配；
-4. 在开始填充前，先判断 HTML 表格每一列是否已完整填写（即该列下所有数据单元格都非空），如果该列已填写，则整列跳过，不进行填充；
-5. 找到表格中预留的数据行 `<tr>`（例如：首列为数字，其他列为空的 `<td>`）；
-6. 按照表头列顺序，依次将 CSV 数据按列填入对应的 `<td>` 中，跳过已有值的 `<td>`；
-7. 若某个 `<td>` 已填写数据（不为空），则保留原值不覆盖；
-8. 如果数据不足，保留剩余空行；若数据多于预留行，仅填前 N 行；
-9. 表尾中包含“审核人”、“制表人”或带有 colspan 的备注行，必须原样保留；
-10. 最终结果应为结构闭合的 HTML 文件，UTF-8 编码，能在浏览器中打开查看；
+【代码目标】
+请生成一段通用、健壮的 Python 代码，完成以下任务：
 
-【输入说明】
-- HTML 表格源代码由我提供；
-- CSV 文件通过路径提供，内容无列名；
-- HTML 表格中可能包含 `<colgroup>` 或合并单元格，请完整保留原结构；
-- 最终结果保存到路径：`D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果_filled.html`。
+1. 自动识别 HTML 表格中数据行的起始位置，通常是“序号”开头的表头行之后；
+2. 忽略 HTML 表格中的表尾说明行（如包含“审核人”或“制表人”的行）；
+3. 将 CSV 文件中的数据逐行填入 HTML 表格的空白 `<td>` 单元格，跳过“序号”列；
+4. 如果 HTML 表格中已有足够的空行，按顺序填入；如空行不足，不追加新行；
+5. 保留原 HTML 表格的结构和样式；
+6. 最终保存修改后的 HTML 表格到新文件中。
 
-【技术要求】
-- 使用 pandas 读取 CSV；
-- 使用 BeautifulSoup 处理 HTML；
-- 不要硬编码 CSV 内容，只能通过路径读取；
-- 不要输出 Markdown 代码块（如 ```python），只输出纯代码；
-- 生成的代码必须在 Windows 系统下可独立运行，无需修改；
-- 不要添加注释或额外说明；
+【额外要求】
+- 所有处理必须健壮，应对字段数量不匹配、空行、不同表格结构等情况；
+- 请确保代码清晰易读，适合复用。
 
-请根据上述信息生成一段完整、可运行的 Python 脚本。
-【代码结构示例】
-以下是你应当生成的代码结构（仅作参考，不必完全复制）：
+【输入】
+- HTML 文件路径：template.html
+- CSV 文件路径：synthesized_table.csv
 
-import pandas as pd
-from bs4 import BeautifulSoup
-
-def fill_html_table(html_path, csv_path, output_path):
-    # 读取 HTML
-    with open(html_path, 'r', encoding='utf-8') as f:
-        soup = BeautifulSoup(f, 'html.parser')
-    
-    # 读取 CSV（无列名）
-    df = pd.read_csv(csv_path, header=None)
-    
-    # 解析表头
-    table = soup.find('table')
-    header_row = table.find_all('tr')[2]
-    headers = [td.get_text(strip=True) for td in header_row.find_all('td')]
-
-    # 查找可填充数据行
-    data_rows = ...
-    
-    # 判断哪些列为空列
-    fillable_columns = ...
-    
-    # 按列顺序填充数据
-    for i, row in enumerate(data_rows):
-        ...
-    
-    # 保存新 HTML 文件
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(str(soup))
+【输出】
+- 纯代码文本，不需要将其包裹在任何代码块中，直接返回代码文本
+- 不需要写注释，解释等，直接返回代码文本
 
 """
 
@@ -416,13 +389,13 @@ def fill_html_table(html_path, csv_path, output_path):
         file_path = state["template_file"]
         template_file_content = read_txt_file(file_path)
         #获得CSV数据示例(前3行)
-        csv_path = r"D:\asianInfo\ExcelAssist\agents\output\synthesized_table.csv"
+        csv_path = f"D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\CSV_files\\synthesized_table.csv"
         CSV_data = pd.read_csv(csv_path, nrows=3)
         CSV_data = CSV_data.to_string(index=False)
 
         user_input = f"""上一轮代码的错误信息:\n{previous_code_error_message}\n
-                         需要填的模板表格(路径：D:\asianInfo\ExcelAssist\agents\output\老党员补贴.html):\n{template_file_content}\n
-                         需要填入的CSV数据例子(路径：D:\asianInfo\ExcelAssist\agents\output\synthesized_table.csv):\n{CSV_data}"""
+                         需要填的模板表格(路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\output\\template.html):\n{template_file_content}\n
+                         需要填入的CSV数据例子(路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\CSV_files\\synthesized_table.csv):\n{CSV_data}"""
         print(f"📝 用户输入总长度: {len(user_input)} 字符")
         print(f"📝 用户输入: {user_input}")
         print("🤖 正在调用LLM生成CSV填充代码...")
@@ -509,8 +482,8 @@ def fill_html_table(html_path, csv_path, output_path):
             
             # Try to find generated HTML file
             output_paths = [
-                "D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html",
-                "agents\\output\\老党员补贴_结果.html",
+                f"D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
+                f"conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
                 "老党员补贴_结果.html"
             ]
             
@@ -596,15 +569,8 @@ def fill_html_table(html_path, csv_path, output_path):
         print("=" * 50)
         
         system_prompt = f"""你的任务是根据CSV填充代码的报错信息和上一次的代码，总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
-
-你需要特别关注以下几个方面：
-1. CSV数据格式是否正确
-2. 模板表格结构解析是否正确
-3. 数据填充逻辑是否有问题
-4. 文件路径和读写权限是否正确
-5. 数据类型转换是否正确
-
-你不需要生成改进的代码，你只需要总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
+        你的总结需要简单明了，不要过于冗长。
+        你不需要生成改进的代码，你只需要总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
 """
 
         previous_code = "上一次的CSV填充代码:\n" + state["fill_CSV_2_template_code"]
@@ -659,7 +625,7 @@ def fill_html_table(html_path, csv_path, output_path):
         print("\n🔄 开始执行: _generate_html_table_completion_code")
         print("=" * 50)
 
-        system_prompt = """你是一位专业的 HTML 表格处理和样式优化专家，擅长通过 Python 代码实现表格的动态扩展和美化。
+        system_prompt = f"""你是一位专业的 HTML 表格处理和样式优化专家，擅长通过 Python 代码实现表格的动态扩展和美化。
 
 【核心任务】
 根据用户提供的 HTML 表格模板，生成一段完整可执行的 Python 代码，实现以下功能：
@@ -691,8 +657,8 @@ def fill_html_table(html_path, csv_path, output_path):
 
 【输出要求】
 - 仅输出完整、可直接执行的 Python 代码（不要添加 markdown 格式或解释性文字）；
-- Python 脚本需从 D:\\asianInfo\\ExcelAssist\\agents\\input\\老党员补贴.txt 读取 HTML 模板；
-- 结果输出为 D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html；
+- Python 脚本需从 {state["template_file"]} 读取 HTML 模板；
+- 结果输出为 D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\output\\template.html； 
 - 编码为 UTF-8，路径必须可写。
 
 【错误修复机制】
@@ -754,36 +720,36 @@ if footer_row:
 
 style_tag = soup.new_tag('style')
 style_tag.string =
-table {
+table {{
     border-collapse: collapse;
     width: 100%;
     font-family: 'Microsoft YaHei', 'Arial', sans-serif;
     font-size: 14px;
     margin-top: 20px;
     color: #333;
-}
-th, td {
+}}
+th, td {{
     border: 1px solid #444;
     padding: 8px 10px;
     text-align: center;
     vertical-align: middle;
-}
-td[colspan="11"] {
+}}
+td[colspan="11"] {{
     font-weight: bold;
     background-color: #e6f0ff;
     text-align: left;
     padding: 10px;
-}
-tr:nth-child(even) td {
+}}
+tr:nth-child(even) td {{
     background-color: #f9f9f9;
-}
-tr:nth-child(odd) td {
+}}
+tr:nth-child(odd) td {{
     background-color: #ffffff;
-}
-th {
+}}
+th {{
     background-color: #dce6f1;
     font-weight: bold;
-}
+}}
 """
 
 
@@ -903,8 +869,8 @@ th {
             
             # Try to find generated HTML file
             output_paths = [
-                "D:\\asianInfo\\ExcelAssist\\agents\\output\\老党员补贴_结果.html",
-                "agents\\output\\老党员补贴_结果.html",
+                f"D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
+                f"conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
                 "老党员补贴_结果.html"
             ]
             
@@ -1014,95 +980,6 @@ th {
         }
 
 
-
-    # def _convert_html_to_excel(self, state: FilloutTableState) -> FilloutTableState:
-    #     """把通过代码构建的html表格通过libreoffice转换为excel表格"""
-    #     try:
-    #         import subprocess
-    #         import tempfile
-    #         import os
-            
-    #         # Get the HTML content from state
-    #         html_content = state.get("styled_html_table", state.get("final_table", ""))
-            
-    #         if not html_content:
-    #             print("❌ 没有找到HTML表格内容")
-    #             return {"error_message": "没有找到HTML表格内容"}
-            
-    #         # If final_table is a file path, read the content
-    #         if isinstance(html_content, str) and Path(html_content).exists():
-    #             html_content = read_txt_file(html_content)
-            
-    #         # Create temporary HTML file
-    #         with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_html:
-    #             temp_html.write(html_content)
-    #             temp_html_path = temp_html.name
-            
-    #         # Output paths
-    #         output_dir = Path("agents/output")
-    #         output_dir.mkdir(exist_ok=True)
-            
-    #         html_output_path = output_dir / "老党员补贴_结果.html"
-    #         excel_output_path = output_dir / "老党员补贴_结果.xlsx"
-            
-    #         # Save the final HTML file
-    #         try:
-    #             with open(html_output_path, 'w', encoding='utf-8') as f:
-    #                 f.write(html_content)
-    #             print(f"✅ HTML文件已保存: {html_output_path}")
-    #         except Exception as e:
-    #             print(f"❌ 保存HTML文件失败: {e}")
-            
-    #         # Convert to Excel using LibreOffice
-    #         try:
-    #             # Use the specified LibreOffice path
-    #             libreoffice_path = r"D:\LibreOffice\program\soffice.exe"
-                
-    #             # Check if LibreOffice exists
-    #             if not os.path.exists(libreoffice_path):
-    #                 print(f"❌ 未找到LibreOffice: {libreoffice_path}")
-    #                 return {"error_message": f"LibreOffice not found at {libreoffice_path}"}
-                
-    #             # Convert HTML to Excel using LibreOffice
-    #             cmd = [
-    #                 libreoffice_path,
-    #                 '--headless',
-    #                 '--convert-to', 'xlsx',
-    #                 '--outdir', str(output_dir),
-    #                 temp_html_path
-    #             ]
-                
-    #             print(f"🔄 正在转换HTML到Excel...")
-    #             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-                
-    #             if result.returncode == 0:
-    #                 print(f"✅ Excel文件已生成: {excel_output_path}")
-    #             else:
-    #                 print(f"❌ LibreOffice转换失败: {result.stderr}")
-    #                 return {"error_message": f"LibreOffice conversion failed: {result.stderr}"}
-                    
-    #         except subprocess.TimeoutExpired:
-    #             print("❌ LibreOffice转换超时")
-    #             return {"error_message": "LibreOffice conversion timeout"}
-    #         except Exception as e:
-    #             print(f"❌ Excel转换失败: {e}")
-    #             return {"error_message": f"Excel conversion failed: {str(e)}"}
-            
-    #         # Clean up temporary file
-    #         try:
-    #             os.unlink(temp_html_path)
-    #         except Exception as e:
-    #             print(f"⚠️ 清理临时文件失败: {e}")
-            
-    #         return {
-    #             "final_table": str(html_output_path),
-    #             "messages": [AIMessage(content=f"表格填写完成！\n- HTML文件: {html_output_path}\n- Excel文件: {excel_output_path}")]
-    #         }
-            
-    #     except Exception as e:
-    #         print(f"❌ 转换过程中发生错误: {e}")
-    #         return {"error_message": f"转换失败: {str(e)}"}
-
     def run_fillout_table_agent(self, session_id: str,
                                 template_file: str,
                                 data_file_path: list[str],
@@ -1113,6 +990,7 @@ th {
         print("=" * 60)
         
         initial_state = self.create_initialize_state(
+            session_id = session_id,
             template_file = template_file,
             data_file_path = data_file_path,
             headers_mapping=headers_mapping
@@ -1123,7 +1001,7 @@ th {
         print(f"📋 初始状态创建完成，会话ID: {session_id}")
         print(f"📄 模板文件: {initial_state['template_file']}")
         print(f"📊 数据文件数量: {len(initial_state['data_file_path'])}")
-        print(f"📚 补充文件数量: {len(initial_state['supplement_files_path'])}")
+        print(f"📚 补充文件摘要: {initial_state['supplement_files_summary']}")
         print("-" * 60)
 
         while True:
