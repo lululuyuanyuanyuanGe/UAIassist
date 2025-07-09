@@ -15,6 +15,13 @@
                 "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\document_files\\original\\重庆市残疾人补贴.docx",
                 "timestamp": "2025-07-09T15:43:55.802459",
                 "file_size": 8848
+            },
+            "玉米水稻种植保险相关说明.txt": {
+                "summary": "{\"玉米水稻种植保险相关说明.txt\": {\"保险责任范围\": \"因自然灾害、意外事故及病虫草鼠害导致玉米、水稻损失率≥20%时启动赔付\", \"赔付标准\": {\"玉米\": \"每亩保险金额800元\", \"水稻\": \"每亩保险金额1000元\", \"赔偿公式\": \"赔偿金额=每亩保险金额×损失面积×损失程度\"}}}",
+                "file_path": "D:\\asianInfo\\ExcelAssist\\files\\document_files\\txt_content\\玉米水稻种植保险相关说明.txt",
+                "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\document_files\\original\\玉米水稻种植保险相关说明.docx",
+                "timestamp": "2025-07-09T18:15:51.216404",
+                "file_size": 3113
             }
         }
     },
@@ -35,11 +42,25 @@
                 "file_size": 189152
             },
             "燕云村残疾人名单.txt": {
-                "summary": "{\n  \"燕云村残疾人名单.txt\": {\n    \"表格结构\": {\n      \"一品街道残疾人名单（2022年1月）\": {\n        \"序号\": [],\n        \"姓名\": [],\n        \"残疾类别\": [],\n        \"监护人姓名\": [],\n        \"残疾证号\": [],\n        \"地址\": [],\n        \"联系电话\": [],\n        \"备注\": []\n      }\n    },\n    \"表格总结\": \"该表格记录了2022年1月一品街道燕云村残疾人名单，包含序号、姓名、残疾类别、监护人姓名、残疾证号、地址、联系电话和备注等信息，适用于残疾人管理和服务。\"\n  }\n}",
+                "summary": "{\n  \"燕云村残疾人名单.txt\": {\n    \"表格结构\": {\n      \"一品街道残疾人名单（2022年1月）\": {\n        \"序号\": [],\n        \"姓名\": [],\n        \"残疾类别\": [],\n        \"监护人姓名\": [],\n        \"残疾证号\": [],\n        \"地址\": [],\n        \"联系电话\": [],\n        \"备注\": []\n      }\n    },\n    \"表格总结\": \"该表格记录了2022年1月一品街道燕云村残疾人名单，包含序号、姓名、残疾类别、监护人姓名、残疾证号、地址、联系电话和备注等信息，适用于残疾人信息管理和服务。\"\n  }\n}",
                 "file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\html_content\\燕云村残疾人名单.txt",
                 "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\original\\燕云村残疾人名单.xlsx",
-                "timestamp": "2025-07-09T15:44:28.748646",
+                "timestamp": "2025-07-09T22:03:47.612646",
                 "file_size": 16218
+            },
+            "种植户银行卡号登记.txt": {
+                "summary": "{\n  \"种植户银行卡号登记.txt\": {\n    \"表格结构\": {\n      \"燕云村种植农户银行卡号登记\": {\n        \"基本信息\": [\n          \"姓名\",\n          \"开户银行\",\n          \"银行账号\",\n          \"是否脱贫户\"\n        ]\n      }\n    },\n    \"表格总结\": \"该表格用于登记燕云村种植农户的银行卡信息，包含姓名、开户银行、银行账号及脱贫状态等基本信息，适用于村级农户补贴发放等行政事务管理。\"\n  }\n}",
+                "file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\html_content\\种植户银行卡号登记.txt",
+                "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\original\\种植户银行卡号登记.xlsx",
+                "timestamp": "2025-07-09T22:03:05.466192",
+                "file_size": 950
+            },
+            "2024年农作物登记.txt": {
+                "summary": "{\n  \"2024年农作物登记.txt\": {\n    \"表格结构\": {\n      \"燕云村2024年农作物耕种登记\": {\n        \"序号\": [],\n        \"姓名\": [],\n        \"身份证号码\": [],\n        \"电话号码\": [],\n        \"玉米（亩）\": [],\n        \"水稻（亩）\": []\n      }\n    },\n    \"表格总结\": \"该表格记录了燕云村2024年村民农作物耕种情况，包含村民个人信息（姓名、身份证号码、电话号码）及耕种面积（玉米和水稻的亩数），适用于村级农业管理和统计用途。\"\n  }\n}",
+                "file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\html_content\\2024年农作物登记.txt",
+                "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\original\\2024年农作物登记.xlsx",
+                "timestamp": "2025-07-09T22:04:54.851318",
+                "file_size": 1159
             }
         },
         "文档": {
@@ -56,6 +77,13 @@
                 "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\document_files\\original\\重庆市残疾人补贴.docx",
                 "timestamp": "2025-07-09T15:43:55.802459",
                 "file_size": 8848
+            },
+            "玉米水稻种植保险相关说明.txt": {
+                "summary": "{\"玉米水稻种植保险相关说明.txt\": {\"保险金额\": \"玉米每亩保险金额为800元，水稻每亩保险金额为1000元\", \"赔偿计算\": \"赔偿金额=每亩保险金额×损失面积×损失程度，累计赔偿不超过总保险金额\"}}",
+                "file_path": "D:\\asianInfo\\ExcelAssist\\files\\document_files\\txt_content\\玉米水稻种植保险相关说明.txt",
+                "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\document_files\\original\\玉米水稻种植保险相关说明.docx",
+                "timestamp": "2025-07-09T18:18:03.327139",
+                "file_size": 3113
             }
         }
     },

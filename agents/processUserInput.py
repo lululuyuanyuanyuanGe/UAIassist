@@ -39,7 +39,7 @@ from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
-def reconstruct_csv_with_headers(table_file_path: str, analysis_response: str, original_filename: str, original_excel_file_path: str = None) -> str:
+def reconstruct_csv_with_headers(analysis_response: str, original_filename: str, original_excel_file_path: str = None) -> str:
     """
     Reconstruct CSV file with headers using the analyzed table structure.
     
@@ -120,12 +120,19 @@ def reconstruct_csv_with_headers(table_file_path: str, analysis_response: str, o
         
         print(f"📊 提取到 {len(data_rows)} 行数据")
         
-        # Partition data into 15 chunks
-        chunk_size = max(1, len(data_rows) // 15)
-        chunks = []
-        for i in range(0, len(data_rows), chunk_size):
-            chunk = data_rows[i:i + chunk_size]
-            chunks.append(chunk)
+        # Dynamically adjust chunking based on data size
+        max_chunks = 15  # Maximum number of chunks we want to create
+        total_rows = len(data_rows)
+        
+        if total_rows <= max_chunks:
+            # If we have fewer rows than max chunks, create one chunk per row
+            chunks = [[row] for row in data_rows]
+            print(f"📦 数据行数({total_rows})小于等于最大分块数({max_chunks})，创建 {len(chunks)} 个单行分块")
+        else:
+            # If we have more rows than max chunks, distribute evenly
+            chunk_size = max(1, total_rows // max_chunks)
+            chunks = [data_rows[i:i + chunk_size] for i in range(0, total_rows, chunk_size)]
+            print(f"📦 数据行数({total_rows})大于最大分块数({max_chunks})，创建 {len(chunks)} 个分块，每块约 {chunk_size} 行")
         
         print(f"📏 数据分为 {len(chunks)} 个块进行处理")
         
@@ -133,6 +140,14 @@ def reconstruct_csv_with_headers(table_file_path: str, analysis_response: str, o
         def process_chunk(chunk_data: list, chunk_index: int) -> tuple[int, str]:
             """Process a single chunk with LLM"""
             try:
+                # Validate chunk data - skip if empty or invalid
+                valid_data = [row for row in chunk_data if row.strip() and ',' in row]
+                if not valid_data:
+                    print(f"⚠️ 跳过块 {chunk_index + 1} - 无有效数据")
+                    return chunk_index, ""
+                
+                print(f"🔍 块 {chunk_index + 1} 包含有效数据: {len(valid_data)} 行")
+                
                 system_prompt = f"""
 你是一位专业的表格结构分析与数据重构专家。
 
@@ -184,20 +199,23 @@ csv数据1，csv数据2，csv数据3，...，csv数据10
 
 请注意：
 - 只需要处理"最底层字段"，无需在输出中包含中间层级表头；
+- 每一组字段必须严格对应一组数据，不要出现数据行与表头行不匹配的情况
+- 如果当前数据块为表头时，请直接返回空内容，不要输出任何表头，也不要做出任何解释，直接返回空值
+- 只有当数据块包含有效的CSV数据行时，才输出对应的表头+数据格式
 - 生成的表头行应保持一致性，始终与原始字段顺序匹配。
 """
                 
-                # Prepare input for this chunk
+                # Prepare input for this chunk using validated data
                 chunk_input = f"""
 === 表格结构 ===
 {json.dumps(structure_data, ensure_ascii=False, indent=2)}
 
 === CSV数据 ===
-{chr(10).join(chunk_data)}
+{chr(10).join(valid_data)}
 """
                 
-                print(f"📤 处理块 {chunk_index + 1} ({len(chunk_data)} 行)")
-                
+                print(f"📤 处理块 {chunk_index + 1} (原始: {len(chunk_data)} 行, 有效: {len(valid_data)} 行)")
+                print(f"🔍 有效数据内容: {valid_data[:2]}...")  # Show first 2 rows for debugging
                 # Call LLM
                 response = invoke_model(
                     model_name="Pro/deepseek-ai/DeepSeek-V3",
@@ -214,7 +232,8 @@ csv数据1，csv数据2，csv数据3，...，csv数据10
         
         # Process all chunks in parallel
         chunk_results = {}
-        max_workers = min(len(chunks), 15)  # Limit concurrent requests
+        max_workers = min(len(chunks), 15)  # Dynamically adjust workers based on actual chunk count
+        print(f"👥 使用 {max_workers} 个并发工作者处理 {len(chunks)} 个数据块")
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_chunk = {
@@ -231,11 +250,12 @@ csv数据1，csv数据2，csv数据3，...，csv数据10
                     print(f"❌ 块 {chunk_index} 处理出错: {e}")
                     chunk_results[chunk_index] = ""
         
-        # Combine results in order
+        # Combine results in order, filtering out empty results
         combined_csv = []
         for i in range(len(chunks)):
-            if i in chunk_results and chunk_results[i]:
+            if i in chunk_results and chunk_results[i] and chunk_results[i].strip():
                 combined_csv.append(chunk_results[i])
+                print(f"✅ 添加块 {i + 1} 的结果到最终CSV")
         
         # Join all chunks
         final_csv_content = '\n'.join(combined_csv)
@@ -243,7 +263,7 @@ csv数据1，csv数据2，csv数据3，...，csv数据10
         # Save to CSV file
         csv_filename = Path(original_filename).stem + ".csv"
         csv_output_path = csv_output_dir / csv_filename
-        
+        print("这是我们CSV的内容：", final_csv_content)
         with open(csv_output_path, 'w', encoding='utf-8', newline='') as f:
             f.write(final_csv_content)
         
@@ -918,7 +938,7 @@ class ProcessUserInputAgent:
                 # Reconstruct CSV with headers using the analyzed structure
                 try:
                     reconstructed_csv_path = reconstruct_csv_with_headers(
-                        table_file, analysis_response, source_path.name, original_excel_file
+                        analysis_response, source_path.name, original_excel_file
                     )
                     if reconstructed_csv_path:
                         result_data["reconstructed_csv_path"] = reconstructed_csv_path

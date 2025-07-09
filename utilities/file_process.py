@@ -915,17 +915,29 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     
     # Calculate chunk sizes for even distribution
     total_lines = len(largest_data_lines)
-    base_chunk_size = total_lines // chunk_nums
-    remainder = total_lines % chunk_nums
     
-    print(f"📏 Dividing {total_lines} data lines into {chunk_nums} chunks")
+    # Use the minimum of requested chunks and actual data lines
+    # This prevents creating more chunks than we have data
+    actual_chunk_nums = min(chunk_nums, total_lines)
+    
+    if actual_chunk_nums == 0:
+        print("⚠️ No data lines to process")
+        return {
+            "combined_chunks": [],
+            "largest_file_row_count": 0
+        }
+    
+    base_chunk_size = total_lines // actual_chunk_nums
+    remainder = total_lines % actual_chunk_nums
+    
+    print(f"📏 Dividing {total_lines} data lines into {actual_chunk_nums} chunks (requested: {chunk_nums})")
     print(f"   Base chunk size: {base_chunk_size}, Extra lines to distribute: {remainder}")
     
     # Step 6: Create evenly distributed chunks
     combined_chunks = []
     current_idx = 0
     
-    for chunk_index in range(chunk_nums):
+    for chunk_index in range(actual_chunk_nums):
         # First 'remainder' chunks get one extra line
         if chunk_index < remainder:
             chunk_size = base_chunk_size + 1
@@ -975,7 +987,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         final_combined = "\n\n".join(chunk_combined)
         combined_chunks.append(final_combined)
         
-        print(f"✅ Created chunk {chunk_index + 1}/{chunk_nums} with {len(chunk_data_lines)} data lines")
+        print(f"✅ Created chunk {chunk_index + 1}/{actual_chunk_nums} with {len(chunk_data_lines)} data lines")
     
     print(f"🎉 Successfully created {len(combined_chunks)} combined chunks")
     

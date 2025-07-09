@@ -180,7 +180,13 @@ class FilloutTableAgent:
             
             print(f"📊 准备处理 {len(excel_file_paths)} 个Excel文件进行分块")
             
-
+            # Use the helper function to process and chunk files
+            # Convert word_file_list to string for supplement content
+            supplement_content = ""
+            if state["supplement_files_summary"]:
+                supplement_content = "=== 补充文件内容 ===\n" + state["supplement_files_summary"]
+                print(f"📚 补充内容长度: {len(supplement_content)} 字符")
+            
             print("🔄 正在调用process_excel_files_with_chunking函数...")
             print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
             chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
@@ -240,7 +246,7 @@ class FilloutTableAgent:
     
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
-        return state
+        # return state
         print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
         print("=" * 50)
         
@@ -356,16 +362,13 @@ class FilloutTableAgent:
             print("=" * 50)
             return {"CSV_data": []}
         
-        # Dynamically adjust max_workers based on actual data size
-        max_workers = min(15, len(chunks_with_indices))  # Use fewer workers if we have less data
         print(f"🚀 开始并发处理 {len(chunks_with_indices)} 个数据块...")
-        print(f"👥 使用 {max_workers} 个并发工作者")
         
         # Use ThreadPoolExecutor for concurrent processing
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         results = {}
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=15) as executor:  # Limit to 5 concurrent requests
             # Submit all tasks
             future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                               for chunk_data in chunks_with_indices}
@@ -590,43 +593,13 @@ class FilloutTableAgent:
 
     def _transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
         """将数据转换为html代码"""
-        return state
-        system_prompt = """你是一个专业的HTML表格数据处理和美化专家。你需要将CSV数据填入HTML模板中，并为表格添加现代化的CSS样式装饰，使其美观专业。
-
-【核心任务】
-1. 将提供的CSV数据准确填入HTML模板
-2. 为表格添加现代化的CSS样式，提升视觉效果
-
-【美化设计原则】
-- 简洁现代：采用简约设计风格，避免过度装饰
-- 清晰易读：确保文字清晰，对比度良好
-- 专业美观：适合正式场合的表格样式
-- 响应式友好：适配不同屏幕尺寸
-
-【CSS样式要求】
-请为表格添加以下样式特性：
-1. **边框设计**: 细线边框，统一颜色，圆角设计
-2. **间距优化**: 合适的内边距(padding)和行高(line-height)
-3. **字体设置**: 清晰易读的字体族，合适的字体大小
-4. **颜色搭配**: 
-   - 表头：优雅的背景色(如#f8f9fa或#e9ecef)
-   - 数据行：交替行颜色或统一浅色背景
-   - 文字：深色文字确保可读性
-5. **对齐方式**: 文本居中或左对齐，保持一致性
-6. **悬停效果**: 鼠标悬停时的高亮效果
-7. **阴影效果**: 轻微的box-shadow增加立体感
-8. **宽度控制**: 表格宽度自适应，列宽均匀分布
-
-【输出要求】
-- 仅输出完整的HTML代码，包含内联CSS样式
-- 不要输出任何解释、注释或其他文本
-- 不要包裹在```html```中
-- CSS样式使用内联style或<style>标签
-- 确保数据填入准确无误
-
-【示例】
-输入数据：1,张三,男,汉族,123456,1990-01-01,无
-输入模板：
+        # return state
+        system_prompt = """你是一个html表格数据处理专家，现在我会给你提供代填数据，和html模板，你需要把数据填入html模板中，
+        返回结果为严格符合html代码规范的代码，不要输出任何其他内容。不要将结果包裹在```html```中
+        举个例子：
+        代填数据：
+        1,张三,男,汉族,123456,1990-01-01,无
+        html模板：
 <tr>
 <td>1</td>
 <td><br/></td>
@@ -636,22 +609,16 @@ class FilloutTableAgent:
 <td><br/></td>
 <td><br/></td>
 </tr>
-
-输出结果：
-<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">张三</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">男</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">汉族</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">123456</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1990-01-01</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">无</td>
+你需要返回的结果
+<tr>
+<td>1</td>
+<td>张三</td>
+<td>男</td>
+<td>汉族</td>
+<td>123456</td>
+<td>1990-01-01</td>
+<td>无</td>
 </tr>
-
-【特别注意】
-- 保持数据的准确性，不得修改或遗漏任何数据
-- CSS样式要统一一致，所有单元格使用相同的样式
-- 确保输出的HTML在浏览器中能正确显示和美观呈现
         """
         
         try:
@@ -664,24 +631,17 @@ class FilloutTableAgent:
             
             print(f"📊 CSV数据行数: {len(csv_data)}")
             
-            # Dynamically adjust chunking based on data size
-            max_chunks = 15  # Maximum number of chunks we want to create
+            # Split into specified number of chunks for parallel processing
+            num_chunks = 15  # Number of parallel tasks to create
             total_rows = len(csv_data)
             
-            if total_rows <= max_chunks:
-                # If we have fewer rows than max chunks, create one chunk per row
-                chunks = [[row] for row in csv_data]
-                print(f"📦 数据行数({total_rows})小于等于最大分块数({max_chunks})，创建 {len(chunks)} 个单行分块")
-            else:
-                # If we have more rows than max chunks, distribute evenly
-                chunk_size = max(1, total_rows // max_chunks)
-                chunks = [csv_data[i:i + chunk_size] for i in range(0, total_rows, chunk_size)]
-                print(f"📦 数据行数({total_rows})大于最大分块数({max_chunks})，创建 {len(chunks)} 个分块，每块约 {chunk_size} 行")
+            # Calculate chunk size based on total rows and desired number of chunks
+            chunk_size = max(1, total_rows // num_chunks)
+            actual_num_chunks = min(num_chunks, total_rows)  # Don't create more chunks than rows
             
-            # Dynamically adjust max_workers based on actual number of chunks
-            max_workers = min(15, len(chunks))
-            print(f"🚀 将创建 {len(chunks)} 个并行LLM调用任务")
-            print(f"👥 使用 {max_workers} 个并发工作者")
+            chunks = [csv_data[i:i + chunk_size] for i in range(0, total_rows, chunk_size)]
+            print(f"📦 分割为 {len(chunks)} 个数据块，总共 {total_rows} 行")
+            print(f"🚀 将创建 {len(chunks)} 个并行LLM调用任务，每块约 {chunk_size} 行")
             
             # Get empty row HTML template from state
             empty_row_html = state.get("empty_row_html", "")
@@ -728,7 +688,7 @@ class FilloutTableAgent:
             from concurrent.futures import ThreadPoolExecutor, as_completed
             
             results = {}
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=15) as executor:
                 # Submit all tasks
                 future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                                   for chunk_data in chunks_with_indices}
@@ -766,156 +726,11 @@ class FilloutTableAgent:
             return {"filled_row": ""}
     
     def _combine_html_tables(self, state: FilloutTableState) -> FilloutTableState:
-        """将表头，数据，表尾html整合在一起，并添加全局美化样式"""
-        
-        print("\n🔄 开始执行: _combine_html_tables")
-        print("=" * 50)
-        
-        # 获取各部分HTML
-        headers_html = state.get("headers_html", "")
-        data_html = state.get("filled_row", "")
-        footer_html = state.get("footer_html", "")
-        
-        # 创建完整的HTML文档，包含全局样式
-        complete_html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>表格报告</title>
-    <style>
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-            line-height: 1.6;
-        }}
-        
-        .table-container {{
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            margin: 0 auto;
-            max-width: 1200px;
-            padding: 20px;
-        }}
-        
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background-color: white;
-        }}
-        
-        /* 表头样式 */
-        table tr:first-child td {{
-            background-color: #2c3e50 !important;
-            color: white !important;
-            font-weight: bold;
-            text-align: center;
-            padding: 15px 12px;
-            font-size: 16px;
-        }}
-        
-        /* 列头样式 */
-        table tr:nth-child(2) td,
-        table tr:nth-child(3) td {{
-            background-color: #34495e !important;
-            color: white !important;
-            font-weight: 600;
-            text-align: center;
-            padding: 12px 10px;
-            font-size: 14px;
-        }}
-        
-        /* 数据行样式 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child) {{
-            background-color: #ffffff;
-        }}
-        
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child):nth-child(even) {{
-            background-color: #f8f9fa;
-        }}
-        
-        /* 数据单元格样式 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) td {{
-            padding: 12px 15px;
-            border: 1px solid #dee2e6;
-            text-align: center;
-            font-size: 14px;
-            color: #333;
-            transition: background-color 0.3s ease;
-        }}
-        
-        /* 悬停效果 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):hover {{
-            background-color: #e3f2fd !important;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        
-        /* 页脚样式 */
-        table tr:last-child td {{
-            background-color: #ecf0f1 !important;
-            color: #2c3e50 !important;
-            font-weight: 500;
-            padding: 15px 12px;
-            font-size: 13px;
-            border-top: 2px solid #bdc3c7;
-        }}
-        
-        /* 响应式设计 */
-        @media (max-width: 768px) {{
-            .table-container {{
-                padding: 10px;
-                margin: 10px;
-            }}
-            
-            table td {{
-                padding: 8px 6px;
-                font-size: 12px;
-            }}
-            
-            table tr:first-child td {{
-                font-size: 14px;
-            }}
-        }}
-        
-        /* 打印样式 */
-        @media print {{
-            body {{
-                background-color: white;
-                padding: 0;
-            }}
-            
-            .table-container {{
-                box-shadow: none;
-                border: 1px solid #ccc;
-            }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="table-container">
-        {headers_html}
-        {data_html}
-        {footer_html}
-    </div>
-</body>
-</html>"""
-        
-        # 保存到文件
-        output_path = f"conversations/{state['session_id']}/output/combined_html.html"
-        with open(output_path, "w", encoding="utf-8") as file:
-            file.write(complete_html)
-        
-        print(f"✅ 美化表格已保存到: {output_path}")
-        print("✅ _combine_html_tables 执行完成")
-        print("=" * 50)
-        
-        return {"combined_html": complete_html}
+        """将表头，数据，表尾html整合在一起"""
+        combined_html = state["headers_html"] + state["filled_row"] + state["footer_html"]
+        with open(r"D:\asianInfo\ExcelAssist\conversations\1\Output\filled_table.html", "w", encoding="utf-8") as file:
+            file.write(combined_html)
+        return {"combined_html": combined_html}
     
     def run_fillout_table_agent(self, session_id: str,
                                 template_file: str,
@@ -994,21 +809,31 @@ if __name__ == "__main__":
     # print(combined_data)
     fillout_table_agent = FilloutTableAgent()
     fillout_table_agent.run_fillout_table_agent(session_id = "1",
-                                                template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\template\种植险投保清单模版.txt",
-                                                data_file_path = [r"D:\asianInfo\ExcelAssist\files\table_files\original\2024年农作物登记.xlsx",
-                                                                  r"D:\asianInfo\ExcelAssist\files\table_files\original\种植户银行卡号登记.xlsx"],
+                                                template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\template\燕云村残疾人补贴申领登记.txt",
+                                                data_file_path = [r"D:\asianInfo\ExcelAssist\files\table_files\original\燕云村残疾人名单.xlsx"],
                                                 headers_mapping={
   "表格结构": {
-    "序号": ["2024年农作物登记.txt: 序号"],
-    "姓名": ["2024年农作物登记.txt: 姓名"],
-    "身份证号码": ["2024年农作物登记.txt: 身份证号码"],
-    "电话号码": ["2024年农作物登记.txt: 电话号码"],
-    "玉米（亩）": ["2024年农作物登记.txt: 玉米（亩）"],
-    "水稻（亩）": ["2024年农作物登记.txt: 水稻（亩）"],
-    "开户银行": ["种植户银行卡号登记.txt: 开户银行"],
-    "银行账号": ["种植户银行卡号登记.txt: 银行账号"],
-    "是否脱贫户": ["种植户银行卡号登记.txt: 是否脱贫户"],
-    "备注": ["推理规则: 根据玉米水稻种植保险相关说明.txt中的保险金额和赔偿计算规则，可以在此字段备注保险金额或赔偿相关信息。例如：玉米每亩保险金额为800元，水稻每亩保险金额为1000元；赔偿金额=每亩保险金额×损失面积×损失程度，累计赔偿不超过总保险金额。"]       
+    "燕云村残疾人补贴申领登记": {
+      "序号": ["燕云村残疾人名单.txt: 序号"],
+      "姓名": ["燕云村残疾人名单.txt: 姓名"],
+      "残疾类别": ["燕云村残疾人名单.txt: 残疾类别"],
+      "监护人姓名": ["燕云村残疾人名单.txt: 监护人姓名"],
+      "残疾证号": ["燕云村残疾人名单.txt: 残疾证号"],
+      "地址": ["燕云村残疾人名单.txt: 地址"],
+      "联系电话": ["燕云村残疾人名单.txt: 联系电话"],
+      "补贴金额": [
+        "推理规则: 根据重庆市残疾人补贴.txt中的补贴标准计算",
+        "1. 困难残疾人生活补贴: 每人每月90元（适用于低保家庭中的各类残疾人）",
+        "2. 重度残疾人护理补贴: 一级每人每月100元，二级每人每月90元",
+        "3. 具体计算逻辑:",
+        "   - 首先需要确认残疾人是否为低保家庭（当前数据中无此信息，需补充）",
+        "   - 若为低保家庭，则享受困难残疾人生活补贴90元",
+        "   - 若残疾类别为'精神'或'智力'且残疾证号第二位为'1'（一级）则额外享受100元护理补贴",
+        "   - 若残疾类别为'精神'或'智力'且残疾证号第二位为'2'（二级）则额外享受90元护理补贴",
+        "   - 其他情况仅享受基础补贴（若有）"
+      ],
+      "备注": ["燕云村残疾人名单.txt: 备注"]
+    }
   },
-  "表格总结": "该表格为燕云村2024年农作物保险投保清单，用于记录农户投保信息，包括个人基本信息、投保作物面积、银行账户信息及脱贫户标识等，适用于村级农作物保险投保管理。所有字段均来自2024年农作物登记.txt和种植户银行卡号登记.txt两个数据文件，备注字段根据玉米水稻种植保险相关说明.txt中的保险金额和赔偿计算规则进行推理填写。"
+  "表格总结": "该表格用于记录燕云村残疾人补贴申领信息，大部分字段可直接从'燕云村残疾人名单.txt'中获取。补贴金额字段需要根据重庆市残疾人补贴政策进行计算，当前缺少低保家庭信息，需要补充该信息才能准确计算补贴金额。"
 })
