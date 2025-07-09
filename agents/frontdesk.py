@@ -504,15 +504,16 @@ class FrontdeskAgent:
         """This node will fill out the table based on the headers mapping"""
         print("\n🔍 开始执行: _fillout_table_agent")
         print("=" * 50)
-        
+        return state
         filloutTableAgent = FilloutTableAgent()
+        print("模板表格文件1111111111", state["template_file_path"])
         print(f"🔍 填充表格的文件2: {state['recalled_xls_files']}")
         filloutTableAgent_final_state = filloutTableAgent.run_fillout_table_agent(
             session_id=state["session_id"],
             headers_mapping=state["headers_mapping"],
             data_file_path=state["recalled_xls_files"],
-            template_file=state["template_file_path"]                                                                       
-                                                                                  )
+            template_file=state["template_file_path"][0]                                                                       
+                                                                                          )
         print(f"🔍 填充表格响应: {filloutTableAgent_final_state}")
 
         return state

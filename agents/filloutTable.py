@@ -138,7 +138,7 @@ class FilloutTableAgent:
     
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
         """整合所有需要用到的数据，并生将其分批，用于分批生成表格"""
-        return
+        # return
         print("\n🔄 开始执行: _combine_data_split_into_chunks")
         print("=" * 50)
         
@@ -187,7 +187,7 @@ class FilloutTableAgent:
             print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
             chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
                                                              session_id=state["session_id"],
-                                                             chunk_nums=35, largest_file=None,  # Let function auto-detect
+                                                             chunk_nums=15, largest_file=None,  # Let function auto-detect
                                                              data_json_path="agents/data.json")
             
             # Extract chunks and row count from the result
@@ -242,7 +242,7 @@ class FilloutTableAgent:
     
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
-        return
+        return state
         print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
         print("=" * 50)
         
@@ -325,16 +325,6 @@ class FilloutTableAgent:
 {state["headers_mapping"]}
 """
 
-
-
-
-
-
-
-
-
-
-        
         print("📋 系统提示准备完成")
         print("系统提示词：", system_prompt)
         
@@ -374,7 +364,7 @@ class FilloutTableAgent:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         results = {}
-        with ThreadPoolExecutor(max_workers=35) as executor:  # Limit to 5 concurrent requests
+        with ThreadPoolExecutor(max_workers=15) as executor:  # Limit to 5 concurrent requests
             # Submit all tasks
             future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                               for chunk_data in chunks_with_indices}
@@ -423,7 +413,7 @@ class FilloutTableAgent:
 从Excel表格的HTML模板中提取出表示空白数据行的HTML代码。
 
 【提取规则】
-1. 识别模板中用于填写数据的空白行（通常包含<br/>或空白内容）
+1. 识别模板中用于填写数据的空白行（通常包含<br/>或空白内容）,只需要识别出一个
 2. 清理掉任何已填入的示例数据，只保留空白行结构
 3. 保持原始HTML标签结构和属性不变
 4. 忽略表头、标题行、结尾行等非数据行
@@ -432,6 +422,7 @@ class FilloutTableAgent:
 - 仅输出纯HTML代码，不要包裹在```html```中
 - 不要输出任何解释、注释或其他文本
 - 确保输出的HTML代码格式正确且可直接使用
+- 如果有多个空白行只需要输出一个
 
 【示例】
 输入HTML模板包含：
@@ -455,6 +446,7 @@ class FilloutTableAgent:
 <td><br/></td>
 <td><br/></td>
 </tr>
+有时输入的html模板中没有空白行，你需要根据表头来构建空白行，规则非常简单，只需要把表头中的每个字段都填充为<br/>即可
         """
         response = invoke_model(
             model_name="deepseek-ai/DeepSeek-V3",
@@ -567,13 +559,13 @@ class FilloutTableAgent:
 <td><br/></td>
 </tr>
 <tr>
-<td colspan="3">制表人：XXX　　　　审核人：YYY</td>
+<td colspan="3">制表人：XXX审核人：YYY</td>
 </tr>
 </table></body></html>
 
 应该输出：
 <tr>
-<td colspan="3">制表人：XXX　　　　审核人：YYY</td>
+<td colspan="3">制表人：XXX审核人：YYY</td>
 </tr>
 </table></body></html>
         """
@@ -584,12 +576,15 @@ class FilloutTableAgent:
         )
         return {"footer_html": response}
     
-
+    
     def _transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
         """将数据转换为html代码"""
         print("\n🔄 开始执行: _transform_data_to_html")
         print("=" * 50)
-        
+        print("摘取到的表头：", state["headers_html"])
+        print("摘取到的表尾：", state["footer_html"])
+        print("摘取到的空白行：", state["empty_row_html"])
+        return state
         system_prompt = """你是一个html表格数据处理专家，现在我会给你提供代填数据，和html模板，你需要把数据填入html模板中，
         返回结果为严格符合html代码规范的代码，不要输出任何其他内容。不要将结果包裹在```html```中
         举个例子：
@@ -628,7 +623,7 @@ class FilloutTableAgent:
             print(f"📊 CSV数据行数: {len(csv_data)}")
             
             # Split into specified number of chunks for parallel processing
-            num_chunks = 35  # Number of parallel tasks to create
+            num_chunks = 15  # Number of parallel tasks to create
             total_rows = len(csv_data)
             
             # Calculate chunk size based on total rows and desired number of chunks
@@ -684,7 +679,7 @@ class FilloutTableAgent:
             from concurrent.futures import ThreadPoolExecutor, as_completed
             
             results = {}
-            with ThreadPoolExecutor(max_workers=35) as executor:
+            with ThreadPoolExecutor(max_workers=15) as executor:
                 # Submit all tasks
                 future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                                   for chunk_data in chunks_with_indices}
@@ -805,60 +800,31 @@ if __name__ == "__main__":
     # print(combined_data)
     fillout_table_agent = FilloutTableAgent()
     fillout_table_agent.run_fillout_table_agent(session_id = "1",
-                                                template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\template\老党员补贴.txt",
-                                                data_file_path = [r"D:\asianInfo\ExcelAssist\files\table_files\original\燕云村24年度党员名册.xlsx"],
+                                                template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\template\燕云村残疾人补贴申领登记.txt",
+                                                data_file_path = [r"D:\asianInfo\ExcelAssist\files\table_files\original\燕云村残疾人名单.xlsx"],
                                                 headers_mapping={
   "表格结构": {
-    "重庆市巴南区享受生活补贴老党员登记表": {
-      "填表单位：燕云村党委": [
-        {
-          "表头": "序号",
-          "来源": "燕云村2024年度党员名册.txt: 序号"
-        },
-        {
-          "表头": "姓名",
-          "来源": "燕云村2024年度党员名册.txt: 姓名"
-        },
-        {
-          "表头": "性别",
-          "来源": "燕云村2024年度党员名册.txt: 性别"
-        },
-        {
-          "表头": "民族",
-          "来源": "燕云村2024年度党员名册.txt: 民族"
-        },
-        {
-          "表头": "身份证号码",
-          "来源": "燕云村2024年度党员名册.txt: 公民身份证号"
-        },
-        {
-          "表头": "出生时间",
-          "来源": "燕云村2024年度党员名册.txt: 出生日期",
-          "转换规则": "将'19750610'格式转换为'1975年6月10日'"
-        },
-        {
-          "表头": "所在党支部",
-          "来源": "燕云村2024年度党员名册.txt: 所属支部"
-        },
-        {
-          "表头": "成为正式党员时间",
-          "来源": "燕云村2024年度党员名册.txt: 转正时间",
-          "转换规则": "将'20130619'格式转换为'2013年6月19日'"
-        },
-        {
-          "表头": "党龄（年）",
-          "推理规则": "当前年份(2024) - 转正时间的年份(从'转正时间'字段提取)"
-        },
-        {
-          "表头": "生活补贴标准（元／月）",
-          "推理规则": "根据[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.txt中的关怀标准计算：1.如果党龄≥55年且年龄≥80岁，按年龄分段：80-89岁500元/年(约42元/月)，90-99岁1000元/年(约83元/月)，100岁以上3000元/年(250元/月)；2.如果不符合年龄条件，仅按党龄：40-49年100元/月，50-54年120元/月，55年及以上150元/月。取两者中较高值"
-        },
-        {
-          "表头": "备注",
-          "推理规则": "如需特殊说明的情况，如临时救助等"
-        }
-      ]
+    "燕云村残疾人补贴申领登记": {
+      "序号": ["燕云村残疾人名单.txt: 序号"],
+      "姓名": ["燕云村残疾人名单.txt: 姓名"],
+      "残疾类别": ["燕云村残疾人名单.txt: 残疾类别"],
+      "监护人姓名": ["燕云村残疾人名单.txt: 监护人姓名"],
+      "残疾证号": ["燕云村残疾人名单.txt: 残疾证号"],
+      "地址": ["燕云村残疾人名单.txt: 地址"],
+      "联系电话": ["燕云村残疾人名单.txt: 联系电话"],
+      "补贴金额": [
+        "推理规则: 根据重庆市残疾人补贴.txt中的补贴标准计算",
+        "1. 困难残疾人生活补贴: 每人每月90元（适用于低保家庭中的各类残疾人）",
+        "2. 重度残疾人护理补贴: 一级每人每月100元，二级每人每月90元",
+        "3. 具体计算逻辑:",
+        "   - 首先需要确认残疾人是否为低保家庭（当前数据中无此信息，需补充）",
+        "   - 若为低保家庭，则享受困难残疾人生活补贴90元",
+        "   - 若残疾类别为'精神'或'智力'且残疾证号第二位为'1'（一级）则额外享受100元护理补贴",
+        "   - 若残疾类别为'精神'或'智力'且残疾证号第二位为'2'（二级）则额外享受90元护理补贴",
+        "   - 其他情况仅享受基础补贴（若有）"
+      ],
+      "备注": ["燕云村残疾人名单.txt: 备注"]
     }
   },
-  "表格总结": "该表格用于登记重庆市巴南区享受生活补贴的老党员信息，主要数据来源为'燕云村2024年度党员名册.txt'，部分字段需要根据党员名册中的数据进行计算或转换。生活补贴标准需结合党龄和年龄，按照《重庆市巴南区党内关怀办法（修订）》的规定进行计算。"
+  "表格总结": "该表格用于记录燕云村残疾人补贴申领信息，大部分字段可直接从'燕云村残疾人名单.txt'中获取。补贴金额字段需要根据重庆市残疾人补贴政策进行计算，当前缺少低保家庭信息，需要补充该信息才能准确计算补贴金额。"
 })
