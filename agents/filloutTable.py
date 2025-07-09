@@ -129,12 +129,13 @@ class FilloutTableAgent:
             "combined_data_array": [],
             "headers_mapping": headers_mapping,
             "CSV_data": [],
-            "largest_file_row_num": 0,
+            "largest_file_row_num": 66,
             "supplement_files_summary": supplement_files_summary
         }
     
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
         """整合所有需要用到的数据，并生将其分批，用于分批生成表格"""
+        return
         print("\n🔄 开始执行: _combine_data_split_into_chunks")
         print("=" * 50)
         
@@ -183,7 +184,7 @@ class FilloutTableAgent:
             print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
             chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
                                                              session_id=state["session_id"],
-                                                             chunk_nums=25, largest_file=None,  # Let function auto-detect
+                                                             chunk_nums=35, largest_file=None,  # Let function auto-detect
                                                              data_json_path="agents/data.json")
             
             # Extract chunks and row count from the result
@@ -233,36 +234,93 @@ class FilloutTableAgent:
     
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
+        return
         print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
         print("=" * 50)
         
+#         system_prompt = f"""
+# 你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。你的任务是根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式，输出结构化、干净的数据行。
+
+# 【输入内容】
+# 1. 模板表头映射（JSON 格式）：描述目标表格每一列的来源、计算逻辑或推理规则；
+# 2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块，其中每条数据行前一行标注了字段名称，用于辅助字段匹配。
+
+# 【任务流程】
+# 1. 请你逐字段分析模板表头映射，明确该字段的来源或推理逻辑；
+# 2. 若字段来自原始数据，请先定位来源字段并校验其格式；
+# 3. 若字段需推理（如日期格式转换、年龄计算、逻辑判断等），请先在脑中逐步推导，确保思路清晰；
+# 4. 若字段需计算，请先明确所需公式并逐步计算出结果；
+# 5. 在完成所有字段推理后，再将结果按照字段顺序合并为一行 CSV 数据；
+# 6. 在每次输出前，请先**在脑中逐项验证字段是否合理、格式是否规范**。
+
+# 💡 请你像一位人类专家一样，**一步一步思考再做决定**，不要跳过任何逻辑过程。
+
+# 【输出要求】
+# - 仅输出纯净的 CSV 数据行，不包含表头、注释或任何多余内容；
+# - 使用英文逗号分隔字段；
+# - 每行数据字段顺序必须与模板表头映射完全一致；
+# - 严禁遗漏字段、重复字段、多输出空值或空行；
+# - 输出中不得出现 Markdown 包裹（如 ```）或额外说明文字。
+
+# 模板表头映射：
+# {state["headers_mapping"]}
+# """ 
         system_prompt = f"""
-你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。你的任务是根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式，输出结构化、干净的数据行。
+你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。
+
+让我们一步一步来解决这个数据转换问题。
+
+【任务目标】
+根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式。
 
 【输入内容】
 1. 模板表头映射（JSON 格式）：描述目标表格每一列的来源、计算逻辑或推理规则；
-2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块，其中每条数据行前一行标注了字段名称，用于辅助字段匹配。
+2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块。
 
-【任务流程】
-1. 请你逐字段分析模板表头映射，明确该字段的来源或推理逻辑；
-2. 若字段来自原始数据，请先定位来源字段并校验其格式；
-3. 若字段需推理（如日期格式转换、年龄计算、逻辑判断等），请先在脑中逐步推导，确保思路清晰；
-4. 若字段需计算，请先明确所需公式并逐步计算出结果；
-5. 在完成所有字段推理后，再将结果按照字段顺序合并为一行 CSV 数据；
-6. 在每次输出前，请先**在脑中逐项验证字段是否合理、格式是否规范**。
+【推理步骤】
+请严格按照以下步骤进行推理，并展示每一步的思考过程：
 
-💡 请你像一位人类专家一样，**一步一步思考再做决定**，不要跳过任何逻辑过程。
+步骤1：理解映射规则
+- 逐一分析每个目标字段的定义
+- 明确数据来源和转换规则
 
-【输出要求】
-- 仅输出纯净的 CSV 数据行，不包含表头、注释或任何多余内容；
-- 使用英文逗号分隔字段；
-- 每行数据字段顺序必须与模板表头映射完全一致；
-- 严禁遗漏字段、重复字段、多输出空值或空行；
-- 输出中不得出现 Markdown 包裹（如 ```）或额外说明文字。
+步骤2：定位原始数据
+- 在原始数据中找到对应字段
+- 验证数据格式和完整性
+
+步骤3：执行转换逻辑
+- 对于计算字段：明确公式并逐步计算
+- 对于推理字段：展示逻辑判断过程
+- 对于格式转换：说明转换规则
+
+步骤4：质量检查
+- 验证每个字段的合理性
+- 检查格式规范性
+- 确认字段顺序正确
+
+【输出格式】
+请按照以下格式输出：
+
+=== 推理过程 ===
+[展示你的完整思考过程，包括每个字段的分析、定位、转换和验证]
+
+=== 最终答案 ===
+[仅输出纯净的 CSV 数据行，使用英文逗号分隔]
+
+【质量要求】
+- 推理过程必须详细展示每个步骤的思考
+- 最终答案仅包含CSV数据，不含任何其他内容
+- 字段顺序必须与模板表头映射完全一致
+- 严禁遗漏字段、重复字段或输出空值
 
 模板表头映射：
 {state["headers_mapping"]}
 """
+
+
+
+
+
 
 
 
@@ -308,7 +366,7 @@ class FilloutTableAgent:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         results = {}
-        with ThreadPoolExecutor(max_workers=25) as executor:  # Limit to 5 concurrent requests
+        with ThreadPoolExecutor(max_workers=35) as executor:  # Limit to 5 concurrent requests
             # Submit all tasks
             future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                               for chunk_data in chunks_with_indices}
@@ -354,32 +412,45 @@ class FilloutTableAgent:
         """这个节点会把生成出的CSV数据填到模板表格中"""
         print("\n🔄 开始执行: _generate_code_fill_CSV_2_template")
         print("=" * 50)
-        
+        #获得模板文件HTML代码
+        file_path = state["template_file"]
+        template_file_content = read_txt_file(file_path)
+
         system_prompt = f"""
-你是一名精通 HTML 表格处理和 Python 脚本编写的工程师。你的任务是根据给定的 **已扩充好的 HTML 表格模板** 和 **CSV 数据文件**，生成一段完整可执行的 Python 代码，将 CSV 里的每一行数据逐格填入 HTML 中对应的 `<td>`。请遵循以下要求：
+你是一名精通 HTML 表格结构处理和 Python 脚本编写的工程师，擅长将结构化数据填充到复杂的 HTML 表格模板中。
 
-1. **输入参数**  
-   - `template_html_path`：已扩充模板的 HTML 文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\{state["template_file"]}
-   - `csv_data_path`：待填数据的 CSV 文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\CSV_files\\synthesized_table.csv
-   - `output_html_path`：填充后输出的 HTML 文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\{state["template_file"]}
+【任务目标】
+请编写一段完整的 Python 脚本，实现在 HTML 表格模板中自动填充 CSV 数据行，生成结果 HTML 文件。
 
-2. **功能需求**  
-   a. 使用合适的库（如 `BeautifulSoup`、`pandas` 或者 `csv` 模块）读取并解析 `template_html_path`。  
-   b. 读取 `csv_data_path`，确保按行、按列读取，每行字段顺序与 HTML 表格列完全对应。  
-   c. 在 HTML 中定位“数据行”区域：跳过表头、标题行和表尾，只对空白或占位符（如 `<br/>` 或空 `<td>`）逐格填值。  
-   d. 对第 N 条 CSV 记录，将记录中第 1 列填入第 N 行第 1 个 `<td>`，第 2 列填入第 N 行第 2 个 `<td>`，以此类推。  
-   e. 如果某个单元格已有内容（非 `<br/>` 或非空），则跳过该单元格，不覆盖原有内容。  
-   f. 填完所有行后，将修改后的 DOM 序列化并写入 `output_html_path`。  
+【任务背景】
+我将为你提供：
+1. 一个 HTML 表格模板（作为结构示例）；
+2. 一个 CSV 数据片段（作为字段示例）；
+3. 实际的数据文件路径（CSV）与 HTML 模板路径；
+4. CSV 数据总行数（实际数据量）。
 
-3. **输出**  
-   - 只输出完整的 Python 脚本，不要将代码包裹在```python里，直接给出代码，不要附加多余解释或示例。  
-   - 脚本需包含必要的 `import`、函数定义和必要注释，便于维护。  
+【任务要求】
+1. 请先解析 HTML 模板结构，定位出**需要插入数据的代表性数据行**（通常是带有空单元格或序号占位的 `<tr>`）；
+2. 利用该数据行作为**插入模板**，将实际 CSV 数据源中的所有行逐行插入；
+3. 若模板中某个单元格已存在有效数据，请跳过对应 CSV 字段填充，保持原样；
+4. 请确保**每一行 CSV 数据都被完整填入表格中**，不得遗漏；
+5. 插入后的 HTML 表格结构必须完整且可被浏览器正常渲染。
 
-另外我会把上一轮生成的代码及错误信息反馈给你，请根据错误信息修复代码。
+【输出要求】
+- 请输出一段**完整、可直接执行的 Python 脚本**；
+- 使用 `pandas` 读取 CSV，`BeautifulSoup` 操作 HTML；
+- 请确保脚本中路径参数清晰、注释简明、逻辑稳健；
+- 不要输出除代码之外的任何说明、解释或 Markdown 包裹。
+- 严禁将输出包裹在```python里，直接给出代码，不要附加多余解释或示例。
 
+💡 请先**思考 HTML 结构与数据对齐逻辑**，再生成代码。
 
-
+HTML模板内容：
+{template_file_content}
 """
+
+
+
 
 
 
@@ -387,23 +458,23 @@ class FilloutTableAgent:
         # 上一轮代码的错误信息:
         previous_code_error_message = state["error_message_summary"]
 
-        #获得模板文件HTML代码
-        file_path = state["template_file"]
-        template_file_content = read_txt_file(file_path)
+        
         #获得CSV数据示例(前3行)
-        csv_path = f"D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\CSV_files\\synthesized_table.csv"
+        csv_path = f"D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\CSV_files\\synthesized_table_with_only_data.csv"
         CSV_data = pd.read_csv(csv_path, nrows=3)
         CSV_data = CSV_data.to_string(index=False)
 
-        user_input = f"""上一轮代码的错误信息:\n{previous_code_error_message}\n
-                         需要填的模板表格(路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\output\\template.html):\n{template_file_content}\n
-                         需要填入的CSV数据例子(路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\CSV_files\\synthesized_table.csv):\n{CSV_data}"""
+        user_input = f"""
+                        上一轮生成的代码:\n{state["fill_CSV_2_template_code"]}\n
+                        上一轮代码的错误信息:\n{previous_code_error_message}\n
+                         需要填的模板表格(路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\output\\expanded_template.html):
+                         需要填入的CSV数据例子(路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\CSV_files\\synthesized_table_with_only_data.csv):\n{CSV_data}"""
         print(f"📝 用户输入总长度: {len(user_input)} 字符")
         print(f"📝 用户输入: {user_input}")
         print("🤖 正在调用LLM生成CSV填充代码...")
-        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3",
+        response = invoke_model(model_name="gpt-4o",
                                 messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                                temperature=0.5
+                                temperature=0.2
                                 )
         
         print("✅ CSV填充代码生成完成")
@@ -570,10 +641,18 @@ class FilloutTableAgent:
         print("\n🔄 开始执行: _summary_error_message_CSV2Template")
         print("=" * 50)
         
-        system_prompt = f"""你的任务是根据CSV填充代码的报错信息和上一次的代码，总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
-        你的总结需要简单明了，不要过于冗长。
-        你不需要生成改进的代码，你只需要总结出错误的原因，并反馈给代码生成智能体，让其根据报错重新生成代码。
+        system_prompt = f"""
+你是一名专业的代码错误分析专家。你的任务是：
+
+1. 阅读提供的 CSV 填充脚本的报错信息和上一次生成的代码。
+2. 简要提炼并定位错误根因，指出问题所在。
+3. 将错误原因反馈给代码生成智能体，帮助其基于这些信息重新生成修正版代码。
+
+【注意】
+- 总结须简明扼要，避免冗长。
+- 只聚焦于错误原因，不提供修复后的代码。
 """
+
 
         previous_code = "上一次的CSV填充代码:\n" + state["fill_CSV_2_template_code"]
         error_message = "报错信息:\n" + state["error_message"]
@@ -588,7 +667,7 @@ class FilloutTableAgent:
             print(f"📋 CSV数据预览长度: {len(csv_data_preview)} 字符")
         
         print("🤖 正在调用LLM总结CSV填充错误信息...")
-        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=input_2_LLM)])
+        response = invoke_model(model_name="gpt-4o", messages=[SystemMessage(content=system_prompt), HumanMessage(content=input_2_LLM)])
         
         print("✅ CSV填充错误信息总结完成")
         print("✅ _summary_error_message_CSV2Template 执行完成")
@@ -626,55 +705,100 @@ class FilloutTableAgent:
         """生成完整的模板表格，生成python代码，但无需执行"""
         print("\n🔄 开始执行: _generate_html_table_completion_code")
         print("=" * 50)
+        file_path = state["template_file"]
+        template_file_content = read_txt_file(file_path)
+        system_prompt = f"""
+你是一名精通 HTML 表格处理和 Python 脚本编写的工程师。
 
-        system_prompt = f"""你是一名精通 HTML 表格处理和 Python 脚本编写的工程师。你的任务是根据给定的 HTML 表格模板，将其“数据行”部分扩充到指定的行数，以便容纳后续要填入的数据。请按照以下要求生成一段完整可执行的 Python 代码（使用 BeautifulSoup 或等效库）：
+【任务目标】
+根据提供的HTML模板表格，智能识别数据行结构并扩展到指定行数，生成完整可执行的Python代码。并将转换结果保存在
+D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\expanded_template.html
 
-1. **输入参数**  
-   - `input_html_path`：原始 HTML 模板文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\
-   - `output_html_path`：扩充后 HTML 输出路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\{state["template_file"]}
-   - `target_row_count`：包含已有行在内，最终表格中“数据行”总数  
+【输入参数】
+- HTML模板表格路径：{file_path}
+- HTML模板表格内容：{template_file_content}
+- 目标行数：{state['largest_file_row_num']}
 
-2. **功能需求**  
-   a. 读取 `input_html_path` 对应的 HTML 文件，用合适的解析器（如 BeautifulSoup）加载并定位 `<table>` 元素。  
-   b. 在表头（header）行之后、表尾（footer）行之前，找到第一个“数据行”模板——通常该行 `<tr>` 中首个 `<td>` 包含连续的行号（如 `1`、`2`、…）。  
-   c. 计算当前已有数据行数量 `current_count`。  
-   d. 如果 `current_count < target_row_count`，则复制“数据行”模板，将其插入到表格中，使得新的行号依次递增，直到行数达到 `target_row_count`。  
-   e. 保留模板中的所有空白单元格（如 `<br/>`、空 `<td>`）和列样式，不修改其它部分（表头、标题行、审核人/制表人等）。  
-   f. 将修改后的 HTML 保存到 `output_html_path`。  
+【处理要求】
+1. 自动识别表格结构：区分表头、数据行、表尾和其他内容
+2. 分析数据行模式：提取现有数据行的完整结构（标签、属性、样式、内容）
+3. 智能扩展：根据现有数据行结构生成新的空白行至目标数量
+4. 保持完整性：确保扩展后保持原有格式、样式和非数据行内容不变
 
-3. **输出**  
-   - 只输出完整的 Python 脚本代码，不要附加多余解释或示例。  
-   - 脚本中应包含必要的 import 语句和注释，让阅读者能快速理解关键逻辑。  
+【数据行识别规则】
+- 数据行通常位于表头之后、表尾之前
+- 包含多个td标签的tr元素
+- 可能包含空白内容或<br/>标签
+- 需要保持原有的单元格数量和结构
 
-请根据上述说明生成代码，不要将代码包裹在```python里，直接给出代码，不要附加多余解释或示例。
+【技术规范】
+- 使用BeautifulSoup解析和修改HTML结构
+- 实现智能数据行识别算法
+- 确保新生成的行与原数据行结构完全一致
+- 添加异常处理和边界条件检查
+- 保持HTML文档的完整性和有效性
 
-另外我会把上一轮生成的代码及错误信息反馈给你，请根据错误信息修复代码。
+【扩展策略】
+- 定位现有数据行的精确位置
+- 复制数据行的完整结构信息
+- 计算需要增加的行数（目标行数-现有行数）
+- 在合适位置插入新生成的数据行
+- 验证扩展后的表格结构正确性
 
+【输出要求】
+输出完整可执行的Python代码，满足以下条件：
+- 代码可直接运行，无需修改
+- 不包含代码块标记（```pyhon等
+- 不包含任何解释文字或注释
+- 包含必要的导入语句和异常处理
+- 代码结构清晰，逻辑完整
+- 不要把模板表格的内容在你的代码里输出，直接读取模板表格的内容
 
+【示例数据行结构】
+参考格式：
+<tr>
+<td></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+<td><br/></td>
+</tr>
+
+请根据实际模板表格内容，生成相应的Python扩展代码。
 """
 
 
-        file_path = state["template_file"]
-        template_file_content = read_txt_file(file_path)
-        number_of_rows = f"需要生成{state['largest_file_row_num']}行数据行"
-        base_input = f"HTML模板地址: {file_path}\n HTML模板内容:\n{template_file_content}\n \n需求:\n{number_of_rows}"
+
+
+
 
         print(f"📄 读取模板文件: {file_path}")
         print(f"📊 模板内容长度: {len(template_file_content)} 字符")
-        print(f"📝 基础输入长度: {len(base_input)} 字符")
 
         # Fix: Check if execution was NOT successful to use error recovery
         if not state["template_completion_code_execution_successful"]:
             previous_code = state["template_file_completion_code"]
+            print("模板填充上一次生成的代码", previous_code)
             error_message = state.get("error_message_summary", state.get("error_message", ""))
             error_input = f"上一次生成的代码:\n{previous_code}\n\n错误信息:\n{error_message}\n\n请根据错误信息修复代码。"
-            full_input = f"{base_input}\n\n{error_input}"
+            full_input = f"\n{error_input}"
             print("🤖 正在基于错误信息重新生成Python代码...")
             print(f"📊 包含错误信息的输入长度: {len(full_input)} 字符")
-            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=full_input)])
+            print("用户输入内容:", full_input)
+            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", 
+                                    messages=[SystemMessage(content=system_prompt), HumanMessage(content=full_input)],
+                                    temperature=0.3)
         else:
             print("🤖 正在生成Python代码...")
-            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=base_input)])
+            response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", 
+                                    messages=[SystemMessage(content=system_prompt)],
+                                    temperature=0.3)
 
         print("✅ Python代码生成完成")
         
@@ -768,38 +892,37 @@ class FilloutTableAgent:
                     "final_table": ""
                 }
             
-            # Try to find generated HTML file
-            output_paths = [
-                f"D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
-                f"conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
-                "老党员补贴_结果.html"
-            ]
+            # # Try to find generated HTML file
+            # output_paths = [
+            #     f"D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
+            #     f"conversations\\{state['session_id']}\\output\\老党员补贴_结果.html",
+            #     "老党员补贴_结果.html"
+            # ]
             
-            html_content = ""
-            for path in output_paths:
-                if Path(path).exists():
-                    try:
-                        html_content = read_txt_file(path)
-                        print(f"✅ 找到生成的HTML文件: {path}")
-                        break
-                    except Exception as e:
-                        print(f"⚠️ 读取文件失败 {path}: {e}")
+            # html_content = ""
+            # for path in output_paths:
+            #     if Path(path).exists():
+            #         try:
+            #             html_content = read_txt_file(path)
+            #             print(f"✅ 找到生成的HTML文件: {path}")
+            #             break
+            #         except Exception as e:
+            #             print(f"⚠️ 读取文件失败 {path}: {e}")
             
-            # If no file found, use output content
-            if not html_content and output:
-                html_content = output
-                print("✅ 使用代码输出作为HTML内容")
-            elif not html_content:
-                print("⚠️ 未找到生成的HTML内容，但代码执行成功")
-                html_content = "<html><body><p>代码执行成功，但未生成HTML内容</p></body></html>"
+            # # If no file found, use output content
+            # if not html_content and output:
+            #     html_content = output
+            #     print("✅ 使用代码输出作为HTML内容")
+            # elif not html_content:
+            #     print("⚠️ 未找到生成的HTML内容，但代码执行成功")
+            #     html_content = "<html><body><p>代码执行成功，但未生成HTML内容</p></body></html>"
             
             print("✅ 代码执行成功")
             print("✅ _execute_template_completion_code_from_LLM 执行完成")
             print("=" * 50)
             return {
                 "template_completion_code_execution_successful": True,
-                "error_message": "",
-                "final_table": html_content
+                "error_message": ""
             }
             
         except SyntaxError as e:
@@ -880,6 +1003,7 @@ class FilloutTableAgent:
             "error_message_summary": response
         }
 
+    
 
     def run_fillout_table_agent(self, session_id: str,
                                 template_file: str,
@@ -957,4 +1081,61 @@ if __name__ == "__main__":
     # combined_data = fillout_table_agent._combine_data_split_into_chunks(file_list)
     # print(combined_data)
     fillout_table_agent = FilloutTableAgent()
-    fillout_table_agent.run_fillout_table_agent(session_id = "1")
+    fillout_table_agent.run_fillout_table_agent(session_id = "1",
+                                                template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\template\老党员补贴.txt",
+                                                data_file_path = [r"D:\asianInfo\ExcelAssist\files\table_files\original\燕云村24年度党员名册.xlsx"],
+                                                headers_mapping={
+  "表格结构": {
+    "重庆市巴南区享受生活补贴老党员登记表": {
+      "填表单位：燕云村党委": [
+        {
+          "表头": "序号",
+          "来源": "燕云村2024年度党员名册.txt: 序号"
+        },
+        {
+          "表头": "姓名",
+          "来源": "燕云村2024年度党员名册.txt: 姓名"
+        },
+        {
+          "表头": "性别",
+          "来源": "燕云村2024年度党员名册.txt: 性别"
+        },
+        {
+          "表头": "民族",
+          "来源": "燕云村2024年度党员名册.txt: 民族"
+        },
+        {
+          "表头": "身份证号码",
+          "来源": "燕云村2024年度党员名册.txt: 公民身份证号"
+        },
+        {
+          "表头": "出生时间",
+          "来源": "燕云村2024年度党员名册.txt: 出生日期",
+          "转换规则": "将'19750610'格式转换为'1975年6月10日'"
+        },
+        {
+          "表头": "所在党支部",
+          "来源": "燕云村2024年度党员名册.txt: 所属支部"
+        },
+        {
+          "表头": "成为正式党员时间",
+          "来源": "燕云村2024年度党员名册.txt: 转正时间",
+          "转换规则": "将'20130619'格式转换为'2013年6月19日'"
+        },
+        {
+          "表头": "党龄（年）",
+          "推理规则": "当前年份(2024) - 转正时间的年份(从'转正时间'字段提取)"
+        },
+        {
+          "表头": "生活补贴标准（元／月）",
+          "推理规则": "根据[正文稿]关于印发《重庆市巴南区党内关怀办法（修订）》的通__知.txt中的关怀标准计算：1.如果党龄≥55年且年龄≥80岁，按年龄分段：80-89岁500元/年(约42元/月)，90-99岁1000元/年(约83元/月)，100岁以上3000元/年(250元/月)；2.如果不符合年龄条件，仅按党龄：40-49年100元/月，50-54年120元/月，55年及以上150元/月。取两者中较高值"
+        },
+        {
+          "表头": "备注",
+          "推理规则": "如需特殊说明的情况，如临时救助等"
+        }
+      ]
+    }
+  },
+  "表格总结": "该表格用于登记重庆市巴南区享受生活补贴的老党员信息，主要数据来源为'燕云村2024年度党员名册.txt'，部分字段需要根据党员名册中的数据进行计算或转换。生活补贴标准需结合党龄和年龄，按照《重庆市巴南区党内关怀办法（修订）》的规定进行计算。"
+})

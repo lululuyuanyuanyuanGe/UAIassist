@@ -1032,6 +1032,44 @@ def extract_file_from_recall(response: str) -> list:
     print(f"📁 解析出的相关文件: {related_files}")
     return related_files
 
+def _clean_csv_data(csv_data: str) -> str:
+    """
+    Clean up the CSV data by removing the thinking part and only keeping the actual data
+    under the "===最终答案===" section
+    
+    Args:
+        csv_data: Raw CSV data string containing both reasoning and final answer
+        
+    Returns:
+        str: Cleaned CSV data with only the actual data rows
+    """
+    csv_data_lines = csv_data.split('\n')
+    
+    # Find the start of the final answer section
+    final_answer_started = False
+    cleaned_lines = []
+    
+    for line in csv_data_lines:
+        line = line.strip()
+        
+        # Check if we've reached the final answer section
+        if "=== 最终答案 ===" in line:
+            final_answer_started = True
+            continue
+        
+        # If we encounter a new reasoning section, stop collecting
+        if final_answer_started and "=== 推理过程 ===" in line:
+            final_answer_started = False
+            continue
+        
+        # If we're in the final answer section, collect the data lines
+        if final_answer_started:
+            # Skip empty lines and lines that look like section headers
+            if line and not line.startswith("==="):
+                cleaned_lines.append(line)
+    
+    # Join the cleaned lines
+    return '\n'.join(cleaned_lines)
 
 def save_csv_to_output(csv_data_list: list[str], session_id: str = "1") -> str:
     """
@@ -1053,9 +1091,12 @@ def save_csv_to_output(csv_data_list: list[str], session_id: str = "1") -> str:
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Generate filename with timestamp
-    actual_filename = "synthesized_table"
-    filename = f"{actual_filename}.csv"
-    filepath = output_dir / filename
+    actual_filename_with_thinking = "synthesized_table_with_thinking"
+    actual_filename_with_only_data = "synthesized_table_with_only_data"
+    filename_with_thinking = f"{actual_filename_with_thinking}.csv"
+    filename_with_only_data = f"{actual_filename_with_only_data}.csv"
+    filepath_with_thinking = output_dir / filename_with_thinking
+    filepath_with_only_data = output_dir / filename_with_only_data
     
     # Combine all CSV data and clean up
     combined_csv = '\n'.join(csv_data_list)
@@ -1071,14 +1112,21 @@ def save_csv_to_output(csv_data_list: list[str], session_id: str = "1") -> str:
     
     # Join with single newlines
     final_csv = '\n'.join(cleaned_lines)
-    
-    # Write to file
-    with open(filepath, 'w', encoding='utf-8', newline='') as f:
+
+    # Write to file with thinking process
+    with open(filepath_with_thinking, 'w', encoding='utf-8', newline='') as f:
         f.write(final_csv)
     
-    print(f"💾 CSV数据已保存到: {filepath}")
+    # Write to file with only cleaned data (using helper function)
+    with open(filepath_with_only_data, 'w', encoding='utf-8', newline='') as f:
+        cleaned_data = _clean_csv_data(final_csv)
+        f.write(cleaned_data)
+            
+    print(f"💾 CSV数据已保存到: {filepath_with_thinking}")
+    print(f"📄 CSV数据已保存到: {filepath_with_only_data}")
     print(f"📊 清理后包含 {len(cleaned_lines)} 行数据")
-    return str(filepath)
+    return str(filepath_with_thinking), str(filepath_with_only_data)
+
 
 
 def get_available_locations(data: dict) -> list[str]:
