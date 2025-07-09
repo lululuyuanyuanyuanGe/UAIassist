@@ -108,15 +108,15 @@ class FilloutTableAgent:
     
     def create_initialize_state(self, session_id: str,
                                  template_file: str = None,
-                                 data_file_path: list[str] = None, supplement_files_path: list[str] = None,
-                                 headers_mapping: dict[str, str] = None) -> FilloutTableState:
+                                 data_file_path: list[str] = None,
+                                 headers_mapping: dict[str, str] = None,
+                                 supplement_files_summary: str = "") -> FilloutTableState:
         """This node will initialize the state of the graph"""
         return {
             "messages": [],
             "session_id": session_id,
             "data_file_path": data_file_path, # excel files(xls) that has raw data
             "template_file": template_file, # txt file of template file in html format
-            "supplement_files_summary": "",
             "template_file_completion_code": "",
             "fill_CSV_2_template_code": "",
             "combined_data": "",
@@ -129,7 +129,8 @@ class FilloutTableAgent:
             "combined_data_array": [],
             "headers_mapping": headers_mapping,
             "CSV_data": [],
-            "largest_file_row_num": 0
+            "largest_file_row_num": 0,
+            "supplement_files_summary": supplement_files_summary
         }
     
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
@@ -180,16 +181,17 @@ class FilloutTableAgent:
             
             print("🔄 正在调用process_excel_files_with_chunking函数...")
             print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
-            print("Find the largest row count in the excel files")
-            largest_file = find_largest_file(excel_file_paths)
-            largest_file_path = list(largest_file.keys())[0]
-            larges_file_row_num = list(largest_file.values())[0]
-            print(f"🎯 Largest file: {Path(largest_file_path).name} with {larges_file_row_num} rows")
-            chunked_data = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
+            chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
                                                              session_id=state["session_id"],
-                                                             chunk_nums=5, largest_file=largest_file_path,
+                                                             chunk_nums=25, largest_file=None,  # Let function auto-detect
                                                              data_json_path="agents/data.json")
+            
+            # Extract chunks and row count from the result
+            chunked_data = chunked_result["combined_chunks"]
+            largest_file_row_count = chunked_result["largest_file_row_count"]
+            
             print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
+            print(f"📊 最大文件行数: {largest_file_row_count}")
             for chunk in chunked_data:
                 print(f"==================🔍 数据块 ==================:")
                 print(chunk)
@@ -198,7 +200,7 @@ class FilloutTableAgent:
             
             return {
                 "combined_data_array": chunked_data,
-                "largest_file_row_num": larges_file_row_num
+                "largest_file_row_num": largest_file_row_count
             }
             
         except Exception as e:
@@ -235,38 +237,34 @@ class FilloutTableAgent:
         print("=" * 50)
         
         system_prompt = f"""
-你是一位专业且严谨的结构化数据填报专家，负责将原始数据集准确映射并填充到目标模板中，输出标准化的 CSV 数据行。
+你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。你的任务是根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式，输出结构化、干净的数据行。
 
 【输入内容】
-1. 原始“数据集”：包含多条记录的表格数据（含表头与数据行）。
-2. “字段映射规则”：定义模板字段与原始数据字段或推理规则之间的对应关系。
-3. “模板结构”：目标 CSV 的字段顺序及格式要求，已通过 headers_mapping 变量提供：
+1. 模板表头映射（JSON 格式）：描述目标表格每一列的来源、计算逻辑或推理规则；
+2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块，其中每条数据行前一行标注了字段名称，用于辅助字段匹配。
+
+【任务流程】
+1. 请你逐字段分析模板表头映射，明确该字段的来源或推理逻辑；
+2. 若字段来自原始数据，请先定位来源字段并校验其格式；
+3. 若字段需推理（如日期格式转换、年龄计算、逻辑判断等），请先在脑中逐步推导，确保思路清晰；
+4. 若字段需计算，请先明确所需公式并逐步计算出结果；
+5. 在完成所有字段推理后，再将结果按照字段顺序合并为一行 CSV 数据；
+6. 在每次输出前，请先**在脑中逐项验证字段是否合理、格式是否规范**。
+
+💡 请你像一位人类专家一样，**一步一步思考再做决定**，不要跳过任何逻辑过程。
+
+【输出要求】
+- 仅输出纯净的 CSV 数据行，不包含表头、注释或任何多余内容；
+- 使用英文逗号分隔字段；
+- 每行数据字段顺序必须与模板表头映射完全一致；
+- 严禁遗漏字段、重复字段、多输出空值或空行；
+- 输出中不得出现 Markdown 包裹（如 ```）或额外说明文字。
+
+模板表头映射：
 {state["headers_mapping"]}
-
-【处理流程】
-1. **解析表头结构**  
-   - 一定要先搞清楚数据源结构，和模板结构，搞清楚映射关系
-   - 读取模板字段顺序；  
-   - 确定每个模板字段在原始数据中的来源列或推理规则。
-
-2. **提取与转换**  
-   - 对照映射规则，从原始数据中提取对应值；  
-   - 按需进行格式转换（日期格式、数值精度等）；  
-   - 对于缺失字段，按映射规则严格执行推理或计算，**严禁自行添加无据数据**。
-   - 对于推理内容严格遵守映射规则，不得自行编造数据
-
-3. **校验与补全**  
-   - 确保每个字段均有合法值；  
-   - 遵循映射规则中所有条件与约束。
-
-4. **生成输出**  
-   - 每条记录输出一行，字段顺序必须与模板一致；  
-   - 仅输出 CSV 数据行（英文逗号分隔，不含表头、注释或其他说明）；  
-   - 直接返回纯文本格式的多行 CSV。
-   - 不要将输出包裹在任何```中
-
-请严格按照以上规范执行，不要输出任何额外信息或解释
 """
+
+
 
 
 
@@ -285,9 +283,9 @@ class FilloutTableAgent:
                 print("用户输入提示词", system_prompt)
                 print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
                 response = invoke_model(
-                    model_name="gpt-3.5-turbo", 
+                    model_name="deepseek-ai/DeepSeek-V3", 
                     messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                    temperature=0.1
+                    temperature=0.2
                 )
                 print(f"✅ Completed chunk {index + 1}")
                 return (index, response)
@@ -310,7 +308,7 @@ class FilloutTableAgent:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         results = {}
-        with ThreadPoolExecutor(max_workers=5) as executor:  # Limit to 5 concurrent requests
+        with ThreadPoolExecutor(max_workers=25) as executor:  # Limit to 5 concurrent requests
             # Submit all tasks
             future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
                               for chunk_data in chunks_with_indices}
@@ -350,6 +348,7 @@ class FilloutTableAgent:
             "CSV_data": sorted_results
         }
     
+    
 
     def _generate_code_fill_CSV_2_template(self, state: FilloutTableState) -> FilloutTableState:
         """这个节点会把生成出的CSV数据填到模板表格中"""
@@ -357,34 +356,28 @@ class FilloutTableAgent:
         print("=" * 50)
         
         system_prompt = f"""
-你是一位专业的 Python 表格处理工程师，擅长使用 pandas 和 BeautifulSoup 将结构化 CSV 数据填入 HTML 表格模板中。
+你是一名精通 HTML 表格处理和 Python 脚本编写的工程师。你的任务是根据给定的 **已扩充好的 HTML 表格模板** 和 **CSV 数据文件**，生成一段完整可执行的 Python 代码，将 CSV 里的每一行数据逐格填入 HTML 中对应的 `<td>`。请遵循以下要求：
 
-【任务描述】
-用户会提供两个文件：
-1. 一个 HTML 格式的表格模板，其中包括表头、样式（CSS）、部分空白的数据行；
-2. 一个 CSV 文件，包含需要填入 HTML 表格中的数据。
+1. **输入参数**  
+   - `template_html_path`：已扩充模板的 HTML 文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\{state["template_file"]}
+   - `csv_data_path`：待填数据的 CSV 文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\CSV_files\\synthesized_table.csv
+   - `output_html_path`：填充后输出的 HTML 文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\{state["template_file"]}
 
-【代码目标】
-请生成一段通用、健壮的 Python 代码，完成以下任务：
+2. **功能需求**  
+   a. 使用合适的库（如 `BeautifulSoup`、`pandas` 或者 `csv` 模块）读取并解析 `template_html_path`。  
+   b. 读取 `csv_data_path`，确保按行、按列读取，每行字段顺序与 HTML 表格列完全对应。  
+   c. 在 HTML 中定位“数据行”区域：跳过表头、标题行和表尾，只对空白或占位符（如 `<br/>` 或空 `<td>`）逐格填值。  
+   d. 对第 N 条 CSV 记录，将记录中第 1 列填入第 N 行第 1 个 `<td>`，第 2 列填入第 N 行第 2 个 `<td>`，以此类推。  
+   e. 如果某个单元格已有内容（非 `<br/>` 或非空），则跳过该单元格，不覆盖原有内容。  
+   f. 填完所有行后，将修改后的 DOM 序列化并写入 `output_html_path`。  
 
-1. 自动识别 HTML 表格中数据行的起始位置，通常是“序号”开头的表头行之后；
-2. 忽略 HTML 表格中的表尾说明行（如包含“审核人”或“制表人”的行）；
-3. 将 CSV 文件中的数据逐行填入 HTML 表格的空白 `<td>` 单元格，跳过“序号”列；
-4. 如果 HTML 表格中已有足够的空行，按顺序填入；如空行不足，不追加新行；
-5. 保留原 HTML 表格的结构和样式；
-6. 最终保存修改后的 HTML 表格到新文件中。
+3. **输出**  
+   - 只输出完整的 Python 脚本，不要将代码包裹在```python里，直接给出代码，不要附加多余解释或示例。  
+   - 脚本需包含必要的 `import`、函数定义和必要注释，便于维护。  
 
-【额外要求】
-- 所有处理必须健壮，应对字段数量不匹配、空行、不同表格结构等情况；
-- 请确保代码清晰易读，适合复用。
+另外我会把上一轮生成的代码及错误信息反馈给你，请根据错误信息修复代码。
 
-【输入】
-- HTML 文件路径：template.html
-- CSV 文件路径：synthesized_table.csv
 
-【输出】
-- 纯代码文本，不需要将其包裹在任何代码块中，直接返回代码文本
-- 不需要写注释，解释等，直接返回代码文本
 
 """
 
@@ -634,137 +627,36 @@ class FilloutTableAgent:
         print("\n🔄 开始执行: _generate_html_table_completion_code")
         print("=" * 50)
 
-        system_prompt = f"""你是一位专业的 HTML 表格处理和样式优化专家，擅长通过 Python 代码实现表格的动态扩展和美化。
+        system_prompt = f"""你是一名精通 HTML 表格处理和 Python 脚本编写的工程师。你的任务是根据给定的 HTML 表格模板，将其“数据行”部分扩充到指定的行数，以便容纳后续要填入的数据。请按照以下要求生成一段完整可执行的 Python 代码（使用 BeautifulSoup 或等效库）：
 
-【核心任务】
-根据用户提供的 HTML 表格模板，生成一段完整可执行的 Python 代码，实现以下功能：
+1. **输入参数**  
+   - `input_html_path`：原始 HTML 模板文件路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\
+   - `output_html_path`：扩充后 HTML 输出路径：D:\\asianInfo\\ExcelAssist\\conversations\\{state['session_id']}\\output\\{state["template_file"]}
+   - `target_row_count`：包含已有行在内，最终表格中“数据行”总数  
 
-1. **表格数据行扩展**：
-   - 你需要识别出表格中哪些是"数据行"，这些行通常满足：
-     - 包含"序号"列；
-     - 且"序号"单元格中是连续的数字（如 1、2、3…）；
-   - 使用这些数据行中第一个有效的 `<tr>` 作为模板进行扩展；
-   - 自动忽略或删除非数据行，如包含"审核人"、"制表人"字段的表尾行，或空白行。
+2. **功能需求**  
+   a. 读取 `input_html_path` 对应的 HTML 文件，用合适的解析器（如 BeautifulSoup）加载并定位 `<table>` 元素。  
+   b. 在表头（header）行之后、表尾（footer）行之前，找到第一个“数据行”模板——通常该行 `<tr>` 中首个 `<td>` 包含连续的行号（如 `1`、`2`、…）。  
+   c. 计算当前已有数据行数量 `current_count`。  
+   d. 如果 `current_count < target_row_count`，则复制“数据行”模板，将其插入到表格中，使得新的行号依次递增，直到行数达到 `target_row_count`。  
+   e. 保留模板中的所有空白单元格（如 `<br/>`、空 `<td>`）和列样式，不修改其它部分（表头、标题行、审核人/制表人等）。  
+   f. 将修改后的 HTML 保存到 `output_html_path`。  
 
-2. **样式美化**：
-   - 使用内嵌 `<style>` 标签添加 CSS 样式；
-   - 样式包括：边框、对齐方式、字体、表头背景、隔行换色等；
-   - 美化后表格应简洁、清晰、正式。
+3. **输出**  
+   - 只输出完整的 Python 脚本代码，不要附加多余解释或示例。  
+   - 脚本中应包含必要的 import 语句和注释，让阅读者能快速理解关键逻辑。  
 
-3. **结构保持**：
-   - 保留表格原有的 `<colgroup>` 区块；
-   - 保留表头 `<tr>`；
-   - 非数据部分结构不应被破坏。
+请根据上述说明生成代码，不要将代码包裹在```python里，直接给出代码，不要附加多余解释或示例。
 
-【技术要求】
-- 使用 BeautifulSoup 解析 HTML；
-- 使用 copy.deepcopy() 或 soup.new_tag() 方法复制模板行；
-- 遍历 <tr> 判断数据行；
-- 使用标准 Python 文件读写操作；
-- 插入数据行时保证序号递增，并清空其余单元格内容；
-- 最终 HTML 结构必须符合标准并可直接在浏览器打开。
+另外我会把上一轮生成的代码及错误信息反馈给你，请根据错误信息修复代码。
 
-【输出要求】
-- 仅输出完整、可直接执行的 Python 代码（不要添加 markdown 格式或解释性文字）；
-- Python 脚本需从 {state["template_file"]} 读取 HTML 模板；
-- 结果输出为 D:\\asianInfo\\ExcelAssist\\conversations\\{state["session_id"]}\\output\\template.html； 
-- 编码为 UTF-8，路径必须可写。
 
-【错误修复机制】
-如遇到执行错误，请重点检查并修复以下问题：
-- 是否错误地复制了非数据行；
-- 是否误删或误保留了尾部备注行；
-- 是否遗漏 HTML 的结构闭合或 CSS 插入；
-- 是否缺失必要依赖（如 copy, BeautifulSoup）；
-- 文件路径是否正确、可读写。
-
-【参考示例】
-以下是符合要求的 Python 参考模板：
-
-from bs4 import BeautifulSoup
-import copy
-
-input_path = ""
-output_path = ""
-num_rows_to_generate = {state["largest_file_row_num"]}
-
-with open(input_path, 'r', encoding='utf-8') as f:
-    soup = BeautifulSoup(f, 'html.parser')
-
-table = soup.find('table')
-all_rows = table.find_all('tr')
-
-data_row_template = None
-for row in all_rows:
-    cells = row.find_all('td')
-    if len(cells) == 11 and cells[0].text.strip().isdigit():
-        data_row_template = copy.deepcopy(row)
-        break
-
-footer_row = None
-# 具体表格具体分析
-for row in reversed(all_rows):
-    if '审核人' in row.text or '制表人' in row.text:
-        footer_row = row
-        break
-
-if footer_row:
-    footer_row.extract()
-
-for row in all_rows:
-    cells = row.find_all('td')
-    if len(cells) == 11 and cells[0].text.strip().isdigit():
-        row.extract()
-
-for i in range(1, num_rows_to_generate + 1):
-    new_row = copy.deepcopy(data_row_template)
-    cells = new_row.find_all('td')
-    cells[0].string = str(i)
-    for j in range(1, len(cells)):
-        cells[j].string = ''
-    table.append(new_row)
-
-if footer_row:
-    table.append(footer_row)
-
-style_tag = soup.new_tag('style')
-style_tag.string =
-table {{
-    border-collapse: collapse;
-    width: 100%;
-    font-family: 'Microsoft YaHei', 'Arial', sans-serif;
-    font-size: 14px;
-    margin-top: 20px;
-    color: #333;
-}}
-th, td {{
-    border: 1px solid #444;
-    padding: 8px 10px;
-    text-align: center;
-    vertical-align: middle;
-}}
-td[colspan="11"] {{
-    font-weight: bold;
-    background-color: #e6f0ff;
-    text-align: left;
-    padding: 10px;
-}}
-tr:nth-child(even) td {{
-    background-color: #f9f9f9;
-}}
-tr:nth-child(odd) td {{
-    background-color: #ffffff;
-}}
-th {{
-    background-color: #dce6f1;
-    font-weight: bold;
-}}
 """
 
 
         file_path = state["template_file"]
         template_file_content = read_txt_file(file_path)
-        number_of_rows = "需要生成100行数据行"
+        number_of_rows = f"需要生成{state['largest_file_row_num']}行数据行"
         base_input = f"HTML模板地址: {file_path}\n HTML模板内容:\n{template_file_content}\n \n需求:\n{number_of_rows}"
 
         print(f"📄 读取模板文件: {file_path}")
@@ -1010,7 +902,7 @@ th {{
         print(f"📋 初始状态创建完成，会话ID: {session_id}")
         print(f"📄 模板文件: {initial_state['template_file']}")
         print(f"📊 数据文件数量: {len(initial_state['data_file_path'])}")
-        print(f"📚 补充文件摘要: {initial_state['supplement_files_summary']}")
+
         print("-" * 60)
 
         while True:

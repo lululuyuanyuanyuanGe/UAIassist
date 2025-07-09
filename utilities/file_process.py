@@ -706,7 +706,7 @@ def find_largest_file(excel_file_paths: list[str]) -> str:
 
 def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
                                       session_id: str = "1", chunk_nums: int = 5, largest_file: str = None,
-                                      data_json_path: str = "agents/data.json") -> list[str]:
+                                      data_json_path: str = "agents/data.json") -> dict:
     """
     Process Excel files by reading their corresponding pre-generated CSV files,
     finding the one with most rows, chunking the largest file, and combining everything.
@@ -717,9 +717,13 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         session_id: Session identifier for folder structure
         chunk_nums: Number of chunks to create (default 5)
         largest_file: Optional pre-specified largest file path
-    
+        data_json_path: Path to data.json file containing structure information
+        
     Returns:
-        List of strings, each containing combined content of one chunk with other files
+        dict: {
+            "combined_chunks": List of strings, each containing combined content of one chunk with other files
+            "largest_file_row_count": int, number of data rows in the largest file
+        }
     """
     print(f"🔄 Processing {len(excel_file_paths)} Excel files...")
     if supplement_files_summary:
@@ -749,7 +753,25 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
                 
                 # Count data rows (excluding header)
                 csv_lines = csv_content.strip().split('\n')
-                data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
+                
+                # Check if this CSV has repeated headers before each data row
+                # by looking for the pattern where every other line is a header
+                if len(csv_lines) >= 4:  # Need at least 4 lines to detect pattern
+                    first_line = csv_lines[0].strip()
+                    third_line = csv_lines[2].strip()
+                    
+                    # If first and third lines are identical, it's likely repeated headers
+                    if first_line == third_line and first_line.startswith('序号'):
+                        # Each data record consists of header + data line
+                        data_rows = len(csv_lines) // 2
+                        print(f"🔍 Detected repeated header format: {len(csv_lines)} lines = {data_rows} data records")
+                    else:
+                        # Normal CSV format with single header
+                        data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
+                        print(f"🔍 Standard CSV format: {len(csv_lines)} lines = {data_rows} data records")
+                else:
+                    # Too few lines, use standard counting
+                    data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
                 
                 csv_files.append(excel_path)  # Keep original Excel path as key
                 row_counts.append(data_rows)
@@ -956,7 +978,14 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         print(f"✅ Created chunk {chunk_index + 1}/{chunk_nums} with {len(chunk_data_lines)} data lines")
     
     print(f"🎉 Successfully created {len(combined_chunks)} combined chunks")
-    return combined_chunks
+    
+    # Return both chunks and largest file row count
+    largest_file_row_count = row_counts[csv_files.index(largest_file)] if largest_file in csv_files else 0
+    
+    return {
+        "combined_chunks": combined_chunks,
+        "largest_file_row_count": largest_file_row_count
+    }
 
 
 
@@ -1028,14 +1057,27 @@ def save_csv_to_output(csv_data_list: list[str], session_id: str = "1") -> str:
     filename = f"{actual_filename}.csv"
     filepath = output_dir / filename
     
-    # Combine all CSV data
+    # Combine all CSV data and clean up
     combined_csv = '\n'.join(csv_data_list)
+    
+    # Remove unnecessary newlines and clean up the CSV content
+    lines = combined_csv.split('\n')
+    cleaned_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if line:  # Only keep non-empty lines
+            cleaned_lines.append(line)
+    
+    # Join with single newlines
+    final_csv = '\n'.join(cleaned_lines)
     
     # Write to file
     with open(filepath, 'w', encoding='utf-8', newline='') as f:
-        f.write(combined_csv)
+        f.write(final_csv)
     
     print(f"💾 CSV数据已保存到: {filepath}")
+    print(f"📊 清理后包含 {len(cleaned_lines)} 行数据")
     return str(filepath)
 
 
