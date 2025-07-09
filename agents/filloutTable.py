@@ -60,12 +60,13 @@ class FilloutTableState(TypedDict):
     retry: int
     combined_data_array: list[str]
     headers_mapping: str
-    CSV_data: list[str]
     largest_file_row_num: int
-    empty_row_html: str
-    headers_html: str
-    footer_html: str
     combined_html: str
+    # Use lambda reducers for concurrent updates
+    empty_row_html: Annotated[str, lambda old, new: new if new else old]
+    headers_html: Annotated[str, lambda old, new: new if new else old]
+    footer_html: Annotated[str, lambda old, new: new if new else old]
+    CSV_data: Annotated[list[str], lambda old, new: new if new else old]
 
 
 
@@ -88,13 +89,16 @@ class FilloutTableAgent:
         graph.add_node("extract_headers_html", self._extract_headers_html)
         graph.add_node("extract_footer_html", self._extract_footer_html)
         graph.add_node("combine_html_tables", self._combine_html_tables)
+        graph.add_node("shield_for_transform_data_to_html", self._shield_for_transform_data_to_html)
         
         # Define the workflow
         graph.add_edge(START, "combine_data_split_into_chunks")
         graph.add_conditional_edges("combine_data_split_into_chunks", self._route_after_combine_data_split_into_chunks)
-        graph.add_edge("extract_empty_row_html", "transform_data_to_html")
-        graph.add_edge("extract_headers_html", "transform_data_to_html")
-        graph.add_edge("extract_footer_html", "transform_data_to_html")
+        graph.add_edge("extract_empty_row_html", "shield_for_transform_data_to_html")
+        graph.add_edge("extract_headers_html", "shield_for_transform_data_to_html")
+        graph.add_edge("extract_footer_html", "shield_for_transform_data_to_html")
+        graph.add_edge("generate_CSV_based_on_combined_data", "shield_for_transform_data_to_html")
+        graph.add_edge("shield_for_transform_data_to_html", "transform_data_to_html")
         graph.add_edge("transform_data_to_html", "combine_html_tables")
         graph.add_edge("combine_html_tables", END)
         
@@ -474,6 +478,7 @@ class FilloutTableAgent:
 - 仅输出纯HTML代码，不要包裹在```html```中
 - 不要输出任何解释、注释或其他文本
 - 确保输出的HTML代码格式正确且可直接使用
+- 一定不要自动补全，例如<table>标签，不要加上</table>标签
 
 【示例】
 输入HTML模板包含：
@@ -576,15 +581,19 @@ class FilloutTableAgent:
         )
         return {"footer_html": response}
     
-    
-    def _transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
-        """将数据转换为html代码"""
-        print("\n🔄 开始执行: _transform_data_to_html")
+    def _shield_for_transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
+        """屏蔽transform_data_to_html的执行"""
+        print("\n🔄 开始执行: _shield_for_transform_data_to_html")
         print("=" * 50)
         print("摘取到的表头：", state["headers_html"])
         print("摘取到的表尾：", state["footer_html"])
         print("摘取到的空白行：", state["empty_row_html"])
         return state
+    
+
+    def _transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
+        """将数据转换为html代码"""
+        # return state
         system_prompt = """你是一个html表格数据处理专家，现在我会给你提供代填数据，和html模板，你需要把数据填入html模板中，
         返回结果为严格符合html代码规范的代码，不要输出任何其他内容。不要将结果包裹在```html```中
         举个例子：
