@@ -31,6 +31,7 @@ from langchain_core.tools import tool
 from agents.processUserInput import ProcessUserInputAgent
 from agents.recallFilesAgent import RecallFilesAgent
 from agents.filloutTable import FilloutTableAgent
+from agents.designExcelAgent import DesignExcelAgent
 
 load_dotenv()
 
