@@ -72,6 +72,7 @@ class FrontdeskState(TypedDict):
     table_summary: str
     headers_mapping: dict[str, str]
     recalled_xls_files: list[str]
+    village_name: str
 
 
 class FrontdeskAgent:
@@ -120,7 +121,7 @@ class FrontdeskAgent:
 
 
 
-    def _create_initial_state(self, session_id: str = "1") -> FrontdeskState:
+    def _create_initial_state(self, session_id: str = "1", village_name: str = "") -> FrontdeskState:
         """This function will create the initial state of the frontdesk agent"""
         return {
             "chat_history": [],
@@ -131,7 +132,8 @@ class FrontdeskAgent:
             "session_id": session_id,
             "previous_node": "",
             "headers_mapping": {},
-            "recalled_xls_files": []
+            "recalled_xls_files": [],
+            "village_name": village_name
         }
 
 
