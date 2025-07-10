@@ -39,6 +39,8 @@ class DesignExcelState(TypedDict):
     template_structure: str
     user_feedback: str
     session_id: str
+    template_path: str
+    village_name: str
 
 class DesignExcelAgent:
     def __init__(self):
@@ -50,20 +52,25 @@ class DesignExcelAgent:
         graph = StateGraph(DesignExcelState)
         graph.add_node("collect_user_requirement", self._collect_user_requirement)
         graph.add_node("design_excel_template", self._design_excel_template)
+        graph.add_node("generate_html_template", self._generate_html_template)
+
         graph.add_edge(START, "collect_user_requirement")
         graph.add_conditional_edges("collect_user_requirement", self._route_after_collect_user_requirement)
-        graph.add_edge("design_excel_template", END)
+        graph.add_edge("design_excel_template", "generate_html_template")
+        graph.add_edge("generate_html_template", END)
         return graph
     
 
-    def _create_initial_state(self, session_id: str) -> DesignExcelState:
+    def _create_initial_state(self, session_id: str, village_name: str) -> DesignExcelState:
         """This function initializes the state of the design excel agent"""
         return {
             "messages": [],
             "next_node": "collect_user_requirement",
             "template_structure": "",
             "user_feedback": "",
-            "session_id": session_id
+            "session_id": session_id,
+            "template_path": "",
+            "village_name": ""
         }
 
     def _collect_user_requirement(self, state: DesignExcelState) -> DesignExcelState:
@@ -89,7 +96,7 @@ class DesignExcelAgent:
         你的返回为纯文本，不要返回任何其他内容或解释
         """
 
-        response = invoke_model(model_name="gpt-4o", 
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-R1", 
                                            messages=[SystemMessage(content=system_prompt)])
         print("大模型返回的路由节点是：", response)
         return response
@@ -100,24 +107,9 @@ class DesignExcelAgent:
         print("\n💬 开始执行: _chat_with_user_to_determine_template")
         print("=" * 50)
         
-        # Check if we have tool results from previous interaction
-        if state.get("messages") and len(state["messages"]) > 0:
-            latest_message = state["messages"][-1]
-            user_context = latest_message.content
-            print(f"📋 用户上下文: {user_context}")
-            user_context = json.loads(user_context)
-            if isinstance(user_context, list):
-                print("🔍 用户上下文是列表:" , user_context[0])
-                user_context = user_context[0]
-                # Fix: Parse the JSON string again since user_context[0] is still a string
-                if isinstance(user_context, str):
-                    user_context = json.loads(user_context)
-                user_context = user_context["summary"]
-            else:
-                user_context = user_context["summary"]
-        else:
-            user_context = "用户需要确定表格结构"
-        print(f"🔍 用户上下文: {user_context}")
+        with open("agent/data.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+            related_files = data[state["village_name"]]
 
         system_prompt = f"""你是一个Excel表格设计专家，你需要跟根据用户的需求，并且参考我们知识库里已收录的信息，
         来设计一个符合用户需求的表格。知识库里收录了所有可以利用的表格或者文档，表格是用户上传给我们的带有原始数据的表格，并且我们
@@ -127,9 +119,9 @@ class DesignExcelAgent:
         你也需要参考这些信息来设计模板或者改进设计。
 
 
+        知识库信息：
+        {related_files}
 
-
-        用户的需求是：{user_context}
 
         请严格遵守以下输出规则
 1. 提取表格的多级表头结构：
@@ -151,7 +143,8 @@ class DesignExcelAgent:
       ]
     }}
   }},
-  "表格总结": "该表格的主要用途及内容说明..."
+  "表格总结": "该表格的主要用途及内容说明...",
+  "额外信息": "该表格额外信息，例如填表人，填表时间，填表单位等"
 }}
 
 
@@ -159,8 +152,9 @@ class DesignExcelAgent:
 """
         print("system_prompt和用户交互确定表格结构:\n ", system_prompt)
         print("📤 正在调用LLM进行表格结构确定...")
-        response = invoke_model(model_name="gpt-4o", 
-                                           messages=[SystemMessage(content=system_prompt)])
+        user_input = state["user_feedback"]
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-R1", 
+                                           messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
         
         print("返回结果：", response)
 
@@ -172,8 +166,60 @@ class DesignExcelAgent:
                 "next_node": "design_excel_template"
                 }
     
-    def run_design_excel_agent(self, session_id: str) -> DesignExcelState:
+
+    def  _generate_html_template(self, state: DesignExcelState) -> DesignExcelState:
+        """根据模板生成html模版"""
+        print("\n🔍 开始执行: _generate_html_template")
+        print("=" * 50)
+        system_prompt = f"""
+你是一个精通 Excel 模板表格的专家，擅长根据 JSON 格式的表格结构摘要自动生成对应的 HTML 模板。
+
+当我提供如下摘要（JSON 格式）时：
+
+{{
+  "表格结构": {{
+    "一级表头1": {{
+      "二级表头A": ["字段A1", "字段A2"],
+      "二级表头B": ["字段B1", "..."]
+    }},
+    "一级表头2": {{
+      "二级表头C": ["字段C1", "..."]
+    }},
+    "..." : {{ "...": ["...", "..."] }}
+  }},
+  "额外信息": {{
+    "填表单位": "单位名称占位",
+    "填表时间": "YYYY-MM-DD 占位",
+    "其他说明": "...占位"
+  }}
+}}
+
+请生成一个通用的 HTML 表格模板，要求：
+1. 使用 <table> 与若干 <colgroup>，列数与最底层字段总数一致；
+2. 第一行使用 <td colspan="..."> 占位展示“表格标题”；
+3. 第二行按 “额外信息” 中键值顺序，生成合并单元格占位展示；
+4. 第三行将所有“字段”扁平展开，按 JSON 结构顺序输出表头占位符；
+5. 最后一行可留给审签/制表人占位；
+6. HTML 代码应保持简洁、结构清晰，仅使用占位符，不包含任何具体业务名称或数据。
+
+仅输出 HTML 模板代码，不要包含多余的解释或示例数据。
+"""
+
+        print("system_prompt和用户交互确定表格结构:\n ", system_prompt)
+        print("📤 正在调用LLM进行表格结构确定...")
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-R1", 
+                                           messages=[SystemMessage(content=system_prompt)])
+        
+        print("返回结果：", response)
+        return state
+    
+    def run_design_excel_agent(self, session_id: str, village_name: str) -> DesignExcelState:
         """Run the design excel agent"""
-        state = self._create_initial_state(session_id)
+        state = self._create_initial_state(session_id, village_name)
         final_state = self.graph.invoke(state)
         return final_state
+    
+
+if __name__ == "__main__":
+    designExcelAgent = DesignExcelAgent()
+    designExcelAgent.run_design_excel_agent(session_id="1", village_name="燕云村")
