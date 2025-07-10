@@ -9,8 +9,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.modelRelated import invoke_model
-from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, save_original_file,
-                                    extract_filename, determine_location_from_content, 
+from utilities.file_process import (retrieve_file_content, save_original_file,
+                                    extract_filename, 
                                     ensure_location_structure, check_file_exists_in_data,
                                     get_available_locations, move_template_files_to_final_destination,
                                     move_supplement_files_to_final_destination, delete_files_from_staging_area,
@@ -50,11 +50,41 @@ class FileProcessState(TypedDict):
     irrelevant_original_files_path: list[str] # Track original files to be deleted with irrelevant files
     all_files_irrelevant: bool  # Flag to indicate all files are irrelevant
     template_complexity: str
+    village_name: str
 
 
 class FileProcessAgent:
+
+    @tool
+    def request_user_clarification(question: str, context: str = "") -> str:
+        """
+        询问用户澄清，和用户确认，或者询问用户补充信息，当你不确定的时候请询问用户
+
+        参数：
+            question: 问题
+            context: 可选补充内容，解释为甚恶魔你需要一下信息
+        """
+        print("\n" + "="*60)
+        print("🤔 需要您的确认")
+        print("="*60)
+        print(f"📋 {question}")
+        if context:
+            print(f"💡 {context}")
+        print("="*60)
+        
+        user_response = input("👤 请输入您的选择: ").strip()
+        
+        print(f"✅ 您的选择: {user_response}")
+        print("="*60 + "\n")
+        
+        return user_response
+    
+    tools = [request_user_clarification]
+
+
     def __init__(self):
-        self.graph = self._build_graph()
+        self.memory = MemorySaver()
+        self.graph = self._build_graph().compile(checkpointer=self.memory)
 
     def _build_graph(self):
         graph = StateGraph(FileProcessState)
@@ -65,7 +95,17 @@ class FileProcessAgent:
         graph.add_node("process_supplement", self._process_supplement)
         graph.add_node("process_irrelevant", self._process_irrelevant)
         graph.add_node("process_template", self._process_template)
-        pass
+        graph.add_node("summary_file_upload", self._summary_file_upload)
+
+        graph.add_edge(START, "file_upload")
+        graph.add_edge("file_upload", "analyze_uploaded_files")
+        graph.add_conditional_edges("analyze_uploaded_files", self._route_after_analyze_uploaded_files)
+        graph.add_edge("process_template", "summary_file_upload")
+        graph.add_edge("process_supplement", "summary_file_upload")
+        graph.add_edge("process_irrelevant", "summary_file_upload")
+        graph.add_edge("summary_file_upload", END)
+
+        return graph
 
     def _create_initial_state(self, session_id: str = "1", upload_files_path: list[str] = []) -> FileProcessState:
         return {
@@ -79,7 +119,8 @@ class FileProcessAgent:
             "irrelevant_files_path": [],
             "irrelevant_original_files_path": [],
             "all_files_irrelevant": False,
-            "template_complexity": ""
+            "template_complexity": "",
+            "village_name": ""
         }
 
 
@@ -88,12 +129,8 @@ class FileProcessAgent:
             print("\n🔍 开始执行: _file_upload")
             print("=" * 50)
             
-            # Re-detect files from user input since routing functions cannot modify state
-            latest_message = state["process_user_input_messages"][-1]
-            message_content = latest_message.content if hasattr(latest_message, 'content') else str(latest_message)
-            
             print("📁 正在检测用户输入中的文件路径...")
-            detected_files = detect_and_process_file_paths(message_content)
+            detected_files = state["upload_files_path"]
             print(f"📋 检测到 {len(detected_files)} 个文件")
             
             # Load data.json with error handling
@@ -201,8 +238,7 @@ class FileProcessAgent:
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
                 "irrelevant_files_path": [],
-                "all_files_irrelevant": True,  # Flag for routing to text analysis
-                "process_user_input_messages": [SystemMessage(content="没有找到可处理的文件，将分析用户文本输入")]
+                "all_files_irrelevant": True  # Flag for routing to text analysis
             }
         
         def analyze_single_file(file_path: str) -> tuple[str, str, str]:
@@ -230,8 +266,6 @@ class FileProcessAgent:
 
                 仔细检查不要把补充文件错误划分为模板文件反之亦然，补充文件里面是有数据的，模板文件里面是空的，或者只有一两个例子数据
                 注意：所有文件已转换为txt格式，表格以HTML代码形式呈现，请根据内容而非文件名或后缀判断。
-
-                用户输入: {state.get("user_input", "")}
 
                 当前分析文件:
                 文件名: {source_path.name}
@@ -325,8 +359,7 @@ class FileProcessAgent:
                 "uploaded_template_files_path": [],
                 "supplement_files_path": {"表格": [], "文档": []},
                 "irrelevant_files_path": [],
-                "all_files_irrelevant": True,  # Flag for routing to text analysis
-                "process_user_input_messages": [SystemMessage(content="没有找到可处理的文件，将分析用户文本输入")]
+                "all_files_irrelevant": True  # Flag for routing to text analysis
             }
         
         # Update state with classification results
@@ -372,7 +405,7 @@ class FileProcessAgent:
                 "supplement_files_path": {"表格": [], "文档": []},
                 "irrelevant_files_path": irrelevant_files,
                 "irrelevant_original_files_path": irrelevant_original_files,
-                "all_files_irrelevant": True,  # Flag for routing
+                "all_files_irrelevant": True  # Flag for routing
             }
         else:
             # Some files are relevant, proceed with normal flow
@@ -391,17 +424,12 @@ class FileProcessAgent:
                 "supplement_files_path": supplement_files,
                 "irrelevant_files_path": irrelevant_files,
                 "irrelevant_original_files_path": irrelevant_original_files,
-                "all_files_irrelevant": False,  # Flag for routing
-                "process_user_input_messages": [SystemMessage(content=analysis_summary)]
+                "all_files_irrelevant": False  # Flag for routing
             }
                 
     def _route_after_analyze_uploaded_files(self, state: FileProcessState):
         """Route after analyzing uploaded files. Uses Send objects for all routing."""
         print("Debug: route_after_analyze_uploaded_files")
-        # Check if LLM request a tool call
-        latest_message = state["process_user_input_messages"][-1]
-        if hasattr(latest_message, 'tool_calls') and latest_message.tool_calls:
-            return [Send("clarification_tool_node", state)]
         
         # Check if all files are irrelevant - route to text analysis
         if state.get("all_files_irrelevant", False):
@@ -409,8 +437,7 @@ class FileProcessAgent:
             sends = []
             if state.get("irrelevant_files_path"):
                 sends.append(Send("process_irrelevant", state))
-            sends.append(Send("analyze_text_input", state))
-            return sends
+            return sends if sends else [Send("summary_file_upload", state)]
         
         # Some files are relevant - process them in parallel
         sends = []
@@ -424,8 +451,8 @@ class FileProcessAgent:
             print("Debug: process_irrelevant")
             sends.append(Send("process_irrelevant", state))
 
-        # The parallel nodes will automatically converge, then continue to analyze_text_input
-        return sends if sends else [Send("analyze_text_input", state)]  # Fallback
+        # The parallel nodes will automatically converge, then continue to summary
+        return sends if sends else [Send("summary_file_upload", state)]  # Fallback
     
     def _process_supplement(self, state: FileProcessState) -> FileProcessState:
         """This node will process the supplement files, it will analyze the supplement files and summarize the content of the files as well as stored the summary in data.json"""
@@ -476,12 +503,7 @@ class FileProcessAgent:
                 file_name = extract_filename(table_file)
                 
                 # Determine location for this file
-                location = determine_location_from_content(
-                    file_content, 
-                    file_name, 
-                    state.get("user_input", ""),
-                    available_locations
-                )
+                location = state["village_name"]
                 
                 # Define the JSON template separately to avoid f-string nesting issues
                 json_template = '''{{
@@ -755,7 +777,7 @@ class FileProcessAgent:
             print("⚠️ 没有文件需要处理")
             print("✅ _process_supplement 执行完成")
             print("=" * 50)
-            return {"process_user_input_messages": new_messages}
+            return {}
         
         max_workers = min(total_files, 5)  # Limit to 4 concurrent requests for supplement processing
         print(f"🚀 开始并行处理补充文件，使用 {max_workers} 个工作线程")
@@ -947,9 +969,9 @@ class FileProcessAgent:
         print("✅ _process_supplement 执行完成")
         print("=" * 50)
         
-        # Return the collected messages for proper state update
-        return {"process_user_input_messages": new_messages}
-        
+        # Return empty dict since we don't need to update state with messages
+        return {}
+    
         
     def _process_irrelevant(self, state: FileProcessState) -> FileProcessState:
         """This node will process the irrelevant files, it will delete the irrelevant files (both processed and original) from the staging area"""
@@ -1178,3 +1200,53 @@ class FileProcessAgent:
                 "template_complexity": template_type,
                 "uploaded_template_files_path": [final_template_path]
             }
+
+    def _summary_file_upload(self, state: FileProcessState) -> FileProcessState:
+        """Summary node for file upload process"""
+        print("\n🔍 开始执行: _summary_file_upload")
+        print("=" * 50)
+        
+        # Log the final state summary
+        print("📊 文件处理总结:")
+        print(f"  - 上传文件总数: {len(state.get('upload_files_path', []))}")
+        print(f"  - 新上传文件数: {len(state.get('new_upload_files_path', []))}")
+        print(f"  - 模板文件数: {len(state.get('uploaded_template_files_path', []))}")
+        print(f"  - 补充表格文件数: {len(state.get('supplement_files_path', {}).get('表格', []))}")
+        print(f"  - 补充文档文件数: {len(state.get('supplement_files_path', {}).get('文档', []))}")
+        print(f"  - 无关文件数: {len(state.get('irrelevant_files_path', []))}")
+        print(f"  - 模板复杂度: {state.get('template_complexity', 'N/A')}")
+        
+        print("✅ _summary_file_upload 执行完成")
+        print("=" * 50)
+        
+        return {}
+
+
+    def run_file_process_agent(self, session_id: str = "1", upload_files_path: list[str] = []) -> FileProcessState:
+        """Driver to run the process file agent"""
+        print("\n🚀 开始运行 FileProcessAgent")
+        print("=" * 60)
+
+        initial_state = self._create_initial_state(session_id = session_id, upload_files_path = upload_files_path)
+        config = {"configurable": {"thread_id": session_id}}
+
+        print(f"📋 会话ID: {session_id}")
+        print(f"📝 初始状态已创建")
+        print("🔄 正在执行文件处理工作流...")
+
+        try:
+            final_state = self.graph.invoke(initial_state, config=config)
+
+            print("\n🎉 FileProcessAgent 执行完成！")
+            print("=" * 60)
+            print("📊 最终结果:")
+            print(f"- 上传文件数量: {len(final_state.get('upload_files_path', []))}")
+            print(f"- 新上传文件数量: {len(final_state.get('new_upload_files_path', []))}")
+            print(f"- 新上传文件已处理数量: {len(final_state.get('new_upload_files_processed_path', []))}")
+            print(f"- 原始文件数量: {len(final_state.get('original_files_path', []))}")
+
+            return final_state
+        
+        except Exception as e:
+            print(f"❌ 执行过程中发生错误: {e}")
+            return initial_state
