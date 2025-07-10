@@ -279,7 +279,11 @@ class FrontdeskAgent:
         
         return state
 
+
     def _chat_with_user_to_determine_template(self, state: FrontdeskState) -> FrontdeskState:
+
+
+    def _design_excel_tempalte(self, state: FrontdeskState) -> FrontdeskState:
         """This node will chat with the user to determine the template, when the template is not provided"""
         print("\n💬 开始执行: _chat_with_user_to_determine_template")
         print("=" * 50)
@@ -303,9 +307,19 @@ class FrontdeskAgent:
             user_context = "用户需要确定表格结构"
         print(f"🔍 用户上下文: {user_context}")
 
-        system_prompt = f"""你是一个智能 Excel 表格生成助手，现在你需要和用户进行对话，来确认用户想要生成的表格结构内容。
-表格可能涉及到复杂的多级表头，因此你需要弄清楚所有的结构层级，不断询问用户，直到你搞清楚全部需求，并返回以下格式：
+        system_prompt = f"""你是一个Excel表格设计专家，你需要跟根据用户的需求，并且参考我们知识库里已收录的信息，
+        来设计一个符合用户需求的表格。知识库里收录了所有可以利用的表格或者文档，表格是用户上传给我们的带有原始数据的表格，并且我们
+        已经整理出了表格结构，以及总结，同样的，文档是用户已经上传的用于辅助填写表格的文件，里面包含一些政策信息，这些信息加上
+        已有数据可以让我们推理出新的数据。你的任务是根据这些已有数据，文档和用户需求设计出一个新的Excel模板表格。你一定要确保
+        设计出来的表格中每个表头都能有确切的数据来源，或者能根据其他信息推理出来。另外我也会把用户的反馈信息或者设计要求提供给你
+        你也需要参考这些信息来设计模板或者改进设计。
 
+
+
+
+        用户的需求是：{user_context}
+
+        请严格遵守以下输出规则
 1. 提取表格的多级表头结构：
    - 使用嵌套的 key-value 形式表示层级关系；
    - 每一级表头应以对象形式展示其子级字段或子表头；
@@ -328,11 +342,8 @@ class FrontdeskAgent:
   "表格总结": "该表格的主要用途及内容说明..."
 }}
 
-请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
 
-如果用户信息不够详细，你可以调用工具来收集更多用户输入。如果用户信息已经足够详细，请直接返回表格结构JSON，不要再调用工具。
-当前会话ID: {state["session_id"]}
-当前情况: {user_context}
+
 """
         print("system_prompt和用户交互确定表格结构:\n ", system_prompt)
         print("📤 正在调用LLM进行表格结构确定...")
