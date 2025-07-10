@@ -127,8 +127,8 @@ class RecallFilesAgent:
         #         file_content = value
         #         self.location = key
         file_content = json.loads(file_content)
-        self.location = "燕云村"
-        self.files_under_location = file_content["燕云村"]
+        self.location = "中讯村"
+        self.files_under_location = file_content["中讯村"]
         file_content = extract_summary_for_each_file(self.files_under_location)
         print("===========================")
         print(self.files_under_location)

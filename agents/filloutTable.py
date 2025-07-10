@@ -240,7 +240,7 @@ class FilloutTableAgent:
     
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
-        return state
+        # return state
         print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
         print("=" * 50)
         
@@ -590,7 +590,7 @@ class FilloutTableAgent:
 
     def _transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
         """将数据转换为html代码"""
-        return state
+        # return state
         system_prompt = """你是一个专业的HTML表格数据处理和美化专家。你需要将CSV数据填入HTML模板中，并为表格添加现代化的CSS样式装饰，使其美观专业。
 
 【核心任务】

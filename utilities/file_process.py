@@ -704,6 +704,224 @@ def find_largest_file(excel_file_paths: list[str]) -> str:
     print(f"🎯 Largest file: {Path(largest_file).name} with {largest_row_count} rows")
     return {largest_file: largest_row_count}
 
+def detect_csv_format(csv_lines: list[str]) -> tuple[bool, int]:
+    """
+    Detect if CSV has repeated headers before each data row.
+    
+    Returns:
+        tuple: (is_repeated_header_format, data_record_count)
+    """
+    if len(csv_lines) >= 4:  # Need at least 4 lines to detect pattern
+        first_line = csv_lines[0].strip()
+        third_line = csv_lines[2].strip()
+        
+        # If first and third lines are identical, it's likely repeated headers
+        if first_line == third_line and first_line.count(',') > 0:
+            # Each data record consists of header + data line
+            data_rows = len(csv_lines) // 2
+            print(f"🔍 Detected repeated header format: {len(csv_lines)} lines = {data_rows} data records")
+            return True, data_rows
+        else:
+            # Normal CSV format with single header
+            data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
+            print(f"🔍 Standard CSV format: {len(csv_lines)} lines = {data_rows} data records")
+            return False, data_rows
+    else:
+        # Too few lines, use standard counting
+        data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
+        return False, data_rows
+
+def extract_structure_info_for_file(file_path: str, table_structure_info: dict) -> str:
+    """
+    Extract structure information for a specific file.
+    
+    Returns:
+        str: Formatted structure information
+    """
+    file_name = Path(file_path).stem + ".txt"
+    structure_info = ""
+    
+    if file_name in table_structure_info:
+        file_structure = table_structure_info[file_name]
+        
+        try:
+            summary_content = file_structure.get("summary", "")
+            if summary_content:
+                summary_content = summary_content.strip()
+                
+                if summary_content.startswith('{') and summary_content.endswith('}'):
+                    parsed_summary = json.loads(summary_content)
+                    
+                    if file_name in parsed_summary:
+                        file_data = parsed_summary[file_name]
+                        
+                        # Extract 表格结构 (detailed column structure)
+                        table_structure = file_data.get("表格结构", {})
+                        if table_structure:
+                            structure_info += "=== 表格结构 ===\n"
+                            structure_info += json.dumps(table_structure, ensure_ascii=False, indent=2) + "\n\n"
+                        
+                        # Extract 表格总结 (summary)
+                        table_summary = file_data.get("表格总结", "")
+                        if table_summary:
+                            structure_info += "=== 表格总结 ===\n"
+                            structure_info += table_summary + "\n\n"
+                else:
+                    structure_info += "=== 文件分析 ===\n"
+                    structure_info += summary_content + "\n\n"
+                        
+        except json.JSONDecodeError:
+            structure_info += "=== 文件分析 ===\n"
+            structure_info += file_structure.get("summary", "") + "\n\n"
+        
+        # Also include the full summary if available and different from structured data
+        if "summary" in file_structure and not structure_info:
+            structure_info += "=== 完整分析 ===\n"
+            structure_info += file_structure["summary"] + "\n\n"
+    
+    return structure_info
+
+def parse_header_data_pairs(csv_lines: list[str], is_repeated_header: bool) -> list[tuple[str, str]]:
+    """
+    Parse CSV lines into header+data pairs.
+    
+    Args:
+        csv_lines: List of CSV lines
+        is_repeated_header: Whether the CSV has repeated headers
+        
+    Returns:
+        list: List of (header, data) tuples
+    """
+    pairs = []
+    
+    if is_repeated_header:
+        # Group every 2 lines as header+data pairs
+        for i in range(0, len(csv_lines), 2):
+            if i + 1 < len(csv_lines):
+                header = csv_lines[i].strip()
+                data = csv_lines[i + 1].strip()
+                if header and data:  # Only add if both header and data exist
+                    pairs.append((header, data))
+    else:
+        # Standard CSV: first line is header, rest are data
+        if csv_lines:
+            header = csv_lines[0].strip()
+            for data_line in csv_lines[1:]:
+                data = data_line.strip()
+                if data:
+                    pairs.append((header, data))
+    
+    return pairs
+
+def create_chunks_from_pairs(pairs: list[tuple[str, str]], chunk_nums: int) -> list[list[tuple[str, str]]]:
+    """
+    Split header+data pairs into chunks, keeping pairs intact.
+    
+    Args:
+        pairs: List of (header, data) tuples
+        chunk_nums: Desired number of chunks
+        
+    Returns:
+        list: List of chunks, each containing pairs
+    """
+    if not pairs:
+        return []
+    
+    total_pairs = len(pairs)
+    actual_chunk_nums = min(chunk_nums, total_pairs)
+    
+    if actual_chunk_nums == 0:
+        return []
+    
+    base_chunk_size = total_pairs // actual_chunk_nums
+    remainder = total_pairs % actual_chunk_nums
+    
+    print(f"📏 Dividing {total_pairs} data pairs into {actual_chunk_nums} chunks (requested: {chunk_nums})")
+    print(f"   Base chunk size: {base_chunk_size} pairs, Extra pairs to distribute: {remainder}")
+    
+    chunks = []
+    current_idx = 0
+    
+    for chunk_index in range(actual_chunk_nums):
+        # First 'remainder' chunks get one extra pair
+        if chunk_index < remainder:
+            chunk_size = base_chunk_size + 1
+        else:
+            chunk_size = base_chunk_size
+        
+        start_idx = current_idx
+        end_idx = current_idx + chunk_size
+        
+        chunk_pairs = pairs[start_idx:end_idx]
+        chunks.append(chunk_pairs)
+        current_idx = end_idx
+        
+        print(f"✅ Created chunk {chunk_index + 1}/{actual_chunk_nums} with {len(chunk_pairs)} data pairs")
+    
+    return chunks
+
+def combine_chunk_content(chunk_pairs: list[tuple[str, str]], largest_structure_info: str, 
+                         largest_filename: str, other_files_content: list[str], 
+                         supplement_files_summary: str) -> str:
+    """
+    Combine chunk content with structure info and other files.
+    
+    Returns:
+        str: Combined content for the chunk
+    """
+    chunk_combined = []
+    
+    # 1. Add other files' complete content (already includes structure)
+    for other_content in other_files_content:
+        if other_content.strip():
+            chunk_combined.append(other_content)
+    
+    # 2. Add largest file structure + data chunk
+    if chunk_pairs:
+        largest_file_chunk_content = ""
+        
+        # Add structure information if available
+        if largest_structure_info.strip():
+            largest_file_chunk_content += largest_structure_info.strip() + "\n\n"
+        
+        # Add data header and reconstruct the header+data format
+        largest_file_chunk_content += f"=== {largest_filename} 的表格数据 ===\n"
+        
+        # Reconstruct the alternating header+data format
+        for header, data in chunk_pairs:
+            largest_file_chunk_content += f"{header}\n{data}\n"
+        
+        chunk_combined.append(largest_file_chunk_content.rstrip())  # Remove trailing newline
+    
+    # 3. Add supplement information last
+    if supplement_files_summary:
+        if supplement_files_summary.strip().startswith("=== 补充文件内容 ==="):
+            chunk_combined.append(supplement_files_summary)
+        else:
+            chunk_combined.append(f"=== 补充文件内容 ===\n{supplement_files_summary}")
+    
+    return "\n\n".join(chunk_combined)
+
+def find_largest_file(csv_files: list[str], row_counts: list[int], largest_file: str = None) -> str:
+    """
+    Find the file with the most data rows.
+    
+    Returns:
+        str: Path to the largest file
+    """
+    if largest_file is None:
+        max_rows_idx = row_counts.index(max(row_counts))
+        largest_file = csv_files[max_rows_idx]
+        print(f"📊 Largest file: {Path(largest_file).name} with {row_counts[max_rows_idx]} rows")
+    else:
+        # Validate the specified largest file exists in our CSV files
+        if largest_file not in csv_files:
+            print(f"⚠️ Specified largest file not found in CSV files, using automatic selection")
+            max_rows_idx = row_counts.index(max(row_counts))
+            largest_file = csv_files[max_rows_idx]
+    
+    return largest_file
+
 def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
                                       session_id: str = "1", chunk_nums: int = 5, largest_file: str = None,
                                       data_json_path: str = "agents/data.json") -> dict:
@@ -736,7 +954,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     
     if not csv_base_dir.exists():
         print(f"❌ CSV files directory not found: {csv_base_dir}")
-        return [f"Error: CSV files directory not found: {csv_base_dir}"]
+        return {"combined_chunks": [], "largest_file_row_count": 0}
     
     # Step 1: Find corresponding CSV files and count rows
     file_contents = {}  # {original_excel_path: csv_content}
@@ -751,27 +969,9 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
                 with open(csv_file_path, 'r', encoding='utf-8') as f:
                     csv_content = f.read()
                 
-                # Count data rows (excluding header)
+                # Count data rows using helper function
                 csv_lines = csv_content.strip().split('\n')
-                
-                # Check if this CSV has repeated headers before each data row
-                # by looking for the pattern where every other line is a header
-                if len(csv_lines) >= 4:  # Need at least 4 lines to detect pattern
-                    first_line = csv_lines[0].strip()
-                    third_line = csv_lines[2].strip()
-                    
-                    # If first and third lines are identical, it's likely repeated headers
-                    if first_line == third_line and first_line.startswith('序号'):
-                        # Each data record consists of header + data line
-                        data_rows = len(csv_lines) // 2
-                        print(f"🔍 Detected repeated header format: {len(csv_lines)} lines = {data_rows} data records")
-                    else:
-                        # Normal CSV format with single header
-                        data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
-                        print(f"🔍 Standard CSV format: {len(csv_lines)} lines = {data_rows} data records")
-                else:
-                    # Too few lines, use standard counting
-                    data_rows = len(csv_lines) - 1 if csv_lines else 0  # Subtract 1 for header
+                is_repeated_header, data_rows = detect_csv_format(csv_lines)
                 
                 csv_files.append(excel_path)  # Keep original Excel path as key
                 row_counts.append(data_rows)
@@ -792,7 +992,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     
     if not csv_files:
         print("❌ No CSV files found for processing")
-        return ["Error: No CSV files found for processing"]
+        return {"combined_chunks": [], "largest_file_row_count": 0}
     
     # Step 2: Load structure information from data.json
     table_structure_info = {}
@@ -809,79 +1009,23 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
             print(f"⚠️ Failed to load structure info: {e}")
     
     # Step 3: Add structure information to file contents
-    for excel_path in file_contents.keys():
-        if excel_path in file_contents:
-            file_name = Path(excel_path).stem + ".txt"
-            structure_info = ""
-            
-            if file_name in table_structure_info:
-                file_structure = table_structure_info[file_name]
-                
-                # Try to parse the JSON structure from the summary field
-                try:
-                    summary_content = file_structure.get("summary", "")
-                    if summary_content:
-                        # Clean up the summary content and try to parse as JSON
-                        summary_content = summary_content.strip()
-                        
-                        # Sometimes the JSON is wrapped in text, try to extract it
-                        if summary_content.startswith('{') and summary_content.endswith('}'):
-                            parsed_summary = json.loads(summary_content)
-                            
-                            # Check if it's the expected format
-                            if file_name in parsed_summary:
-                                file_data = parsed_summary[file_name]
-                                
-                                # Extract 表格结构 (detailed column structure)
-                                table_structure = file_data.get("表格结构", {})
-                                if table_structure:
-                                    structure_info += "=== 表格结构 ===\n"
-                                    structure_info += json.dumps(table_structure, ensure_ascii=False, indent=2) + "\n\n"
-                                
-                                # Extract 表格总结 (summary)
-                                table_summary = file_data.get("表格总结", "")
-                                if table_summary:
-                                    structure_info += "=== 表格总结 ===\n"
-                                    structure_info += table_summary + "\n\n"
-                        else:
-                            # If not proper JSON format, use the raw summary
-                            structure_info += "=== 文件分析 ===\n"
-                            structure_info += summary_content + "\n\n"
-                            
-                except json.JSONDecodeError:
-                    # If JSON parsing fails, use the raw summary
-                    structure_info += "=== 文件分析 ===\n"
-                    structure_info += file_structure.get("summary", "") + "\n\n"
-                
-                # Also include the full summary if available and different from structured data
-                if "summary" in file_structure and not structure_info:
-                    structure_info += "=== 完整分析 ===\n"
-                    structure_info += file_structure["summary"] + "\n\n"
-            
-            # Update file content to include structure information
-            if structure_info:
-                original_content = file_contents[excel_path]
-                # Replace the simple header with structured header
-                filename = Path(excel_path).name
-                new_content = f"=== {filename} 的表格结构 ===\n{structure_info}=== {filename} 的表格数据 ===\n"
-                # Extract the CSV data part
-                csv_data = original_content.split(f"=== {filename} 的表格数据 ===\n", 1)[1] if f"=== {filename} 的表格数据 ===" in original_content else original_content
-                file_contents[excel_path] = new_content + csv_data
-                print(f"✅ Added structure info for {filename}")
+    for excel_path in list(file_contents.keys()):
+        structure_info = extract_structure_info_for_file(excel_path, table_structure_info)
+        
+        # Update file content to include structure information
+        if structure_info:
+            original_content = file_contents[excel_path]
+            filename = Path(excel_path).name
+            new_content = f"=== {filename} 的表格结构 ===\n{structure_info}=== {filename} 的表格数据 ===\n"
+            # Extract the CSV data part
+            csv_data = original_content.split(f"=== {filename} 的表格数据 ===\n", 1)[1] if f"=== {filename} 的表格数据 ===" in original_content else original_content
+            file_contents[excel_path] = new_content + csv_data
+            print(f"✅ Added structure info for {filename}")
     
     # Step 4: Find the largest file by row count
-    if largest_file is None:
-        max_rows_idx = row_counts.index(max(row_counts))
-        largest_file = csv_files[max_rows_idx]
-        print(f"📊 Largest file: {Path(largest_file).name} with {row_counts[max_rows_idx]} rows")
-    else:
-        # Validate the specified largest file exists in our CSV files
-        if largest_file not in csv_files:
-            print(f"⚠️ Specified largest file not found in CSV files, using automatic selection")
-            max_rows_idx = row_counts.index(max(row_counts))
-            largest_file = csv_files[max_rows_idx]
+    largest_file = find_largest_file(csv_files, row_counts, largest_file)
     
-    # Step 5: Handle the largest file - divide into chunks
+    # Step 5: Handle the largest file - divide into chunks while preserving header+data pairs
     largest_file_content = file_contents[largest_file]
     other_files_content = [content for path, content in file_contents.items() if path != largest_file]
     
@@ -913,81 +1057,29 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     while largest_data_lines and not largest_data_lines[-1].strip():
         largest_data_lines.pop()
     
-    # Calculate chunk sizes for even distribution
-    total_lines = len(largest_data_lines)
+    # Detect format and parse into header+data pairs
+    is_repeated_header, _ = detect_csv_format(largest_data_lines)
+    header_data_pairs = parse_header_data_pairs(largest_data_lines, is_repeated_header)
     
-    # Use the minimum of requested chunks and actual data lines
-    # This prevents creating more chunks than we have data
-    actual_chunk_nums = min(chunk_nums, total_lines)
+    if not header_data_pairs:
+        print("⚠️ No valid header+data pairs found")
+        return {"combined_chunks": [], "largest_file_row_count": 0}
     
-    if actual_chunk_nums == 0:
-        print("⚠️ No data lines to process")
-        return {
-            "combined_chunks": [],
-            "largest_file_row_count": 0
-        }
+    # Create chunks from pairs (preserving header+data integrity)
+    pair_chunks = create_chunks_from_pairs(header_data_pairs, chunk_nums)
     
-    base_chunk_size = total_lines // actual_chunk_nums
-    remainder = total_lines % actual_chunk_nums
+    if not pair_chunks:
+        print("⚠️ No chunks created")
+        return {"combined_chunks": [], "largest_file_row_count": 0}
     
-    print(f"📏 Dividing {total_lines} data lines into {actual_chunk_nums} chunks (requested: {chunk_nums})")
-    print(f"   Base chunk size: {base_chunk_size}, Extra lines to distribute: {remainder}")
-    
-    # Step 6: Create evenly distributed chunks
+    # Step 6: Combine chunks with other content
     combined_chunks = []
-    current_idx = 0
-    
-    for chunk_index in range(actual_chunk_nums):
-        # First 'remainder' chunks get one extra line
-        if chunk_index < remainder:
-            chunk_size = base_chunk_size + 1
-        else:
-            chunk_size = base_chunk_size
-        
-        start_idx = current_idx
-        end_idx = current_idx + chunk_size
-        
-        chunk_data_lines = largest_data_lines[start_idx:end_idx]
-        current_idx = end_idx
-        
-        # Create chunk with structure information:
-        # 1. Other files' complete content (including structure)
-        # 2. Largest file structure + chunk data
-        # 3. Supplement information last
-        
-        chunk_combined = []
-        
-        # 1. Add other files' complete content (already includes structure)
-        for other_content in other_files_content:
-            if other_content.strip():
-                chunk_combined.append(other_content)
-        
-        # 2. Add largest file structure + data chunk
-        if chunk_data_lines:
-            largest_file_chunk_content = ""
-            
-            # Add structure information if available
-            if largest_structure_info.strip():
-                largest_file_chunk_content += largest_structure_info.strip() + "\n\n"
-            
-            # Add data header and chunk data
-            largest_file_chunk_content += f"=== {largest_filename} 的表格数据 ===\n" + '\n'.join(chunk_data_lines)
-            
-            chunk_combined.append(largest_file_chunk_content)
-        
-        # 3. Add supplement information last
-        if supplement_files_summary:
-            # Check if supplement content already has header
-            if supplement_files_summary.strip().startswith("=== 补充文件内容 ==="):
-                chunk_combined.append(supplement_files_summary)
-            else:
-                chunk_combined.append(f"=== 补充文件内容 ===\n{supplement_files_summary}")
-        
-        # Join all parts with clean separators
-        final_combined = "\n\n".join(chunk_combined)
-        combined_chunks.append(final_combined)
-        
-        print(f"✅ Created chunk {chunk_index + 1}/{actual_chunk_nums} with {len(chunk_data_lines)} data lines")
+    for chunk_index, chunk_pairs in enumerate(pair_chunks):
+        combined_content = combine_chunk_content(
+            chunk_pairs, largest_structure_info, largest_filename, 
+            other_files_content, supplement_files_summary
+        )
+        combined_chunks.append(combined_content)
     
     print(f"🎉 Successfully created {len(combined_chunks)} combined chunks")
     
