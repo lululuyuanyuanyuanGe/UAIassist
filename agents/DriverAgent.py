@@ -179,7 +179,7 @@ class FrontdeskAgent:
             print("=" * 50)
             return {
                 "messages": [AIMessage(content=error_msg)],
-                "template_file_path": "",
+                "template_file_path": summary_message[1],
                 "previous_node": "initial_collect_user_input"
             }
             
@@ -290,6 +290,9 @@ class FrontdeskAgent:
         designExcelAgent_final_state = designExcelAgent.run_design_excel_agent(session_id=state["session_id"])
         template_structure = designExcelAgent_final_state["template_structure"]
         template_path = designExcelAgent_final_state["template_path"]
+        return {"template_structure": template_structure,
+                "template_path": template_path,
+                "previous_node": "chat_with_user_to_determine_template"}
 
 
     

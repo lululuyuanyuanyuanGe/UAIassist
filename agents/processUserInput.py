@@ -198,7 +198,7 @@ class ProcessUserInputAgent:
         )
         
         # Handle template file path - convert list to string if necessary
-        template_files_list = file_process_agent_final_state.get("uploaded_template_files_path", [])
+        template_files_list = file_process_agent_final_state.get("upload_files_path", [])
         if isinstance(template_files_list, list) and len(template_files_list) > 0:
             template_file_path = template_files_list[0]  # Take the first template file
         else:
@@ -511,8 +511,11 @@ class ProcessUserInputAgent:
 
                 print("🎉执行完毕")
                 summary_message = final_state.get("summary_message", "")
-                template_file = final_state.get("uploaded_template_files_path", "")
-                return [summary_message, template_file]
+                template_file = final_state.get("template_file_path", "")
+                print(f"🔍 返回信息测试template: {template_file}")
+                combined_message = [summary_message, template_file]
+                print(f"🔍 返回信息测试template: {combined_message}")
+                return combined_message
             
         except Exception as e:
             print(f"❌ 执行过程中发生错误: {e}")

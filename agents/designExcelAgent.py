@@ -5,8 +5,6 @@ import json
 # Add root project directory to sys.path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-
-
 from typing import Dict, List, Optional, Any, TypedDict, Annotated, Union
 from datetime import datetime
 
@@ -16,7 +14,6 @@ from pathlib import Path
 # Create an interactive chatbox using gradio
 import gradio as gr
 from dotenv import load_dotenv
-
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
@@ -47,7 +44,6 @@ class DesignExcelAgent:
         self.memory = MemorySaver()
         self.graph = self._build_graph().compile(checkpointer=self.memory)
 
-
     def _build_graph(self) -> StateGraph:
         graph = StateGraph(DesignExcelState)
         graph.add_node("collect_user_requirement", self._collect_user_requirement)
@@ -60,7 +56,6 @@ class DesignExcelAgent:
         graph.add_edge("generate_html_template", END)
         return graph
     
-
     def _create_initial_state(self, session_id: str, village_name: str) -> DesignExcelState:
         """This function initializes the state of the design excel agent"""
         return {
@@ -70,7 +65,7 @@ class DesignExcelAgent:
             "user_feedback": "",
             "session_id": session_id,
             "template_path": "",
-            "village_name": ""
+            "village_name": village_name
         }
 
     def _collect_user_requirement(self, state: DesignExcelState) -> DesignExcelState:
@@ -88,135 +83,231 @@ class DesignExcelAgent:
 
     def _route_after_collect_user_requirement(self, state: DesignExcelState) -> str:
         """根据用户需求，设计模版"""
-        system_prompt = f"""你是一个文本分析专家，根据收集到的用户输入总结你来判断下一步的路由节点，
-        如果用户给出了肯定的答复则返回
-        END
-        否则返回
-        design_excel_template
-        你的返回为纯文本，不要返回任何其他内容或解释
-        """
+        system_prompt = """你是一个智能路由分析专家，负责分析用户反馈并决定下一步操作。
 
-        response = invoke_model(model_name="deepseek-ai/DeepSeek-R1", 
-                                           messages=[SystemMessage(content=system_prompt)])
+请仔细分析用户的输入内容，判断用户的意图和需求：
+
+**路由规则：**
+1. 如果用户表示满意、同意、确认或给出了明确的肯定回复（如"好的"、"可以"、"满意"、"没问题"等），返回：END
+
+2. 如果用户提出了具体的需求、修改建议、新的要求，或者表达了不满意，返回：design_excel_template
+
+3. 如果用户询问问题、要求解释或需要更多信息，返回：design_excel_template
+
+**分析要点：**
+- 关注用户的情感倾向（满意/不满意）
+- 识别是否有具体的修改要求
+- 判断用户是否需要进一步的设计工作
+
+**重要提醒：**
+- 只返回路由节点名称，不要添加任何解释或其他内容
+- 返回值必须是：END 或 design_excel_template
+- 当有疑问时，倾向于选择 design_excel_template 继续设计流程
+"""
+
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", 
+                               messages=[SystemMessage(content=system_prompt), HumanMessage(content=state["user_feedback"])])
         print("大模型返回的路由节点是：", response)
-        return response
-
+        return response.strip()
 
     def _design_excel_template(self, state: DesignExcelState) -> DesignExcelState:
         """根据用户需求，设计模版"""
-        print("\n💬 开始执行: _chat_with_user_to_determine_template")
+        print("\n💬 开始执行: _design_excel_template")
         print("=" * 50)
         
-        with open("agent/data.json", "r", encoding="utf-8") as f:
+        with open("agents/data.json", "r", encoding="utf-8") as f:
             data = json.load(f)
-            related_files = data[state["village_name"]]
+            related_files = data.get(state["village_name"], {"表格": {}, "文档": {}})
 
-        system_prompt = f"""你是一个Excel表格设计专家，你需要跟根据用户的需求，并且参考我们知识库里已收录的信息，
-        来设计一个符合用户需求的表格。知识库里收录了所有可以利用的表格或者文档，表格是用户上传给我们的带有原始数据的表格，并且我们
-        已经整理出了表格结构，以及总结，同样的，文档是用户已经上传的用于辅助填写表格的文件，里面包含一些政策信息，这些信息加上
-        已有数据可以让我们推理出新的数据。你的任务是根据这些已有数据，文档和用户需求设计出一个新的Excel模板表格。你一定要确保
-        设计出来的表格中每个表头都能有确切的数据来源，或者能根据其他信息推理出来。另外我也会把用户的反馈信息或者设计要求提供给你
-        你也需要参考这些信息来设计模板或者改进设计。
+        system_prompt = f"""你是一个专业的Excel表格设计专家，专门为村级行政管理设计高质量的数据表格模板。
 
+## 🎯 任务目标
+根据用户需求和现有数据资源，设计一个结构化、实用的Excel表格模板，确保每个字段都有明确的数据来源或计算依据。
 
-        知识库信息：
-        {related_files}
+## 📊 可用数据资源
+以下是{state["village_name"]}的知识库资源：
 
+### 📋 现有表格数据：
+{json.dumps(related_files.get("表格", {}), ensure_ascii=False, indent=2)}
 
-        请严格遵守以下输出规则
-1. 提取表格的多级表头结构：
-   - 使用嵌套的 key-value 形式表示层级关系；
-   - 每一级表头应以对象形式展示其子级字段或子表头；
-   - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
+### 📄 政策文档资料：
+{json.dumps(related_files.get("文档", {}), ensure_ascii=False, indent=2)}
 
-2. 提供一个对该表格内容的简要总结：
-   - 内容应包括表格用途、主要信息类别、适用范围等；
-   - 语言简洁，不超过 150 字；
+## 🔍 设计原则
+1. **数据可追溯性**：每个表头字段必须有明确的数据来源
+   - 直接来源：现有表格中的字段
+   - 推导来源：根据政策文档和现有数据可计算得出
+   - 手工录入：需要村民或管理员填写的新信息
 
-输出格式如下：
+2. **结构合理性**：
+   - 采用多级表头结构，逻辑清晰
+   - 相关字段分组归类
+   - 字段命名规范统一
+
+3. **实用性导向**：
+   - 符合村级行政管理实际需求
+   - 便于数据录入和维护
+   - 支持后续统计分析
+
+## 🎨 用户反馈处理
+用户反馈："{state["user_feedback"]}"
+
+请根据用户反馈调整设计方案，如果是首次设计，请基于用户需求创建合适的模板。
+
+## 📝 输出要求
+严格按照以下JSON格式输出：
+
+```json
 {{
   "表格结构": {{
-    "顶层表头名称": {{
-      "二级表头名称": [
-        "字段1",
-        "字段2"
-      ]
+    "主要分类1": {{
+      "子分类A": ["字段1", "字段2", "字段3"],
+      "子分类B": ["字段4", "字段5"]
+    }},
+    "主要分类2": {{
+      "子分类C": ["字段6", "字段7"]
     }}
   }},
-  "表格总结": "该表格的主要用途及内容说明...",
-  "额外信息": "该表格额外信息，例如填表人，填表时间，填表单位等"
+  "表格总结": "详细说明该表格的用途、适用场景、主要功能和预期效果（100-200字）",
+  "额外信息": {{
+    "填表单位": "{state["village_name"]}",
+    "填表时间": "填表日期占位符",
+    "制表人": "制表人姓名占位符",
+    "审核人": "审核人姓名占位符"
+  }},
+  "数据来源说明": {{
+    "字段1": "来源：现有表格XXX",
+    "字段2": "来源：根据政策文档XXX计算",
+    "字段3": "来源：需要手工录入"
+  }}
 }}
+```
 
-
-
+## ⚠️ 注意事项
+- 确保所有字段都有明确的数据来源
+- 表格结构要符合Excel操作习惯
+- 考虑数据录入的便利性和准确性
+- 如果现有资源不足，请在"数据来源说明"中明确标注
 """
-        print("system_prompt和用户交互确定表格结构:\n ", system_prompt)
-        print("📤 正在调用LLM进行表格结构确定...")
+
+        print("📤 正在调用LLM进行表格结构设计...")
         user_input = state["user_feedback"]
-        response = invoke_model(model_name="deepseek-ai/DeepSeek-R1", 
-                                           messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", 
+                               messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
         
         print("返回结果：", response)
-
         
-        print("✅ _chat_with_user_to_determine_template 执行完成")
+        print("✅ _design_excel_template 执行完成")
         print("=" * 50)
         
         return {"template_structure": str(response),
-                "next_node": "design_excel_template"
-                }
+                "next_node": "generate_html_template"}
     
-
-    def  _generate_html_template(self, state: DesignExcelState) -> DesignExcelState:
+    def _generate_html_template(self, state: DesignExcelState) -> DesignExcelState:
         """根据模板生成html模版"""
         print("\n🔍 开始执行: _generate_html_template")
         print("=" * 50)
-        system_prompt = f"""
-你是一个精通 Excel 模板表格的专家，擅长根据 JSON 格式的表格结构摘要自动生成对应的 HTML 模板。
+        
+        system_prompt = f"""你是一个专业的HTML表格生成专家，擅长将JSON格式的表格结构转换为美观、实用的HTML表格模板。
 
-当我提供如下摘要（JSON 格式）时：
+## 📋 任务要求
+根据提供的JSON表格结构，生成一个完整的HTML表格模板，用于村级行政管理的数据录入和展示。
 
-{{
-  "表格结构": {{
-    "一级表头1": {{
-      "二级表头A": ["字段A1", "字段A2"],
-      "二级表头B": ["字段B1", "..."]
-    }},
-    "一级表头2": {{
-      "二级表头C": ["字段C1", "..."]
-    }},
-    "..." : {{ "...": ["...", "..."] }}
-  }},
-  "额外信息": {{
-    "填表单位": "单位名称占位",
-    "填表时间": "YYYY-MM-DD 占位",
-    "其他说明": "...占位"
-  }}
-}}
+## 🎨 设计规范
 
-请生成一个通用的 HTML 表格模板，要求：
-1. 使用 <table> 与若干 <colgroup>，列数与最底层字段总数一致；
-2. 第一行使用 <td colspan="..."> 占位展示“表格标题”；
-3. 第二行按 “额外信息” 中键值顺序，生成合并单元格占位展示；
-4. 第三行将所有“字段”扁平展开，按 JSON 结构顺序输出表头占位符；
-5. 最后一行可留给审签/制表人占位；
-6. HTML 代码应保持简洁、结构清晰，仅使用占位符，不包含任何具体业务名称或数据。
+### 1. 表格结构要求
+- 使用标准的`<table>`标签
+- 合理设置`<colgroup>`，列数与最底层字段总数匹配
+- 使用`colspan`和`rowspan`实现多级表头
+- 保持表格结构清晰、对齐美观
 
-仅输出 HTML 模板代码，不要包含多余的解释或示例数据。
+### 2. 表头层次设计
+- **第一行**：表格标题（全表合并）
+- **第二行**：额外信息行（填表单位、时间、制表人等）
+- **第三行及以后**：多级表头结构
+- **最后几行**：数据录入区域（至少3-5行示例）
+
+### 3. 样式要求
+- 添加基本的CSS样式，确保表格美观
+- 表头使用深色背景，数据区域使用浅色背景
+- 设置合适的边框、间距和字体
+- 确保表格在不同设备上显示良好
+
+### 4. 内容填充
+- 表头使用实际的字段名称
+- 数据区域使用占位符（如"请输入..."）
+- 额外信息区域使用带占位符的实际标签
+
+## 🔧 HTML结构示例
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表格模板</title>
+    <style>
+        /* 在这里添加CSS样式 */
+    </style>
+</head>
+<body>
+    <table>
+        <colgroup>
+            <!-- 根据实际列数设置 -->
+        </colgroup>
+        <thead>
+            <!-- 表头结构 -->
+        </thead>
+        <tbody>
+            <!-- 数据录入区域 -->
+        </tbody>
+        <tfoot>
+            <!-- 签名区域 -->
+        </tfoot>
+    </table>
+</body>
+</html>
+```
+
+## 📊 输入的JSON结构
+{state["template_structure"]}
+
+## 🎯 输出要求
+- 生成完整的HTML文档，包含CSS样式
+- 确保表格结构与JSON描述完全匹配
+- 提供美观的视觉效果和良好的用户体验
+- 代码结构清晰，便于后续修改
+
+请直接输出完整的HTML代码，不要添加任何解释或说明文字。
 """
 
-        print("system_prompt和用户交互确定表格结构:\n ", system_prompt)
-        print("📤 正在调用LLM进行表格结构确定...")
-        response = invoke_model(model_name="deepseek-ai/DeepSeek-R1", 
-                                           messages=[SystemMessage(content=system_prompt)])
+        print("📤 正在调用LLM进行HTML模板生成...")
+        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", 
+                               messages=[SystemMessage(content=system_prompt)])
         
         print("返回结果：", response)
-        return state
+        
+        # 保存HTML模板到文件
+        html_filename = f"{state['village_name']}_表格模板_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        html_path = Path("完整案列") / html_filename
+        
+        try:
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(response)
+            print(f"✅ HTML模板已保存到: {html_path}")
+        except Exception as e:
+            print(f"❌ 保存HTML模板失败: {e}")
+        
+        print("✅ _generate_html_template 执行完成")
+        print("=" * 50)
+        
+        return {"template_path": str(html_path)}
     
     def run_design_excel_agent(self, session_id: str, village_name: str) -> DesignExcelState:
         """Run the design excel agent"""
+        config = {"configurable": {"thread_id": session_id}}
         state = self._create_initial_state(session_id, village_name)
-        final_state = self.graph.invoke(state)
+        final_state = self.graph.invoke(state, config=config)
         return final_state
     
 

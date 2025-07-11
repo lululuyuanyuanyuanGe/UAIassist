@@ -201,6 +201,13 @@
                 "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\original\\燕云村2024年度党员名册.xlsx",
                 "timestamp": "2025-07-10T19:12:01.154129",
                 "file_size": 18837
+            },
+            "燕云村残疾人名单.txt": {
+                "summary": "{\n  \"燕云村残疾人名单.txt\": {\n    \"表格结构\": {\n      \"一品街道残疾人名单（2022年1月）\": {\n        \"序号\": [],\n        \"姓名\": [],\n        \"残疾类别\": [],\n        \"监护人姓名\": [],\n        \"残疾证号\": [],\n        \"地址\": [],\n        \"联系电话\": [],\n        \"备注\": []\n      }\n    },\n    \"表格总结\": \"该表格记录了2022年1月一品街道燕云村残疾人名单，包含序号、姓名、残疾类别、监护人信息、残疾证号、住址、联系方式及备注等字段，主要用于残疾人信息管理和社区服务。\"\n  }\n}",
+                "file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\html_content\\燕云村残疾人名单.txt",
+                "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\table_files\\original\\燕云村残疾人名单.xlsx",
+                "timestamp": "2025-07-11T18:50:05.198325",
+                "file_size": 16218
             }
         },
         "文档": {}
