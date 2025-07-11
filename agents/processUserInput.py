@@ -198,7 +198,7 @@ class ProcessUserInputAgent:
         )
         
         # Handle template file path - convert list to string if necessary
-        template_files_list = file_process_agent_final_state.get("upload_files_path", [])
+        template_files_list = file_process_agent_final_state.get("uploaded_template_files_path", [])
         if isinstance(template_files_list, list) and len(template_files_list) > 0:
             template_file_path = template_files_list[0]  # Take the first template file
         else:

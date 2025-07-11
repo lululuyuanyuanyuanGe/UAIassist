@@ -1146,7 +1146,9 @@ class FileProcessAgent:
                 template_file, corresponding_original_file, session_id
             )
             final_template_path = move_result["processed_template_path"]
-            
+            final_original_template_path = move_result["original_template_path"]
+            print(f"📁 模板原始文件已移动到: {final_original_template_path}")
+            print(f"📁 模板处理文件已移动到: {final_template_path}")
             if move_result["original_template_path"]:
                 print(f"📁 模板原始文件已移动到: {move_result['original_template_path']}")
             else:
@@ -1157,7 +1159,7 @@ class FileProcessAgent:
             print("=" * 50)
 
             return {"template_complexity": template_type,
-                    "uploaded_template_files_path": [final_template_path]
+                    "uploaded_template_files_path": [final_original_template_path]
                     }
 
         except Exception as e:
