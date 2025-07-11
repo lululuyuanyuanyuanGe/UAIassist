@@ -172,7 +172,7 @@ class FileProcessAgent:
             staging_dir.mkdir(parents=True, exist_ok=True)
             
             # Process the files to get .txt versions
-            processed_files = retrieve_file_content(detected_files, "files")
+            processed_files = retrieve_file_content(detected_files, state["session_id"])
             
             # Save original files separately
             original_files = []
@@ -1159,7 +1159,7 @@ class FileProcessAgent:
             print("=" * 50)
 
             return {"template_complexity": template_type,
-                    "uploaded_template_files_path": [final_original_template_path]
+                    "uploaded_template_files_path": [final_template_path]
                     }
 
         except Exception as e:
