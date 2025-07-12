@@ -191,7 +191,7 @@ class FrontdeskAgent:
         return {
             "messages": [AIMessage(content=summary_message[0])],
             "template_file_path": summary_message[1],
-            "previous_node": "initial_collect_user_input"
+            "previous_node": "chat_with_user_to_determine_template"
         }
         
     def _route_after_initial_collect_user_input(self, state: FrontdeskState) -> str:
@@ -287,7 +287,7 @@ class FrontdeskAgent:
         print("=" * 50)
         
         designExcelAgent = DesignExcelAgent()
-        designExcelAgent_final_state = designExcelAgent.run_design_excel_agent(session_id=state["session_id"])
+        designExcelAgent_final_state = designExcelAgent.run_design_excel_agent(session_id=state["session_id"], village_name=state["village_name"], user_feedback=state["messages"][-1].content)
         template_structure = designExcelAgent_final_state["template_structure"]
         template_path = designExcelAgent_final_state["template_path"]
         return {"template_structure": template_structure,
@@ -458,12 +458,12 @@ class FrontdeskAgent:
         return state
 
     
-    def run_frontdesk_agent(self, session_id: str = "1") -> None:
+    def run_frontdesk_agent(self, session_id: str = "1", village_name: str = "") -> None:
         """This function will run the frontdesk agent using stream method with interrupt handling"""
         print("\n🚀 启动 FrontdeskAgent")
         print("=" * 60)
         
-        initial_state = self._create_initial_state(session_id)
+        initial_state = self._create_initial_state(session_id, village_name)
         config = {"configurable": {"thread_id": session_id}}
         current_state = initial_state
 
@@ -497,4 +497,4 @@ graph = frontdesk_agent.graph
 
 if __name__ == "__main__":
     frontdesk_agent = FrontdeskAgent()
-    frontdesk_agent.run_frontdesk_agent()
+    frontdesk_agent.run_frontdesk_agent(village_name="燕云村")

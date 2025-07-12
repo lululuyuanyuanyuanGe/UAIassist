@@ -46,6 +46,8 @@ class ProcessUserInputState(TypedDict):
     template_file_path: str
     template_complexity: str
     session_id: str
+    current_node: str
+    next_node: str
 
     
 class ProcessUserInputAgent:
@@ -91,6 +93,8 @@ class ProcessUserInputAgent:
         graph.add_node("analyze_text_input", self._analyze_text_input)
         graph.add_node("clarification_tool_node", ToolNode(self.tools, messages_key = "process_user_input_messages"))
         graph.add_node("summary_user_input", self._summary_user_input)
+        graph.add_node("decide_next_node", self._decide_next_node)
+        graph.add_node("combine_summary_and_decide_next_node", self._combine_summary_and_decide_next_node)
         
         graph.add_edge(START, "collect_user_input")
 
@@ -104,24 +108,15 @@ class ProcessUserInputAgent:
         )
 
         graph.add_edge("file_process_agent", "summary_user_input")
-
-       
-
-        graph.add_conditional_edges(
-            "analyze_text_input",
-            self._route_after_analyze_text_input,
-            {
-                "valid_text_input": "summary_user_input",
-                "invalid_text_input": "collect_user_input",
-            }
-        )
-
-        graph.add_edge("summary_user_input", END)
+        graph.add_conditional_edges("analyze_text_input", self._route_after_analyze_text_input)
+        graph.add_edge("summary_user_input", "combine_summary_and_decide_next_node")
+        graph.add_edge("decide_next_node", "combine_summary_and_decide_next_node")
+        graph.add_edge("combine_summary_and_decide_next_node", END)
         return graph
 
 
 
-    def create_initial_state(self, session_id: str, previous_AI_messages = None) -> ProcessUserInputState:
+    def create_initial_state(self, session_id: str, previous_AI_messages = None, current_node: str = "") -> ProcessUserInputState:
         """This function initializes the state of the process user input agent"""
         
         # Handle both single BaseMessage and list[BaseMessage] input
@@ -146,7 +141,9 @@ class ProcessUserInputAgent:
             "summary_message": "",
             "template_complexity": "",
             "template_file_path": "",
-            "session_id": session_id
+            "session_id": session_id,
+            "current_node": "collect_user_input",
+            "next_node": "collect_user_input"
         }
 
 
@@ -297,8 +294,6 @@ class ProcessUserInputAgent:
 """
 
 
-
-        
         try:
             print("📤 正在调用LLM进行文本输入验证...")
             # Get LLM validation
@@ -360,20 +355,83 @@ class ProcessUserInputAgent:
 
     def _route_after_analyze_text_input(self, state: ProcessUserInputState) -> str:
         """Route after text input validation based on [Valid] or [Invalid] result."""
-        
+        sends = []
         validation_result = state.get("text_input_validation", "[Invalid]")
         
         if validation_result == "[Valid]":
-            # Text input is valid and table-related, proceed to summary
-            return "valid_text_input"
+            sends.append(Send("decide_next_node", state))
+            sends.append(Send("summary_user_input", state))
         else:
             # Text input is invalid, route back to collect user input
-            return "invalid_text_input"
+            sends.append(Send("collect_user_input", state))
+        return sends
         
 
+
+    def _decide_next_node(self, state: ProcessUserInputState) -> ProcessUserInputState:
+        """这个节点调用大模型来决定下一步的路由"""
+        print("\n🔍 开始执行: _decide_next_node")
+        print("=" * 50)
+        
+        # First check if template complexity is available
+        template_complexity = state.get("template_complexity", "")
+        print(f"🔍 模板复杂度: {template_complexity}")
+        
+        if "[Complex]" in template_complexity:
+            route_decision = "complex_template"
+            print("📍 基于模板复杂度路由到: complex_template")
+        elif "[Simple]" in template_complexity:
+            route_decision = "simple_template"
+            print("📍 基于模板复杂度路由到: simple_template")
+        else:
+            # If no template complexity, determine based on user input context
+            user_input = state.get("user_input", "")
+            
+            # Get previous AI messages for context
+            previous_ai_content = ""
+            if state.get("previous_AI_messages"):
+                previous_ai_messages = state["previous_AI_messages"]
+                if isinstance(previous_ai_messages, list) and len(previous_ai_messages) > 0:
+                    latest_message = previous_ai_messages[-1]
+                    if hasattr(latest_message, 'content'):
+                        previous_ai_content = latest_message.content
+                    else:
+                        previous_ai_content = str(latest_message)
+                elif not isinstance(previous_ai_messages, list):
+                    if hasattr(previous_ai_messages, 'content'):
+                        previous_ai_content = previous_ai_messages.content
+                    else:
+                        previous_ai_content = str(previous_ai_messages)
+            
+            system_prompt = f"""你是一个路由决策专家，根据用户输入和上下文，决定下一步的路由。
+
+规则如下：
+- 如果用户的输入为有效时，且涉及到表格生成，则返回"design_excel_template"
+- 当前对话涉及"design_excel_template"时，如果用户给出了积极肯定的反馈则返回"generate_html_template"，反之如果用户给出了改进建议则返回"design_excel_template"
+- 当前对话涉及"recall_relative_files"时，如果用户给出了积极肯定的反馈则返回"determine_the_mapping_of_headers"，反之如果用户给出了改进建议则返回"recall_relative_files"
+- 如果没有明确的上下文，根据用户输入的内容判断最合适的下一步
+
+上一轮 AI 的回复：{previous_ai_content}
+用户当前输入：{user_input}
+
+输出要求：不要包含任何解释，直接返回路由名称"""
+            
+            try:
+                response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
+                route_decision = response.strip()
+                print(f"📍 基于LLM决策路由到: {route_decision}")
+            except Exception as e:
+                print(f"❌ LLM路由决策失败: {e}")
+                route_decision = "design_excel_template"  # 默认路由
+                print(f"📍 使用默认路由: {route_decision}")
+        
+        print("✅ _decide_next_node 执行完成")
+        print("=" * 50)
+        
+        return {"next_node": route_decision}
     
     def _summary_user_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
-        """Summary node that consolidates all information from this round and determines next routing."""
+        """Summary node that consolidates all information from this round."""
         
         print("\n🔍 开始执行: _summary_user_input")
         print("=" * 50)
@@ -381,23 +439,8 @@ class ProcessUserInputAgent:
         print(f"🔄 开始总结用户输入，当前消息数: {len(state.get('process_user_input_messages', []))}")
         
         # Extract content from all messages in this processing round
-        process_user_input_messages_content =("\n").join([item.content for item in state["process_user_input_messages"]])
+        process_user_input_messages_content = ("\n").join([item.content for item in state["process_user_input_messages"]])
         print(f"📝 处理的消息内容长度: {len(process_user_input_messages_content)} 字符")
-        
-        # Determine route decision based on template complexity (with proper parsing)
-        template_complexity = state.get("template_complexity", "")
-        print(f"🔍 原始模板复杂度: {repr(template_complexity)}")
-        template_complexity = template_complexity.strip()
-        print(f"🔍 清理后模板复杂度: '{template_complexity}'")
-        
-        if "[Complex]" in template_complexity:
-            route_decision = "complex_template"
-        elif "[Simple]" in template_complexity:
-            route_decision = "simple_template"
-        else:
-            route_decision = "previous_node"
-        
-        print(f"🎯 路由决定: {route_decision}")
         
         system_prompt = f"""
 你是一位专业的用户输入分析专家，任务是根据当前轮次的历史对话内容，总结用户在信息收集过程中的所有有效输入。
@@ -418,7 +461,6 @@ class ProcessUserInputAgent:
   "summary": "对本轮用户提供的信息进行总结"
 }}
 """
-
 
         try:
             user_input = "【历史对话】\n" + process_user_input_messages_content
@@ -460,7 +502,6 @@ class ProcessUserInputAgent:
             print(f"🔍 清理后的响应: {cleaned_response}")
             
             response_json = json.loads(cleaned_response)
-            response_json["next_node"] = route_decision
             final_response = json.dumps(response_json, ensure_ascii=False)
             
             print(f"✅ 总结生成成功")
@@ -475,8 +516,7 @@ class ProcessUserInputAgent:
             print(f"❌ 原始响应: {repr(response)}")
             # Fallback response
             fallback_response = {
-                "summary": "用户本轮提供了文件信息，但解析过程中出现错误",
-                "next_node": route_decision
+                "summary": "用户本轮提供了文件信息，但解析过程中出现错误"
             }
             final_fallback = json.dumps(fallback_response, ensure_ascii=False)
             print(f"🔄 使用备用响应: {final_fallback}")
@@ -484,14 +524,49 @@ class ProcessUserInputAgent:
             print("=" * 50)
             return {"summary_message": final_fallback}
 
+    def _combine_summary_and_decide_next_node(self, state: ProcessUserInputState) -> ProcessUserInputState:
+        """Combine summary and decide next node results"""
+        print("\n🔍 开始执行: _combine_summary_and_decide_next_node")
+        print("=" * 50)
+        
+        summary_message = state.get("summary_message", "")
+        next_node = state.get("next_node", "")
+        
+        print(f"📝 总结消息: {summary_message}")
+        print(f"🔄 下一节点: {next_node}")
+        
+        # Parse the summary message to add next_node information
+        try:
+            if summary_message:
+                summary_json = json.loads(summary_message)
+                summary_json["next_node"] = next_node
+                combined_summary = json.dumps(summary_json, ensure_ascii=False)
+            else:
+                # If no summary message, create a basic one
+                combined_summary = json.dumps({
+                    "summary": "用户输入处理完成",
+                    "next_node": next_node
+                }, ensure_ascii=False)
+        except json.JSONDecodeError as e:
+            print(f"❌ 解析summary_message时出错: {e}")
+            # Fallback to basic structure
+            combined_summary = json.dumps({
+                "summary": "用户输入处理完成，但解析过程中出现错误",
+                "next_node": next_node
+            }, ensure_ascii=False)
+        
+        print(f"📊 合并后的总结: {combined_summary}")
+        print("✅ _combine_summary_and_decide_next_node 执行完成")
+        print("=" * 50)
+        
+        return {"summary_message": combined_summary}
 
-
-    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None) -> List:
+    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None, current_node: str = "") -> List:
         """This function runs the process user input agent using invoke method instead of streaming"""
         print("\n🚀 开始运行 ProcessUserInputAgent")
         print("=" * 60)
         
-        initial_state = self.create_initial_state(session_id = session_id, previous_AI_messages = previous_AI_messages)
+        initial_state = self.create_initial_state(session_id=session_id, previous_AI_messages=previous_AI_messages, current_node=current_node)
         config = {"configurable": {"thread_id": session_id}}
         
         print(f"📋 会话ID: {session_id}")
@@ -512,9 +587,10 @@ class ProcessUserInputAgent:
                 print("🎉执行完毕")
                 summary_message = final_state.get("summary_message", "")
                 template_file = final_state.get("template_file_path", "")
+                print(f"🔍 返回信息测试summary: {summary_message}")
                 print(f"🔍 返回信息测试template: {template_file}")
                 combined_message = [summary_message, template_file]
-                print(f"🔍 返回信息测试template: {combined_message}")
+                print(f"🔍 返回信息测试combined: {combined_message}")
                 return combined_message
             
         except Exception as e:
@@ -522,9 +598,9 @@ class ProcessUserInputAgent:
             # Return empty results on error
             error_summary = json.dumps({
                 "summary": f"处理用户输入时发生错误: {str(e)}",
-                "next_node": "previous_node"
+                "next_node": "design_excel_template"
             }, ensure_ascii=False)
-            return [error_summary, []]
+            return [error_summary, ""]
 
 
 
@@ -536,4 +612,4 @@ graph = agent.graph
 if __name__ == "__main__":
     agent = ProcessUserInputAgent()
     # save_graph_visualization(agent.graph, "process_user_input_graph.png")
-    agent.run_process_user_input_agent("")
+    agent.run_process_user_input_agent(current_node="design_excel_template")
