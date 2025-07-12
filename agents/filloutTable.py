@@ -12,10 +12,9 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
 from utilities.visualize_graph import save_graph_visualization
 from utilities.message_process import build_BaseMessage_type, filter_out_system_messages
-from utilities.file_process import (detect_and_process_file_paths, retrieve_file_content, read_txt_file, 
-                                    process_excel_files_with_chunking, find_largest_file)
+from utilities.file_process import (read_txt_file, 
+                                    process_excel_files_with_chunking)
 from utilities.modelRelated import invoke_model
-
 import uuid
 import json
 import os
@@ -240,7 +239,7 @@ class FilloutTableAgent:
     
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
-        # return state
+        return state
         print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
         print("=" * 50)
         
@@ -400,7 +399,7 @@ class FilloutTableAgent:
         
         print("✅ _generate_CSV_based_on_combined_data 执行完成")
         print("=" * 50)
-        print(f"🔍 生成的CSV数据: {sorted_results}")
+        # print(f"🔍 生成的CSV数据: {sorted_results}")
         return {
             "CSV_data": sorted_results
         }
@@ -572,6 +571,7 @@ class FilloutTableAgent:
 </table></body></html>
         """
         template_file_content = read_txt_file(state["template_file"])
+        print("模板文件内容：", template_file_content)
         response = invoke_model(
             model_name="deepseek-ai/DeepSeek-V3",
             messages=[SystemMessage(content=system_prompt), HumanMessage(content=template_file_content)]
@@ -590,7 +590,7 @@ class FilloutTableAgent:
 
     def _transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
         """将数据转换为html代码"""
-        # return state
+        return state
         system_prompt = """你是一个专业的HTML表格数据处理和美化专家。你需要将CSV数据填入HTML模板中，并为表格添加现代化的CSS样式装饰，使其美观专业。
 
 【核心任务】
@@ -925,6 +925,7 @@ class FilloutTableAgent:
         """This function will run the fillout table agent using invoke method with manual debug printing"""
         print("\n🚀 启动 FilloutTableAgent")
         print("=" * 60)
+        print("模板文件：", template_file)
         
         initial_state = self.create_initialize_state(
             session_id = session_id,
