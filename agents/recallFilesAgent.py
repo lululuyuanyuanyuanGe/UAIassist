@@ -67,13 +67,13 @@ class RecallFilesState(TypedDict):
     headers_mapping_: dict[any, any]
     file_content: str # 把文件摘要里面的相关村子的文件全部提取出来，并按照表格，模板进行分类
     document_files_content: str # 把文件摘要里面的相关村子的文件全部提取出来，并按照表格，模板进行分类
+    village_name: str
 
 
 class RecallFilesAgent:
     def __init__(self):
         self.tools = [request_user_clarification]  # Reference the standalone function
         self.graph = self._build_graph()
-        self.location: str # 村子名字
         self.files_under_location: str # 村子下的文件
         self.related_files_classified: dict
 
@@ -89,7 +89,7 @@ class RecallFilesAgent:
         graph.add_edge("determine_the_mapping_of_headers", END)
         return graph.compile(checkpointer = MemorySaver())
 
-    def _create_initial_state(self, template_structure: str) -> RecallFilesState:
+    def _create_initial_state(self, template_structure: str, village_name: str) -> RecallFilesState:
 
         
         
@@ -103,8 +103,8 @@ class RecallFilesAgent:
         #         file_content = value
         #         self.location = key
         file_content = json.loads(file_content)
-        self.location = "燕云村"
-        self.files_under_location = file_content["燕云村"]
+        self.location = village_name
+        self.files_under_location = file_content[village_name]
         file_content = extract_summary_for_each_file(self.files_under_location)
         print("===========================")
         print(self.files_under_location)
@@ -119,7 +119,8 @@ class RecallFilesAgent:
             "template_structure": template_structure,
             "headers_mapping_": {},
             "file_content": file_content,
-            "document_files_content": ""
+            "document_files_content": "",
+            "village_name": village_name
         }
     
 
@@ -338,13 +339,13 @@ class RecallFilesAgent:
             "document_files_content": document_files_content
         }
     
-    def run_recall_files_agent(self, template_structure: str, session_id: str = "1") -> Dict:
+    def run_recall_files_agent(self, template_structure: str, session_id: str = "1", village_name: str = "燕云村") -> Dict:
         """运行召回文件代理，使用invoke方法而不是stream"""
         print("\n🚀 开始运行 RecallFilesAgent")
         print("=" * 60)
 
         config = {"configurable": {"thread_id": session_id}}
-        initial_state = self._create_initial_state(template_structure)
+        initial_state = self._create_initial_state(template_structure, village_name)
         
         try:
             # Use invoke instead of stream

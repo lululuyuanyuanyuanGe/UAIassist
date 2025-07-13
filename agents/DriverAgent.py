@@ -109,8 +109,8 @@ class FrontdeskAgent:
         graph.add_edge("entry", "initial_collect_user_input")
         graph.add_conditional_edges("initial_collect_user_input", self._route_after_initial_collect_user_input,
                                     {
-                                        "simple_template": "simple_template_handle",
-                                        "complex_template": "simple_template_handle",
+                                        "simple_template_handle": "simple_template_handle",
+                                        "complex_template_handle": "simple_template_handle",
                                         "design_excel_template": "chat_with_user_to_determine_template"
                                     })
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
@@ -434,7 +434,8 @@ class FrontdeskAgent:
         recallFilesAgent = RecallFilesAgent()
         # Pass as JSON string to ensure consistent format
         recallFilesAgent_final_state = recallFilesAgent.run_recall_files_agent(
-            template_structure=json.dumps(template_structure, ensure_ascii=False)
+            template_structure=json.dumps(template_structure, ensure_ascii=False),
+            village_name=state["village_name"]
         )
 
         headers_mapping = recallFilesAgent_final_state.get("headers_mapping")

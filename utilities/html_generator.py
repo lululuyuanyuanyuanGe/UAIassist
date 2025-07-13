@@ -487,12 +487,6 @@ def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, s
         expected_columns = len(template_cells)
         print(f"📋 模板列数: {expected_columns}")
         
-        # Define modern CSS styles
-        css_styles = {
-            'tr': 'background-color: #ffffff; transition: background-color 0.3s ease;',
-            'td': 'padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333; vertical-align: middle;'
-        }
-        
         filled_rows = []
         valid_row_count = 0
         skipped_row_count = 0
@@ -535,15 +529,7 @@ def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, s
                         cell.clear()
                     cell.string = ''
             
-            # Apply CSS styles
-            new_row['style'] = css_styles['tr']
-            for cell in cells:
-                cell['style'] = css_styles['td']
-            
-            # Add alternating row colors
-            if valid_row_count % 2 == 0:
-                new_row['style'] += ' background-color: #f8f9fa;'
-            
+            # No inline styles needed - CSS handles all styling
             filled_rows.append(str(new_row))
             
             # Progress indicator for large datasets
@@ -580,7 +566,7 @@ def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, s
 
 def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> str:
     """
-    Combine HTML parts with enhanced styling.
+    Combine HTML parts with enhanced modern styling.
     
     Args:
         headers_html: HTML for headers
@@ -594,7 +580,7 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
     print("=" * 50)
     
     try:
-        # Create complete HTML document with enhanced styling
+        # Create complete HTML document with professional formal styling
         complete_html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -602,57 +588,79 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>表格报告</title>
     <style>
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        * {{
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            font-family: 'Microsoft YaHei', 'SimHei', Arial, sans-serif;
+            background-color: #f8f9fa;
+            padding: 30px 20px;
+            color: #333;
             line-height: 1.6;
         }}
         
         .table-container {{
-            background-color: white;
+            background: white;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             margin: 0 auto;
             max-width: 1200px;
-            padding: 20px;
+            padding: 25px;
+            border: 1px solid #e0e0e0;
         }}
         
         table {{
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            background-color: white;
-        }}
-        
-        /* 表头样式 */
-        table tr:first-child td {{
-            background-color: #2c3e50 !important;
-            color: white !important;
-            font-weight: bold;
-            text-align: center;
-            padding: 15px 12px;
-            font-size: 16px;
-        }}
-        
-        /* 列头样式 */
-        table tr:nth-child(2) td,
-        table tr:nth-child(3) td {{
-            background-color: #34495e !important;
-            color: white !important;
-            font-weight: 600;
-            text-align: center;
-            padding: 12px 10px;
+            margin: 0;
+            background: white;
             font-size: 14px;
         }}
         
-        /* 数据行样式 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child) {{
-            background-color: #ffffff;
+        /* 表头样式 - 主标题 */
+        table tr:first-child td {{
+            background-color: #2c3e50 !important;
+            color: white !important;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            padding: 18px 15px;
+            border: 1px solid #2c3e50;
         }}
         
+        /* 分类标题行 */
+        table tr:nth-child(2) td {{
+            background-color: #34495e !important;
+            color: white !important;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+            padding: 14px 12px;
+            border: 1px solid #34495e;
+        }}
+        
+        /* 字段标题行 */
+        table tr:nth-child(3) td {{
+            background-color: #ecf0f1 !important;
+            color: #2c3e50 !important;
+            font-weight: 600;
+            font-size: 13px;
+            text-align: center;
+            padding: 12px 10px;
+            border: 1px solid #bdc3c7;
+        }}
+        
+        /* 数据行基础样式 */
+        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child) {{
+            background-color: white;
+            transition: background-color 0.2s ease;
+        }}
+        
+        /* 交替行颜色 */
         table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child):nth-child(even) {{
             background-color: #f8f9fa;
         }}
@@ -662,55 +670,142 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             padding: 12px 15px;
             border: 1px solid #dee2e6;
             text-align: center;
-            font-size: 14px;
-            color: #333;
-            transition: background-color 0.3s ease;
+            font-size: 13px;
+            color: #495057;
+            font-weight: 400;
+            vertical-align: middle;
         }}
         
-        /* 悬停效果 */
+        /* 第一列特殊样式 - 序号列 */
+        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) td:first-child {{
+            background-color: #f1f3f4;
+            font-weight: 500;
+            color: #5f6368;
+            border-right: 2px solid #dadce0;
+        }}
+        
+        /* 数据行悬停效果 */
         table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):hover {{
-            background-color: #e3f2fd !important;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: #e8f4f8 !important;
+        }}
+        
+        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):hover td {{
+            color: #1a73e8;
         }}
         
         /* 页脚样式 */
         table tr:last-child td {{
-            background-color: #ecf0f1 !important;
-            color: #2c3e50 !important;
+            background-color: #f8f9fa !important;
+            color: #495057 !important;
             font-weight: 500;
             padding: 15px 12px;
-            font-size: 13px;
-            border-top: 2px solid #bdc3c7;
+            font-size: 12px;
+            border-top: 2px solid #dee2e6;
+            text-align: center;
+        }}
+        
+        /* 表格外边框 */
+        table {{
+            border: 2px solid #bdc3c7;
         }}
         
         /* 响应式设计 */
-        @media (max-width: 768px) {{
+        @media (max-width: 1200px) {{
             .table-container {{
-                padding: 10px;
+                padding: 20px;
+                margin: 15px;
+            }}
+        }}
+        
+        @media (max-width: 768px) {{
+            body {{
+                padding: 15px 10px;
+            }}
+            
+            .table-container {{
+                padding: 15px;
                 margin: 10px;
+                border-radius: 6px;
             }}
             
             table td {{
                 padding: 8px 6px;
-                font-size: 12px;
+                font-size: 11px;
             }}
             
             table tr:first-child td {{
                 font-size: 14px;
+                padding: 15px 10px;
+            }}
+            
+            table tr:nth-child(2) td {{
+                font-size: 12px;
+                padding: 12px 8px;
+            }}
+            
+            table tr:nth-child(3) td {{
+                font-size: 11px;
+                padding: 10px 6px;
+            }}
+        }}
+        
+        @media (max-width: 480px) {{
+            .table-container {{
+                padding: 10px;
+                margin: 5px;
+            }}
+            
+            table td {{
+                padding: 6px 4px;
+                font-size: 10px;
+            }}
+            
+            table tr:first-child td {{
+                font-size: 12px;
+                padding: 12px 8px;
             }}
         }}
         
         /* 打印样式 */
         @media print {{
             body {{
-                background-color: white;
+                background: white;
                 padding: 0;
             }}
             
             .table-container {{
                 box-shadow: none;
-                border: 1px solid #ccc;
+                border: 1px solid #000;
+                background: white;
+                padding: 0;
+            }}
+            
+            table {{
+                border: 1px solid #000;
+            }}
+            
+            table td {{
+                border: 1px solid #000;
+            }}
+            
+            table tr:hover {{
+                background: white !important;
+            }}
+        }}
+        
+        /* 轻微的入场动画 */
+        .table-container {{
+            animation: fadeIn 0.3s ease-out;
+        }}
+        
+        @keyframes fadeIn {{
+            from {{
+                opacity: 0;
+                transform: translateY(10px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0);
             }}
         }}
     </style>
@@ -724,7 +819,7 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
 </body>
 </html>"""
         
-        print(f"✅ 成功合并HTML文档")
+        print(f"✅ 成功合并HTML文档 - 应用正式专业设计")
         print(f"📄 总长度: {len(complete_html)} 字符")
         print("✅ combine_html_parts 执行完成")
         print("=" * 50)
