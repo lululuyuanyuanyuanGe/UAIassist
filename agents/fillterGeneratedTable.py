@@ -45,6 +45,7 @@ from langchain_core.tools import tool
 
 # import other agents
 from agents.processUserInput import ProcessUserInputAgent
+from agents.filloutTable import FilloutTableAgent
 
 
 class FillterGeneratedTableState(TypedDict):
@@ -109,7 +110,10 @@ class FillterGeneratedTableAgent:
         pass
 
 
-    def  _
+    def  _fillout_new_table(self, state: FillterGeneratedTableState) -> FillterGeneratedTableState:
+        fillout_table_agent = FilloutTableAgent()
+        fillout_table_agent.run_fillout_table_agent(state["session_id"], state["template_file"], state["data_file_path"], state["headers_mapping"])
+        return state
 
 
     

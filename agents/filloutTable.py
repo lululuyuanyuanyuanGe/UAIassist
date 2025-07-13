@@ -72,6 +72,7 @@ class FilloutTableState(TypedDict):
     headers_html: Annotated[str, lambda old, new: new if new else old]
     footer_html: Annotated[str, lambda old, new: new if new else old]
     CSV_data: Annotated[list[str], lambda old, new: new if new else old]
+    modify_after_first_fillout: bool
 
 
 
@@ -117,7 +118,8 @@ class FilloutTableAgent:
                                  template_file: str = None,
                                  data_file_path: list[str] = None,
                                  headers_mapping: dict[str, str] = None,
-                                 supplement_files_summary: str = "") -> FilloutTableState:
+                                 supplement_files_summary: str = "",
+                                 modify_after_first_fillout: bool = False) -> FilloutTableState:
         """This node will initialize the state of the graph"""
         return {
             "messages": [],
@@ -141,7 +143,8 @@ class FilloutTableAgent:
             "empty_row_html": "",
             "headers_html": "",
             "footer_html": "",
-            "combined_html": ""
+            "combined_html": "",
+            "modify_after_first_fillout": False
             
         }
     
@@ -150,268 +153,273 @@ class FilloutTableAgent:
         # return
         print("\n🔄 开始执行: _combine_data_split_into_chunks")
         print("=" * 50)
-        
-        try:
-            # Get Excel file paths from state
-            excel_file_paths = []
-            print(f"📋 开始处理 {len(state["data_file_path"])} 个数据文件")
-            
-            # Convert data files to Excel paths if they're not already
-            for file_path in state["data_file_path"]:
-                print(f"📄 检查文件: {file_path}")
-                if file_path.endswith('.txt'):
-                    # Try to find corresponding Excel file
-                    excel_path = file_path.replace('.txt', '.xlsx')
-                    if Path(excel_path).exists():
-                        excel_file_paths.append(excel_path)
-                        print(f"✅ 找到对应的Excel文件: {excel_path}")
-                    else:
-                        # Try .xls extension
-                        excel_path = file_path.replace('.txt', '.xls')
+        if not state["modify_after_first_fillout"]:
+            try:
+                # Get Excel file paths from state
+                excel_file_paths = []
+                print(f"📋 开始处理 {len(state["data_file_path"])} 个数据文件")
+                
+                # Convert data files to Excel paths if they're not already
+                for file_path in state["data_file_path"]:
+                    print(f"📄 检查文件: {file_path}")
+                    if file_path.endswith('.txt'):
+                        # Try to find corresponding Excel file
+                        excel_path = file_path.replace('.txt', '.xlsx')
                         if Path(excel_path).exists():
                             excel_file_paths.append(excel_path)
                             print(f"✅ 找到对应的Excel文件: {excel_path}")
                         else:
-                            print(f"⚠️ 未找到对应的Excel文件: {file_path}")
-                elif file_path.endswith(('.xlsx', '.xls', '.xlsm')):
-                    excel_file_paths.append(file_path)
-                    print(f"✅ 直接使用Excel文件: {file_path}")
-            
-            if not excel_file_paths:
-                print("❌ 没有找到可用的Excel文件")
+                            # Try .xls extension
+                            excel_path = file_path.replace('.txt', '.xls')
+                            if Path(excel_path).exists():
+                                excel_file_paths.append(excel_path)
+                                print(f"✅ 找到对应的Excel文件: {excel_path}")
+                            else:
+                                print(f"⚠️ 未找到对应的Excel文件: {file_path}")
+                    elif file_path.endswith(('.xlsx', '.xls', '.xlsm')):
+                        excel_file_paths.append(file_path)
+                        print(f"✅ 直接使用Excel文件: {file_path}")
+                
+                if not excel_file_paths:
+                    print("❌ 没有找到可用的Excel文件")
+                    print("✅ _combine_data_split_into_chunks 执行完成(错误)")
+                    print("=" * 50)
+                    return {"combined_data_array": []}
+                
+                print(f"📊 准备处理 {len(excel_file_paths)} 个Excel文件进行分块")
+                
+
+                print("🔄 正在调用process_excel_files_with_chunking函数...")
+                print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
+                chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
+                                                                session_id=state["session_id"],
+                                                                chunk_nums=15, largest_file=None,  # Let function auto-detect
+                                                                data_json_path="agents/data.json")
+                
+                # Extract chunks and row count from the result
+                chunked_data = chunked_result["combined_chunks"]
+                largest_file_row_count = chunked_result["largest_file_row_count"]
+                
+                print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
+                print(f"📊 最大文件行数: {largest_file_row_count}")
+                for chunk in chunked_data:
+                    print(f"==================🔍 数据块 ==================:")
+                    print(chunk)
+                print("✅ _combine_data_split_into_chunks 执行完成")
+                print("=" * 50)
+                
+                return {
+                    "combined_data_array": chunked_data,
+                    "largest_file_row_num": largest_file_row_count
+                }
+                
+            except Exception as e:
+                print(f"❌ _combine_data_split_into_chunks 执行失败: {e}")
+                import traceback
+                print(f"错误详情: {traceback.format_exc()}")
                 print("✅ _combine_data_split_into_chunks 执行完成(错误)")
                 print("=" * 50)
-                return {"combined_data_array": []}
-            
-            print(f"📊 准备处理 {len(excel_file_paths)} 个Excel文件进行分块")
-            
-
-            print("🔄 正在调用process_excel_files_with_chunking函数...")
-            print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
-            chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
-                                                             session_id=state["session_id"],
-                                                             chunk_nums=15, largest_file=None,  # Let function auto-detect
-                                                             data_json_path="agents/data.json")
-            
-            # Extract chunks and row count from the result
-            chunked_data = chunked_result["combined_chunks"]
-            largest_file_row_count = chunked_result["largest_file_row_count"]
-            
-            print(f"✅ 成功生成 {len(chunked_data)} 个数据块")
-            print(f"📊 最大文件行数: {largest_file_row_count}")
-            for chunk in chunked_data:
-                print(f"==================🔍 数据块 ==================:")
-                print(chunk)
-            print("✅ _combine_data_split_into_chunks 执行完成")
-            print("=" * 50)
-            
-            return {
-                "combined_data_array": chunked_data,
-                "largest_file_row_num": largest_file_row_count
-            }
-            
-        except Exception as e:
-            print(f"❌ _combine_data_split_into_chunks 执行失败: {e}")
-            import traceback
-            print(f"错误详情: {traceback.format_exc()}")
-            print("✅ _combine_data_split_into_chunks 执行完成(错误)")
-            print("=" * 50)
-            return {
-                "combined_data_array": []
-            }
+                return {
+                    "combined_data_array": []
+                }
+        else:
+            return state
 
     def _route_after_combine_data_split_into_chunks(self, state: FilloutTableState) -> str:
         """并行执行模板代码的生成和CSV数据的合成"""
         print("\n🔀 开始执行: _route_after_combine_data_split_into_chunks")
         print("=" * 50)
+        if not state["modify_after_first_fillout"]:
+            print("🔄 创建并行任务...")
+            sends = []
+            sends.append(Send("generate_CSV_based_on_combined_data", state))
+            sends.append(Send("extract_empty_row_html", state))
+            sends.append(Send("extract_headers_html", state))
+            sends.append(Send("extract_footer_html", state)) 
+            print("✅ 创建了4个并行任务:")
+            print("   - generate_CSV_based_on_combined_data")
+            print("   - extract_empty_row_html")
+            print("   - extract_headers_html")
+            print("   - extract_footer_html")
         
-        print("🔄 创建并行任务...")
-        sends = []
-        sends.append(Send("generate_CSV_based_on_combined_data", state))
-        sends.append(Send("extract_empty_row_html", state))
-        sends.append(Send("extract_headers_html", state))
-        sends.append(Send("extract_footer_html", state)) 
-        print("✅ 创建了4个并行任务:")
-        print("   - generate_CSV_based_on_combined_data")
-        print("   - extract_empty_row_html")
-        print("   - extract_headers_html")
-        print("   - extract_footer_html")
-    
-        
-        print("✅ _route_after_combine_data_split_into_chunks 执行完成")
-        print("=" * 50)
-        
-        return sends
+            
+            print("✅ _route_after_combine_data_split_into_chunks 执行完成")
+            print("=" * 50)
+            
+            return sends
+
     
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
-        # return state
-        print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
-        print("=" * 50)
-        
-#         system_prompt = f"""
-# 你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。你的任务是根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式，输出结构化、干净的数据行。
-
-# 【输入内容】
-# 1. 模板表头映射（JSON 格式）：描述目标表格每一列的来源、计算逻辑或推理规则；
-# 2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块，其中每条数据行前一行标注了字段名称，用于辅助字段匹配。
-
-# 【任务流程】
-# 1. 请你逐字段分析模板表头映射，明确该字段的来源或推理逻辑；
-# 2. 若字段来自原始数据，请先定位来源字段并校验其格式；
-# 3. 若字段需推理（如日期格式转换、年龄计算、逻辑判断等），请先在脑中逐步推导，确保思路清晰；
-# 4. 若字段需计算，请先明确所需公式并逐步计算出结果；
-# 5. 在完成所有字段推理后，再将结果按照字段顺序合并为一行 CSV 数据；
-# 6. 在每次输出前，请先**在脑中逐项验证字段是否合理、格式是否规范**。
-
-# 💡 请你像一位人类专家一样，**一步一步思考再做决定**，不要跳过任何逻辑过程。
-
-# 【输出要求】
-# - 仅输出纯净的 CSV 数据行，不包含表头、注释或任何多余内容；
-# - 使用英文逗号分隔字段；
-# - 每行数据字段顺序必须与模板表头映射完全一致；
-# - 严禁遗漏字段、重复字段、多输出空值或空行；
-# - 输出中不得出现 Markdown 包裹（如 ```）或额外说明文字。
-
-# 模板表头映射：
-# {state["headers_mapping"]}
-# """ 
-        system_prompt = f"""
-你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。
-
-让我们一步一步来解决这个数据转换问题。
-
-【任务目标】
-根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式。
-
-【输入内容】
-1. 模板表头映射（JSON 格式）：描述目标表格每一列的来源、计算逻辑或推理规则；
-2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块。
-
-【推理步骤】
-请严格按照以下步骤进行推理，并展示每一步的思考过程：
-
-步骤1：理解映射规则
-- 逐一分析每个目标字段的定义
-- 明确数据来源和转换规则
-
-步骤2：定位原始数据
-- 在原始数据中找到对应字段
-- 验证数据格式和完整性
-
-步骤3：执行转换逻辑
-- 对于计算字段：明确公式并逐步计算
-- 对于推理字段：展示逻辑判断过程
-- 对于格式转换：说明转换规则
-
-步骤4：质量检查
-- 验证每个字段的合理性
-- 检查格式规范性
-- 确认字段顺序正确
-
-【输出格式】
-请按照以下格式输出：
-
-=== 推理过程 ===
-[展示你的完整思考过程，包括每个字段的分析、定位、转换和验证]
-
-=== 最终答案 ===
-[仅输出纯净的 CSV 数据行，使用英文逗号分隔]
-
-【质量要求】
-- 推理过程必须详细展示每个步骤的思考
-- 最终答案仅包含CSV数据，不含任何其他内容
-- 字段顺序必须与模板表头映射完全一致
-- 严禁遗漏字段、重复字段或输出空值
-
-模板表头映射：
-{state["headers_mapping"]}
-"""
-
-        print("📋 系统提示准备完成")
-        print("系统提示词：", system_prompt)
-        
-        def process_single_chunk(chunk_data):
-            """处理单个chunk的函数"""
-            chunk, index = chunk_data
-            try:
-                user_input = f"""
-                数据级：
-                {chunk}
-                """             
-                print("用户输入提示词", system_prompt)
-                print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
-                response = invoke_model(
-                    model_name="deepseek-ai/DeepSeek-V3", 
-                    messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                    temperature=0.2
-                )
-                print(f"✅ Completed chunk {index + 1}")
-                return (index, response)
-            except Exception as e:
-                print(f"❌ Error processing chunk {index + 1}: {e}")
-                return (index, f"Error processing chunk {index + 1}: {e}")
-        
-        # Prepare chunk data with indices
-        chunks_with_indices = [(chunk, i) for i, chunk in enumerate(state["combined_data_array"])]
-        
-        if not chunks_with_indices:
-            print("⚠️ 没有数据块需要处理")
-            print("✅ _generate_CSV_based_on_combined_data 执行完成(无数据)")
+        if not state["modify_after_first_fillout"]:
+            # return state
+            print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
             print("=" * 50)
-            return {"CSV_data": []}
-        
-        # Dynamically adjust max_workers based on actual data size
-        max_workers = min(15, len(chunks_with_indices))  # Use fewer workers if we have less data
-        print(f"🚀 开始并发处理 {len(chunks_with_indices)} 个数据块...")
-        print(f"👥 使用 {max_workers} 个并发工作者")
-        
-        # Use ThreadPoolExecutor for concurrent processing
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        
-        results = {}
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
-            future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
-                              for chunk_data in chunks_with_indices}
-            print(f"✅ 已提交 {len(future_to_index)} 个并发任务")
             
-            # Collect results as they complete
-            completed_count = 0
-            for future in as_completed(future_to_index):
-                try:
-                    index, response = future.result()
-                    results[index] = response
-                    completed_count += 1
-                    print(f"✅ 完成第 {completed_count}/{len(chunks_with_indices)} 个任务")
-                except Exception as e:
-                    index = future_to_index[future]
-                    print(f"❌ 第 {index + 1} 个数据块处理异常: {e}")
-                    results[index] = f"数据块 {index + 1} 处理异常: {e}"
-        
-        # Sort results by index to maintain order
-        sorted_results = [results[i] for i in sorted(results.keys())]
-        
-        print(f"🎉 成功并发处理 {len(sorted_results)} 个数据块")
-        
-        # Save CSV data to output folder using helper function
-        try:
-            from utilities.file_process import save_csv_to_output
-            saved_file_path = save_csv_to_output(sorted_results, state["session_id"])
-            print(f"✅ CSV数据已保存到输出文件夹: {saved_file_path}")
-        except Exception as e:
-            print(f"❌ 保存CSV文件时发生错误: {e}")
-            print("⚠️ 数据仍保存在内存中，可继续处理")
-        
-        print("✅ _generate_CSV_based_on_combined_data 执行完成")
-        print("=" * 50)
-        # print(f"🔍 生成的CSV数据: {sorted_results}")
-        return {
-            "CSV_data": sorted_results
-        }
-    
+    #         system_prompt = f"""
+    # 你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。你的任务是根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式，输出结构化、干净的数据行。
 
-    def _generate_html_code_based_on_csv_data(self, state: FilloutTableState) -> FilloutTableState:
+    # 【输入内容】
+    # 1. 模板表头映射（JSON 格式）：描述目标表格每一列的来源、计算逻辑或推理规则；
+    # 2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块，其中每条数据行前一行标注了字段名称，用于辅助字段匹配。
+
+    # 【任务流程】
+    # 1. 请你逐字段分析模板表头映射，明确该字段的来源或推理逻辑；
+    # 2. 若字段来自原始数据，请先定位来源字段并校验其格式；
+    # 3. 若字段需推理（如日期格式转换、年龄计算、逻辑判断等），请先在脑中逐步推导，确保思路清晰；
+    # 4. 若字段需计算，请先明确所需公式并逐步计算出结果；
+    # 5. 在完成所有字段推理后，再将结果按照字段顺序合并为一行 CSV 数据；
+    # 6. 在每次输出前，请先**在脑中逐项验证字段是否合理、格式是否规范**。
+
+    # 💡 请你像一位人类专家一样，**一步一步思考再做决定**，不要跳过任何逻辑过程。
+
+    # 【输出要求】
+    # - 仅输出纯净的 CSV 数据行，不包含表头、注释或任何多余内容；
+    # - 使用英文逗号分隔字段；
+    # - 每行数据字段顺序必须与模板表头映射完全一致；
+    # - 严禁遗漏字段、重复字段、多输出空值或空行；
+    # - 输出中不得出现 Markdown 包裹（如 ```）或额外说明文字。
+
+    # 模板表头映射：
+    # {state["headers_mapping"]}
+    # """ 
+            system_prompt = f"""
+    你是一名专业且严谨的结构化数据填报专家，具备逻辑推理和计算能力。
+
+    让我们一步一步来解决这个数据转换问题。
+
+    【任务目标】
+    根据原始数据和模板映射规则，将数据准确转换为目标 CSV 格式。
+
+    【输入内容】
+    1. 模板表头映射（JSON 格式）：描述目标表格每一列的来源、计算逻辑或推理规则；
+    2. 原始数据集：包括表头结构的 JSON 和 CSV 数据块。
+
+    【推理步骤】
+    请严格按照以下步骤进行推理，并展示每一步的思考过程：
+
+    步骤1：理解映射规则
+    - 逐一分析每个目标字段的定义
+    - 明确数据来源和转换规则
+
+    步骤2：定位原始数据
+    - 在原始数据中找到对应字段
+    - 验证数据格式和完整性
+
+    步骤3：执行转换逻辑
+    - 对于计算字段：明确公式并逐步计算
+    - 对于推理字段：展示逻辑判断过程
+    - 对于格式转换：说明转换规则
+
+    步骤4：质量检查
+    - 验证每个字段的合理性
+    - 检查格式规范性
+    - 确认字段顺序正确
+
+    【输出格式】
+    请按照以下格式输出：
+
+    === 推理过程 ===
+    [展示你的完整思考过程，包括每个字段的分析、定位、转换和验证]
+
+    === 最终答案 ===
+    [仅输出纯净的 CSV 数据行，使用英文逗号分隔]
+
+    【质量要求】
+    - 推理过程必须详细展示每个步骤的思考
+    - 最终答案仅包含CSV数据，不含任何其他内容
+    - 字段顺序必须与模板表头映射完全一致
+    - 严禁遗漏字段、重复字段或输出空值
+
+    模板表头映射：
+    {state["headers_mapping"]}
+    """
+
+            print("📋 系统提示准备完成")
+            print("系统提示词：", system_prompt)
+            
+            def process_single_chunk(chunk_data):
+                """处理单个chunk的函数"""
+                chunk, index = chunk_data
+                try:
+                    user_input = f"""
+                    数据级：
+                    {chunk}
+                    """             
+                    print("用户输入提示词", system_prompt)
+                    print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
+                    response = invoke_model(
+                        model_name="deepseek-ai/DeepSeek-V3", 
+                        messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
+                        temperature=0.2
+                    )
+                    print(f"✅ Completed chunk {index + 1}")
+                    return (index, response)
+                except Exception as e:
+                    print(f"❌ Error processing chunk {index + 1}: {e}")
+                    return (index, f"Error processing chunk {index + 1}: {e}")
+            
+            # Prepare chunk data with indices
+            chunks_with_indices = [(chunk, i) for i, chunk in enumerate(state["combined_data_array"])]
+            
+            if not chunks_with_indices:
+                print("⚠️ 没有数据块需要处理")
+                print("✅ _generate_CSV_based_on_combined_data 执行完成(无数据)")
+                print("=" * 50)
+                return {"CSV_data": []}
+            
+            # Dynamically adjust max_workers based on actual data size
+            max_workers = min(15, len(chunks_with_indices))  # Use fewer workers if we have less data
+            print(f"🚀 开始并发处理 {len(chunks_with_indices)} 个数据块...")
+            print(f"👥 使用 {max_workers} 个并发工作者")
+            
+            # Use ThreadPoolExecutor for concurrent processing
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            results = {}
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all tasks
+                future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
+                                for chunk_data in chunks_with_indices}
+                print(f"✅ 已提交 {len(future_to_index)} 个并发任务")
+                
+                # Collect results as they complete
+                completed_count = 0
+                for future in as_completed(future_to_index):
+                    try:
+                        index, response = future.result()
+                        results[index] = response
+                        completed_count += 1
+                        print(f"✅ 完成第 {completed_count}/{len(chunks_with_indices)} 个任务")
+                    except Exception as e:
+                        index = future_to_index[future]
+                        print(f"❌ 第 {index + 1} 个数据块处理异常: {e}")
+                        results[index] = f"数据块 {index + 1} 处理异常: {e}"
+            
+            # Sort results by index to maintain order
+            sorted_results = [results[i] for i in sorted(results.keys())]
+            
+            print(f"🎉 成功并发处理 {len(sorted_results)} 个数据块")
+            
+            # Save CSV data to output folder using helper function
+            try:
+                from utilities.file_process import save_csv_to_output
+                saved_file_path = save_csv_to_output(sorted_results, state["session_id"])
+                print(f"✅ CSV数据已保存到输出文件夹: {saved_file_path}")
+            except Exception as e:
+                print(f"❌ 保存CSV文件时发生错误: {e}")
+                print("⚠️ 数据仍保存在内存中，可继续处理")
+            
+            print("✅ _generate_CSV_based_on_combined_data 执行完成")
+            print("=" * 50)
+            # print(f"🔍 生成的CSV数据: {sorted_results}")
+            return {
+                "CSV_data": sorted_results
+            }
+        
+        else:
+            return state
+    
         
     def _extract_empty_row_html_code_based(self, state: FilloutTableState) -> FilloutTableState:
         """提取模板表格中的空行html代码 - 基于代码的高效实现"""
@@ -521,7 +529,8 @@ class FilloutTableAgent:
     def run_fillout_table_agent(self, session_id: str,
                                 template_file: str,
                                 data_file_path: list[str],
-                                headers_mapping: dict[str, str]
+                                headers_mapping: dict[str, str],
+                                modify_after_first_fillout: bool = False
                                 ) -> None:
         """This function will run the fillout table agent using invoke method with manual debug printing"""
         print("\n🚀 启动 FilloutTableAgent")
@@ -532,7 +541,8 @@ class FilloutTableAgent:
             session_id = session_id,
             template_file = template_file,
             data_file_path = data_file_path,
-            headers_mapping=headers_mapping
+            headers_mapping=headers_mapping,
+            modify_after_first_fillout=modify_after_first_fillout
         )
 
         config = {"configurable": {"thread_id": session_id}}
