@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表格报告</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        
+        .table-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin: 0 auto;
+            max-width: 1200px;
+            padding: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+        }
+        
+        /* 表头样式 */
+        table tr:first-child td {
+            background-color: #2c3e50 !important;
+            color: white !important;
+            font-weight: bold;
+            text-align: center;
+            padding: 15px 12px;
+            font-size: 16px;
+        }
+        
+        /* 列头样式 */
+        table tr:nth-child(2) td,
+        table tr:nth-child(3) td {
+            background-color: #34495e !important;
+            color: white !important;
+            font-weight: 600;
+            text-align: center;
+            padding: 12px 10px;
+            font-size: 14px;
+        }
+        
+        /* 数据行样式 */
+        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child) {
+            background-color: #ffffff;
+        }
+        
+        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child):nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        /* 数据单元格样式 */
+        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) td {
+            padding: 12px 15px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+            font-size: 14px;
+            color: #333;
+            transition: background-color 0.3s ease;
+        }
+        
+        /* 悬停效果 */
+        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):hover {
+            background-color: #e3f2fd !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* 页脚样式 */
+        table tr:last-child td {
+            background-color: #ecf0f1 !important;
+            color: #2c3e50 !important;
+            font-weight: 500;
+            padding: 15px 12px;
+            font-size: 13px;
+            border-top: 2px solid #bdc3c7;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .table-container {
+                padding: 10px;
+                margin: 10px;
+            }
+            
+            table td {
+                padding: 8px 6px;
+                font-size: 12px;
+            }
+            
+            table tr:first-child td {
+                font-size: 14px;
+            }
+        }
+        
+        /* 打印样式 */
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            
+            .table-container {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="table-container">
+        <html><body><table>
+<colgroup span="15"></colgroup>
+<tr>
+<td colspan="15"><b>2024新槐村监测户基本信息台账</b></td>
+</tr>
+<tr>
+<td><b>序号</b></td>
+<td><b>行政村</b></td>
+<td><b>自然村</b></td>
+<td><b>姓名</b></td>
+<td><b>证件号码</b></td>
+<td><b>人数</b></td>
+<td><b>与户主关系</b></td>
+<td><b>致贫原因</b></td>
+<td><b>人联系电话</b></td>
+<td><b>户类型</b></td>
+<td><b>纳入监测日期</b></td>
+<td><b>易返贫致贫户(监测对象)类型</b></td>
+<td><b>风险是否消除</b></td>
+<td><b>是否两类群体</b></td>
+<td><b>是否长期不在家</b></td>
+</tr>
+        <tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">1</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">中讯村</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">一湾村</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">孙万海</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">510300193803043577</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">3</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">户主</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">因病</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">13578945621</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">脱贫户</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">2023-01-15</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">是</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">是</td>
+<td style="padding: 10px 12px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #333;">否</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">陈通仕</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">51050019461014789X</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">自身发展动力不足</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">18623457890</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2023-02-20</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">否</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">3</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">崔炳珍</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510200194209192462</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">缺技术</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">17712345678</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">4</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">何维寿</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510100194909255635</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">缺技术</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">15987654321</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">5</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">王守成</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510400195104171239</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">4</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因病</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">19945678901</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">6</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">吴洪秀</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510300194412018644</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">自身发展动力不足</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">13012345678</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">7</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">张光素</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510100195705246828</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">3</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因病</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">18789654321</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">8</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">孙云</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510500194605223411</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">缺劳力</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">18856789012</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">9</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">文治昭</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510200194802199013</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">4</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因病</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">17132165498</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">赵庆光</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510400194111124393</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">3</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因残</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">15245678901</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫、监测户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2013.9</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">突发严重困难户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">否</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">11</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">何志中</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510200194603078644</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">4</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因残</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">19178945632</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">12</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">王甫德</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510300194906283577</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">自身发展动力不足</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">13365498721</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">13</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">王甫元</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510100195009046828</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">缺技术</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">18901234567</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">14</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">王守臣</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510500195111139011</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">缺技术</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">17823456789</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">15</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">谢国珍</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510400193712254393</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因学</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">15598765432</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">16</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">张洪秀</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">51020019411228341X</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">3</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因学</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">18965478901</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #e0e0e0; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">17</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">霍开福</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510300195407255635</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">3</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">缺技术</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">13987650123</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">18</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">郭廷香</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510100194401037893</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">5</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">缺技术</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">18123456789</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">19</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">张仁连</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510500193907101239</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">3</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">因病</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">17654321098</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+</tr>
+<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">20</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">中讯村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">一湾村</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">王积禄</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">510400194407262462</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">2</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">户主</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">自身发展动力不足</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">15098765432</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;"></td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">脱贫不稳定户</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">是</td>
+</tr>
+        </table><!-- ************************************************************************** --></body></html>
+    </div>
+</body>
+</html>
