@@ -606,15 +606,23 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
             margin: 0 auto;
-            max-width: 1200px;
+            width: 100%;
+            max-width: none;
             padding: 25px;
             border: 1px solid #e0e0e0;
         }}
         
+        .table-wrapper {{
+            overflow-x: auto;
+            overflow-y: hidden;
+            width: 100%;
+            border-radius: 4px;
+        }}
+        
         table {{
             width: 100%;
+            min-width: 800px;
             border-collapse: collapse;
             margin: 0;
             background: white;
@@ -630,6 +638,11 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             text-align: center;
             padding: 18px 15px;
             border: 1px solid #2c3e50;
+            border-right: 2px solid #1a252f;
+        }}
+        
+        table tr:first-child td:last-child {{
+            border-right: 1px solid #2c3e50;
         }}
         
         /* 分类标题行 */
@@ -641,6 +654,11 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             text-align: center;
             padding: 14px 12px;
             border: 1px solid #34495e;
+            border-right: 2px solid #2c3e50;
+        }}
+        
+        table tr:nth-child(2) td:last-child {{
+            border-right: 1px solid #34495e;
         }}
         
         /* 字段标题行 */
@@ -652,6 +670,11 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             text-align: center;
             padding: 12px 10px;
             border: 1px solid #bdc3c7;
+            border-right: 2px solid #95a5a6;
+        }}
+        
+        table tr:nth-child(3) td:last-child {{
+            border-right: 1px solid #bdc3c7;
         }}
         
         /* 数据行基础样式 */
@@ -706,7 +729,31 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
         
         /* 表格外边框 */
         table {{
-            border: 2px solid #bdc3c7;
+            border: 2px solid #2c3e50;
+        }}
+        
+        /* 水平滚动条样式 */
+        .table-wrapper::-webkit-scrollbar {{
+            height: 12px;
+        }}
+        
+        .table-wrapper::-webkit-scrollbar-track {{
+            background: #f1f1f1;
+            border-radius: 6px;
+        }}
+        
+        .table-wrapper::-webkit-scrollbar-thumb {{
+            background: #c1c1c1;
+            border-radius: 6px;
+            border: 2px solid #f1f1f1;
+        }}
+        
+        .table-wrapper::-webkit-scrollbar-thumb:hover {{
+            background: #a8a8a8;
+        }}
+        
+        .table-wrapper::-webkit-scrollbar-corner {{
+            background: #f1f1f1;
         }}
         
         /* 响应式设计 */
@@ -726,6 +773,14 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
                 padding: 15px;
                 margin: 10px;
                 border-radius: 6px;
+            }}
+            
+            .table-wrapper {{
+                border-radius: 4px;
+            }}
+            
+            table {{
+                min-width: 600px;
             }}
             
             table td {{
@@ -755,6 +810,10 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
                 margin: 5px;
             }}
             
+            table {{
+                min-width: 500px;
+            }}
+            
             table td {{
                 padding: 6px 4px;
                 font-size: 10px;
@@ -778,10 +837,17 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
                 border: 1px solid #000;
                 background: white;
                 padding: 0;
+                width: 100%;
+            }}
+            
+            .table-wrapper {{
+                overflow: visible;
             }}
             
             table {{
                 border: 1px solid #000;
+                min-width: auto;
+                width: 100%;
             }}
             
             table td {{
@@ -812,9 +878,11 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
 </head>
 <body>
     <div class="table-container">
-        {headers_html}
-        {data_html}
-        {footer_html}
+        <div class="table-wrapper">
+            {headers_html}
+            {data_html}
+            {footer_html}
+        </div>
     </div>
 </body>
 </html>"""

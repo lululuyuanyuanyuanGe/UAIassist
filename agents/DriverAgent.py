@@ -44,11 +44,12 @@ def append_strings(left: list[str], right: Union[list[str], str]) -> list[str]:
     
 
 @tool
-def _collect_user_input(session_id: str, AI_question: str) -> str:
+def _collect_user_input(session_id: str, AI_question: str, village_name: str) -> str:
     """这是一个用来收集用户输入的工具，你需要调用这个工具来收集用户输入
     参数：
         session_id: 当前会话ID
         AI_question: 大模型的问题
+        village_name: 当前村名
     返回：
         str: 总结后的用户输入信息
     """
@@ -58,7 +59,9 @@ def _collect_user_input(session_id: str, AI_question: str) -> str:
     
     processUserInputAgent = ProcessUserInputAgent()
     ai_message = AIMessage(content=AI_question)
-    response = processUserInputAgent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = ai_message)
+    response = processUserInputAgent.run_process_user_input_agent(session_id = session_id, 
+                                                                  previous_AI_messages = ai_message,
+                                                                  village_name = village_name)
     print(f"🔄 返回响应: {response[:100]}...")
     return response
     
@@ -111,7 +114,9 @@ class FrontdeskAgent:
                                     {
                                         "simple_template_handle": "simple_template_handle",
                                         "complex_template_handle": "simple_template_handle",
-                                        "design_excel_template": "chat_with_user_to_determine_template"
+                                        "design_excel_template": "chat_with_user_to_determine_template",
+                                        "chat_with_user_to_determine_template": "chat_with_user_to_determine_template",
+                                        "initial_collect_user_input": "initial_collect_user_input"
                                     })
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
@@ -172,7 +177,10 @@ class FrontdeskAgent:
         print("🔄 正在调用ProcessUserInputAgent...")
         
         processUserInputAgent = ProcessUserInputAgent()
-        summary_message = processUserInputAgent.run_process_user_input_agent(session_id = session_id, previous_AI_messages = previous_AI_messages)
+        summary_message = processUserInputAgent.run_process_user_input_agent(session_id = session_id, 
+                                                                             previous_AI_messages = previous_AI_messages,
+                                                                             village_name = state["village_name"],
+                                                                             current_node = "initial_collect_user_input")
         print(f"📥 原始返回信息：{summary_message}")
         
         # Handle the case where summary_message might be None
@@ -503,4 +511,4 @@ graph = frontdesk_agent.graph
 
 if __name__ == "__main__":
     frontdesk_agent = FrontdeskAgent()
-    frontdesk_agent.run_frontdesk_agent(village_name="燕云村")
+    frontdesk_agent.run_frontdesk_agent(village_name="中讯村")

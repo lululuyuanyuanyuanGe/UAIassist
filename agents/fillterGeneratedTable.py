@@ -95,8 +95,8 @@ class FillterGeneratedTableAgent:
         system_prompt = f"""
         你是一个经验丰富的数据分析师，现在需要你根据用户的需求，生成代码在synthesized_table.csv中过滤数据。
         用户的需求是：{state["user_requirement"]}
-        
         """
+        response = invoke_model(model="deepseek-ai/DeepSeek-V3")
 
     def _execute_code_to_filter_csv_data(self, state: FillterGeneratedTableState) -> FillterGeneratedTableState:
         """这个节点用于执行代码在synthesized_table.csv中过滤数据"""
@@ -112,7 +112,9 @@ class FillterGeneratedTableAgent:
 
     def  _fillout_new_table(self, state: FillterGeneratedTableState) -> FillterGeneratedTableState:
         fillout_table_agent = FilloutTableAgent()
-        fillout_table_agent.run_fillout_table_agent(state["session_id"], state["template_file"], state["data_file_path"], state["headers_mapping"])
+        fillout_table_agent.run_fillout_table_agent(state["session_id"], state["template_file"], 
+                                                    state["data_file_path"], state["headers_mapping"],
+                                                    modify_after_first_fillout=True)
         return state
 
 

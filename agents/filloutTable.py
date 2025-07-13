@@ -252,7 +252,7 @@ class FilloutTableAgent:
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
         if not state["modify_after_first_fillout"]:
-            # return state
+            return state
             print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
             print("=" * 50)
             

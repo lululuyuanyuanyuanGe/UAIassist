@@ -48,7 +48,7 @@ class ProcessUserInputState(TypedDict):
     session_id: str
     current_node: str
     next_node: str
-
+    village_name: str
     
 class ProcessUserInputAgent:
 
@@ -116,7 +116,8 @@ class ProcessUserInputAgent:
 
 
 
-    def create_initial_state(self, session_id: str, previous_AI_messages = None, current_node: str = "") -> ProcessUserInputState:
+    def create_initial_state(self, session_id: str, previous_AI_messages = None, 
+                             current_node: str = "", village_name: str = "") -> ProcessUserInputState:
         """This function initializes the state of the process user input agent"""
         
         # Handle both single BaseMessage and list[BaseMessage] input
@@ -142,8 +143,9 @@ class ProcessUserInputAgent:
             "template_complexity": "",
             "template_file_path": "",
             "session_id": session_id,
-            "current_node": "collect_user_input",
-            "next_node": "collect_user_input"
+            "current_node": current_node,
+            "next_node": "collect_user_input",
+            "village_name": village_name
         }
 
 
@@ -191,7 +193,8 @@ class ProcessUserInputAgent:
         file_process_agent = FileProcessAgent()
         file_process_agent_final_state = file_process_agent.run_file_process_agent(
             session_id=state["session_id"],
-            upload_files_path=state["upload_files_path"]
+            upload_files_path=state["upload_files_path"],
+            village_name=state["village_name"]
         )
         
         # Handle template file path - convert list to string if necessary
@@ -407,29 +410,33 @@ class ProcessUserInputAgent:
                     else:
                         previous_ai_content = str(previous_ai_messages)
             
-            system_prompt = f"""你是一位智能工作流路由决策专家，负责根据用户输入和对话上下文，精确判断下一步应该执行的节点。
+            system_prompt = f"""你是一位智能工作流路由决策专家，负责根据用户输入和对话上下文，和当前节点，精确判断下一步应该执行的节点。
 
 ## 📋 路由决策规则
 
-### 1. 表格设计流程路由
-**节点：design_excel_template**
+### 1. 当前节点为initial_collect_user_input时
+- **判断逻辑**：分析用户输入是否包含明确的表格生成意图
+- **路由规则**：
+  - **包含明确表格生成意图**（如"生成表格"、"创建模板"、"填充表格"、"制作报表"等）→ `chat_with_user_to_determine_template`
+  - **仅提供文件路径**或**模糊需求**或**无明确意图** → `initial_collect_user_input`（继续收集用户输入）
+- **关键词示例**：
+  - ✅ 触发路由：生成、创建、制作、填充、表格、模板、报表、统计、整理数据
+  - ❌ 继续收集：仅文件路径、简单问候、不明确描述
+
+### 2. 当前节点为design_excel_template时
 - **触发条件**：用户输入涉及表格生成、模板设计、字段定义等需求
 - **用户反馈判断**：
   - 满意/确认 → `generate_html_template`（开始生成HTML模板）
   - 修改建议/不满意 → `design_excel_template`（重新设计表格结构）
 
-### 2. 文件召回流程路由
-**节点：recall_relative_files**
+### 3. 当前节点为recall_relative_files时
 - **触发条件**：需要查找或确认相关文件
 - **用户反馈判断**：
   - 文件相关/确认使用 → `determine_the_mapping_of_headers`（进行字段映射）
   - 文件不相关/需要重新查找 → `recall_relative_files`（重新召回文件）
 
-### 3. 默认路由策略
-**当无明确上下文时**：
-- 表格相关需求 → `design_excel_template`
-- 文件查找需求 → `recall_relative_files`  
-- 数据处理需求 → `determine_the_mapping_of_headers`
+## 当前节点
+{state["current_node"]}
 
 ## 📊 上下文信息
 **上一轮AI回复内容**：
@@ -439,15 +446,25 @@ class ProcessUserInputAgent:
 {user_input}
 
 ## 🎯 判断要点
-- 识别用户意图：确认、修改、新需求
-- 分析反馈性质：积极肯定 vs 改进建议
-- 考虑工作流连续性：确保逻辑流畅
+- **意图识别**：用户是否明确表达了表格生成需求？
+- **内容分析**：仅文件路径 vs 明确的表格处理指令
+- **上下文理解**：结合当前节点状态做出合理判断
+
+## 📝 决策示例
+**当前节点为initial_collect_user_input时：**
+- 用户输入："帮我生成一个党员信息表格" → `chat_with_user_to_determine_template`
+- 用户输入："d:\files\党员信息表.xlsx" → `initial_collect_user_input`
+- 用户输入："你好" → `initial_collect_user_input`
+- 用户输入："我要制作一个统计报表" → `chat_with_user_to_determine_template`
 
 ## 📤 输出要求
 **严格按照以下格式输出，不得包含任何解释或额外文字**：
 仅返回节点名称，如：`design_excel_template`"""
             
             try:
+                print("当前节点为：" + state["current_node"])
+                print("用户输入为：" + user_input)
+                print("系统提示为：" + system_prompt)
                 response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])
                 route_decision = response.strip()
                 print(f"📍 基于LLM决策路由到: {route_decision}")
@@ -592,12 +609,14 @@ class ProcessUserInputAgent:
         
         return {"summary_message": combined_summary}
 
-    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None, current_node: str = "") -> List:
+    def run_process_user_input_agent(self, session_id: str = "1", previous_AI_messages: BaseMessage = None, 
+                                     current_node: str = "", village_name: str = "") -> List:
         """This function runs the process user input agent using invoke method instead of streaming"""
         print("\n🚀 开始运行 ProcessUserInputAgent")
         print("=" * 60)
         
-        initial_state = self.create_initial_state(session_id=session_id, previous_AI_messages=previous_AI_messages, current_node=current_node)
+        initial_state = self.create_initial_state(session_id=session_id, previous_AI_messages=previous_AI_messages, 
+                                                  current_node=current_node, village_name=village_name)
         config = {"configurable": {"thread_id": session_id}}
         
         print(f"📋 会话ID: {session_id}")

@@ -107,7 +107,7 @@ class FileProcessAgent:
 
         return graph
 
-    def _create_initial_state(self, session_id: str = "1", upload_files_path: list[str] = []) -> FileProcessState:
+    def _create_initial_state(self, session_id: str = "1", upload_files_path: list[str] = [], village_name: str = "") -> FileProcessState:
         return {
             "session_id": session_id,
             "upload_files_path": upload_files_path,
@@ -120,7 +120,7 @@ class FileProcessAgent:
             "irrelevant_original_files_path": [],
             "all_files_irrelevant": False,
             "template_complexity": "",
-            "village_name": ""
+            "village_name": village_name
         }
 
 
@@ -1224,12 +1224,12 @@ class FileProcessAgent:
         return {}
 
 
-    def run_file_process_agent(self, session_id: str = "1", upload_files_path: list[str] = []) -> FileProcessState:
+    def run_file_process_agent(self, session_id: str = "1", upload_files_path: list[str] = [], village_name: str = "") -> FileProcessState:
         """Driver to run the process file agent"""
         print("\n🚀 开始运行 FileProcessAgent")
         print("=" * 60)
 
-        initial_state = self._create_initial_state(session_id = session_id, upload_files_path = upload_files_path)
+        initial_state = self._create_initial_state(session_id = session_id, upload_files_path = upload_files_path, village_name = village_name)
         config = {"configurable": {"thread_id": session_id}}
 
         print(f"📋 会话ID: {session_id}")
