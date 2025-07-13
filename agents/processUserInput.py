@@ -107,7 +107,7 @@ class ProcessUserInputAgent:
             }
         )
 
-        graph.add_edge("file_process_agent", "summary_user_input")
+        graph.add_conditional_edges("file_process_agent", self._route_after_file_process_agent)
         graph.add_conditional_edges("analyze_text_input", self._route_after_analyze_text_input)
         graph.add_edge("summary_user_input", "combine_summary_and_decide_next_node")
         graph.add_edge("decide_next_node", "combine_summary_and_decide_next_node")
@@ -208,7 +208,11 @@ class ProcessUserInputAgent:
         return {"template_file_path": template_file_path,
                 "template_complexity": template_complexity}
 
-
+    def _route_after_file_process_agent(self, state: ProcessUserInputState) -> str:
+        sends = []
+        sends.append(Send("decide_next_node", state))
+        sends.append(Send("summary_user_input", state))
+        return sends
 
     def _analyze_text_input(self, state: ProcessUserInputState) -> ProcessUserInputState:
         """This node performs a safety check on user text input when all uploaded files are irrelevant.

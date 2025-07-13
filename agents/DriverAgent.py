@@ -152,7 +152,6 @@ class FrontdeskAgent:
         
         return {
             "messages": [AIMessage(content=welcome_message)],
-            "previous_node": "chat_with_user_to_determine_template"
         }
     
 
@@ -191,7 +190,6 @@ class FrontdeskAgent:
         return {
             "messages": [AIMessage(content=summary_message[0])],
             "template_file_path": summary_message[1],
-            "previous_node": "chat_with_user_to_determine_template"
         }
         
     def _route_after_initial_collect_user_input(self, state: FrontdeskState) -> str:
@@ -397,7 +395,7 @@ class FrontdeskAgent:
         print("\n🔍 开始执行: _recall_files_agent")
         print("=" * 50)
 
-        return state
+        # return state
         
         raw_template = state["template_structure"]
         print(f"🔍 模板结构类型: {type(raw_template)}")
@@ -445,7 +443,7 @@ class FrontdeskAgent:
         """This node will fill out the table based on the headers mapping"""
         print("\n🔍 开始执行: _fillout_table_agent")
         print("=" * 50)
-        return state
+        # return state
         filloutTableAgent = FilloutTableAgent()
         print("模板表格文件1111111111", state["template_file_path"])
         print(f"🔍 填充表格的文件2: {state['recalled_xls_files']}")
