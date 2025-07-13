@@ -22,8 +22,7 @@ from utilities.html_generator import (
     transform_data_to_html_code_based,
     combine_html_parts
 )
-import uuid
-import json
+
 import os
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -31,8 +30,7 @@ from pathlib import Path
 # Create an interactive chatbox using gradio
 import gradio as gr
 from dotenv import load_dotenv
-import re
-import csv
+
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
@@ -412,6 +410,9 @@ class FilloutTableAgent:
             "CSV_data": sorted_results
         }
     
+
+    def _generate_html_code_based_on_csv_data(self, state: FilloutTableState) -> FilloutTableState:
+        
     def _extract_empty_row_html_code_based(self, state: FilloutTableState) -> FilloutTableState:
         """提取模板表格中的空行html代码 - 基于代码的高效实现"""
         try:
