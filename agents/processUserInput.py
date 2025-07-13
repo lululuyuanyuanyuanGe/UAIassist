@@ -403,18 +403,45 @@ class ProcessUserInputAgent:
                     else:
                         previous_ai_content = str(previous_ai_messages)
             
-            system_prompt = f"""你是一个路由决策专家，根据用户输入和上下文，决定下一步的路由。
+            system_prompt = f"""你是一位智能工作流路由决策专家，负责根据用户输入和对话上下文，精确判断下一步应该执行的节点。
 
-规则如下：
-- 如果用户的输入为有效时，且涉及到表格生成，则返回"design_excel_template"
-- 当前对话涉及"design_excel_template"时，如果用户给出了积极肯定的反馈则返回"generate_html_template"，反之如果用户给出了改进建议则返回"design_excel_template"
-- 当前对话涉及"recall_relative_files"时，如果用户给出了积极肯定的反馈则返回"determine_the_mapping_of_headers"，反之如果用户给出了改进建议则返回"recall_relative_files"
-- 如果没有明确的上下文，根据用户输入的内容判断最合适的下一步
+## 📋 路由决策规则
 
-上一轮 AI 的回复：{previous_ai_content}
-用户当前输入：{user_input}
+### 1. 表格设计流程路由
+**节点：design_excel_template**
+- **触发条件**：用户输入涉及表格生成、模板设计、字段定义等需求
+- **用户反馈判断**：
+  - 满意/确认 → `generate_html_template`（开始生成HTML模板）
+  - 修改建议/不满意 → `design_excel_template`（重新设计表格结构）
 
-输出要求：不要包含任何解释，直接返回路由名称"""
+### 2. 文件召回流程路由
+**节点：recall_relative_files**
+- **触发条件**：需要查找或确认相关文件
+- **用户反馈判断**：
+  - 文件相关/确认使用 → `determine_the_mapping_of_headers`（进行字段映射）
+  - 文件不相关/需要重新查找 → `recall_relative_files`（重新召回文件）
+
+### 3. 默认路由策略
+**当无明确上下文时**：
+- 表格相关需求 → `design_excel_template`
+- 文件查找需求 → `recall_relative_files`  
+- 数据处理需求 → `determine_the_mapping_of_headers`
+
+## 📊 上下文信息
+**上一轮AI回复内容**：
+{previous_ai_content}
+
+**用户当前输入**：
+{user_input}
+
+## 🎯 判断要点
+- 识别用户意图：确认、修改、新需求
+- 分析反馈性质：积极肯定 vs 改进建议
+- 考虑工作流连续性：确保逻辑流畅
+
+## 📤 输出要求
+**严格按照以下格式输出，不得包含任何解释或额外文字**：
+仅返回节点名称，如：`design_excel_template`"""
             
             try:
                 response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])

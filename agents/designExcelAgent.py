@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any, TypedDict, Annotated, Union
 from datetime import datetime
 
 from utilities.modelRelated import invoke_model, invoke_model_with_tools
-from utilities.clean_response import clean_json_response, clean_html_response
+from utilities.clean_response import clean_json_response
 
 from pathlib import Path
 # Create an interactive chatbox using gradio
@@ -22,13 +22,120 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 from langchain_core.tools import tool
-
-# import other agents
+from langchain_openai import ChatOpenAI
 from agents.processUserInput import ProcessUserInputAgent
-from agents.recallFilesAgent import RecallFilesAgent
-from agents.filloutTable import FilloutTableAgent
+
+load_dotenv()
+
+
+def generate_html_from_json(json_data: dict) -> str:
+    """
+    Generate HTML table structure from JSON data.
+    
+    Args:
+        json_data: Dictionary containing 表格标题 and 表格结构
+        
+    Returns:
+        str: HTML table code
+    """
+    try:
+        # Parse JSON if it's a string
+        if isinstance(json_data, str):
+            data = json.loads(json_data)
+        else:
+            data = json_data
+        
+        table_title = data.get("表格标题", "表格")
+        table_structure = data.get("表格结构", {})
+        
+        # Count total columns
+        total_columns = 0
+        is_multilevel = False
+        
+        # Check if structure is multilevel (nested dict) or single level (list)
+        for key, value in table_structure.items():
+            if isinstance(value, dict):
+                is_multilevel = True
+                for subkey, subvalue in value.items():
+                    if isinstance(subvalue, list):
+                        total_columns += len(subvalue)
+            elif isinstance(value, list):
+                total_columns += len(value)
+        
+        # Generate colgroup
+        colgroup_html = "\n".join([f"<colgroup></colgroup>" for _ in range(total_columns)])
+        
+        # Generate HTML
+        html_lines = [
+            "<html><body><table>",
+            colgroup_html,
+            # Title row
+            f'<tr>\n<td colspan="{total_columns}"><b>{table_title}</b></td>\n</tr>'
+        ]
+        
+        if is_multilevel:
+            # Generate multilevel structure
+            # Second row: main categories
+            main_categories_row = ["<tr>"]
+            # Third row: subcategories  
+            sub_categories_row = ["<tr>"]
+            # Fourth row: fields
+            fields_row = ["<tr>"]
+            
+            for main_cat, sub_cats in table_structure.items():
+                if isinstance(sub_cats, dict):
+                    # Count total fields under this main category
+                    main_cat_span = sum(len(fields) for fields in sub_cats.values() if isinstance(fields, list))
+                    main_categories_row.append(f'<td colspan="{main_cat_span}"><b>{main_cat}</b></td>')
+                    
+                    # Add subcategories and fields
+                    for sub_cat, fields in sub_cats.items():
+                        if isinstance(fields, list):
+                            sub_categories_row.append(f'<td colspan="{len(fields)}"><b>{sub_cat}</b></td>')
+                            for field in fields:
+                                fields_row.append(f'<td><b>{field}</b></td>')
+            
+            main_categories_row.append("</tr>")
+            sub_categories_row.append("</tr>")
+            fields_row.append("</tr>")
+            
+            html_lines.extend([
+                "\n".join(main_categories_row),
+                "\n".join(sub_categories_row), 
+                "\n".join(fields_row)
+            ])
+        
+        else:
+            # Generate single level structure
+            # Second row: categories
+            categories_row = ["<tr>"]
+            # Third row: fields
+            fields_row = ["<tr>"]
+            
+            for category, fields in table_structure.items():
+                if isinstance(fields, list):
+                    categories_row.append(f'<td colspan="{len(fields)}"><b>{category}</b></td>')
+                    for field in fields:
+                        fields_row.append(f'<td><b>{field}</b></td>')
+            
+            categories_row.append("</tr>")
+            fields_row.append("</tr>")
+            
+            html_lines.extend([
+                "\n".join(categories_row),
+                "\n".join(fields_row)
+            ])
+        
+        html_lines.append("</table></body></html>")
+        
+        return "\n".join(html_lines)
+        
+    except Exception as e:
+        print(f"❌ HTML生成错误: {e}")
+        # Fallback simple structure
+        return f"<html><body><table><tr><td><b>表格生成错误</b></td></tr></table></body></html>"
 
 
 class DesignExcelState(TypedDict):
@@ -95,13 +202,14 @@ class DesignExcelAgent:
 
 ## 🔍 设计原则
 1. **数据可追溯性**：每个表头字段必须有明确的数据来源
-   - 直接来源：现有表格中的字段
+   - 直接来源：现有表格中的字段，请将表格名称包含在内
    - 推导来源：根据政策文档和现有数据可计算得出
    - 手工录入：需要村民或管理员填写的新信息
    - 注意所有数据来源必须有明确的数据来源，必须严格参考现有表格或者政策文档来设计
 
 2. **结构合理性**：
-   - 采用多级表头结构，逻辑清晰
+   - **多级表头优化**：只有当主分类下有多个子分类时才使用多级表头
+   - **单级表头简化**：如果主分类下只有一个子分类，直接使用主分类作为表头，不需要创建多级结构
    - 相关字段分组归类
    - 字段命名规范统一
 
@@ -120,7 +228,9 @@ class DesignExcelAgent:
 ## 📝 输出要求
 严格按照以下JSON格式输出：
 
+**多级表头格式**（当主分类下有多个子分类时使用）：
 {{
+  "表格标题": "根据用户需求和表格用途设计的具体标题",
   "表格结构": {{
     "主要分类1": {{
       "子分类A": ["字段1", "字段2", "字段3"],
@@ -132,34 +242,52 @@ class DesignExcelAgent:
   }}
 }}
 
+**单级表头格式**（当主分类下只有一个子分类时使用）：
+{{
+  "表格标题": "根据用户需求和表格用途设计的具体标题",
+  "表格结构": {{
+    "补贴资格": ["字段1", "字段2", "字段3"],
+    "个人信息": ["字段4", "字段5", "字段6"]
+  }}
+}}
 
-注意表格子分类等白头结构组织不限于以上格式，请根据实际情况进行组织
+**表格标题要求**：
+- 根据用户提问和表格用途设计具体、明确的标题
+- 标题应体现表格的主要功能和使用场景
+- 格式示例："XX村XX年度XX登记表"、"XX村XX补贴申领表"等
+
+**结构设计要求**：
+- **多级表头**：当一个分类下有多个子分类时使用，如"个人信息"下有"基本信息"和"联系信息"
+- **单级表头**：当一个分类下只有一个子分类时，直接使用分类名称，如"补贴资格"直接包含相关字段
+- 避免不必要的层级嵌套，保持结构简洁明了
 
 ## ⚠️ 注意事项
 - 确保所有字段都有明确的数据来源
 - 表格结构要符合Excel操作习惯
 - 考虑数据录入的便利性和准确性
-- 如果现有资源不足，请在"数据来源说明"中明确标注
+- 如果现有资源不足，内部记录即可，不要在表格中体现
 - 如果用户反馈中没有明确的需求，请根据现有资源和实际情况进行设计
+- **数据来源仅用于内部设计参考**：不要将数据来源作为表头字段或在表格中显示
+- **表头简洁性**：避免不必要的多级嵌套，优先使用简洁的单级表头
 """
         
-        """,
-  "数据来源说明": {{
-    "字段1": "来源：现有表格XXX",
-    "字段2": "来源：根据政策文档XXX计算",
-    "字段3": "来源：需要手工录入"
-  }}
+  #       """,
+  # "数据来源说明": {{
+  #   "字段1": "来源：现有表格XXX",
+  #   "字段2": "来源：根据政策文档XXX计算",
+  #   "字段3": "来源：需要手工录入"
+  # }}
   
-  ,
-  "表格总结": "详细说明该表格的用途、适用场景、主要功能和预期效果（100-200字）",
-  "额外信息": {{
-    "填表单位": "{state["village_name"]}",
-    "填表时间": "填表日期占位符",
-    "制表人": "制表人姓名占位符",
-    "审核人": "审核人姓名占位符"
-  }}
+  # ,
+  # "表格总结": "详细说明该表格的用途、适用场景、主要功能和预期效果（100-200字）",
+  # "额外信息": {{
+  #   "填表单位": "{state["village_name"]}",
+  #   "填表时间": "填表日期占位符",
+  #   "制表人": "制表人姓名占位符",
+  #   "审核人": "审核人姓名占位符"
+  # }}
   
-  """
+  # """
         
         print("📤 正在调用LLM进行表格结构设计...")
         print("提示词：", system_prompt)
@@ -213,95 +341,34 @@ class DesignExcelAgent:
 
     
     def _generate_html_template(self, state: DesignExcelState) -> DesignExcelState:
-        """根据模板生成html模版"""
-        print("\n🔍 开始执行: _generate_html_template")
+        """根据模板生成html模版（使用代码生成，替代LLM）"""
+        print("\n🔍 开始执行: _generate_html_template（代码生成模式）")
         print("=" * 50)
         
-        system_prompt = f"""你是一个专业的HTML表格生成专家，擅长将JSON格式的表格结构转换为美观、实用的HTML表格模板。
-
-## 📋 任务要求
-根据提供的JSON表格结构，生成一个完整的HTML表格模板，用于村级行政管理的数据录入和展示。
-
-## 🎨 设计规范
-
-### 1. 表格结构要求
-- 使用标准的`<table>`标签
-- 合理设置`<colgroup>`，列数与最底层字段总数匹配
-- 使用`colspan`和`rowspan`实现多级表头
-- 保持表格结构清晰、对齐美观
-
-### 2. 表头层次设计
-- **第一行**：表格标题（全表合并）
-- **第二行**：额外信息行（填表单位、时间、制表人等）
-- **第三行及以后**：多级表头结构
-- **最后行**：数据录入区域（仅提供1行示例）
-
-### 3. 样式要求
-- 添加基本的CSS样式，确保表格美观
-- 表头使用深色背景，数据区域使用浅色背景
-- 设置合适的边框、间距和字体
-- 确保表格在不同设备上显示良好
-
-### 4. 内容填充
-- 表头使用实际的字段名称
-- 数据区域使用占位符（如"请输入..."）
-- 额外信息区域使用带占位符的实际标签
-
-## 🔧 HTML结构示例
-```html
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>表格模板</title>
-    <style>
-        /* 在这里添加CSS样式 */
-    </style>
-</head>
-<body>
-    <table>
-        <colgroup>
-            <!-- 根据实际列数设置 -->
-        </colgroup>
-        <thead>
-            <!-- 表头结构 -->
-        </thead>
-        <tbody>
-            <!-- 数据录入区域 -->
-        </tbody>
-        <tfoot>
-            <!-- 签名区域 -->
-        </tfoot>
-    </table>
-</body>
-</html>
-```
-
-## 📊 输入的JSON结构
-{state["template_structure"]}
-
-## 🎯 输出要求
-- 生成完整的HTML文档，包含CSS样式
-- 确保表格结构与JSON描述完全匹配
-- 提供美观的视觉效果和良好的用户体验
-- 代码结构清晰，便于后续修改
-
-请直接输出完整的HTML代码，不要添加任何解释或说明文字。
-"""
-
-        print("📤 正在调用LLM进行HTML模板生成...")
-        response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", 
-                               messages=[SystemMessage(content=system_prompt)])
-        
-        # Clean the response to handle markdown code blocks
-        cleaned_response = clean_html_response(response)
+        try:
+            # Parse the template structure JSON
+            template_structure = state["template_structure"]
+            print(f"📊 正在解析模板结构: {template_structure}")
+            
+            # Generate HTML using code instead of LLM
+            print("🔧 正在使用代码生成HTML...")
+            cleaned_response = generate_html_from_json(template_structure)
+            print(f"✅ HTML代码生成成功，长度: {len(cleaned_response)} 字符")
+            print(f"🔍 生成的HTML预览: {cleaned_response[:200]}...")
+            
+        except Exception as e:
+            print(f"❌ HTML生成失败: {e}")
+            # Fallback HTML
+            cleaned_response = f"<html><body><table><tr><td><b>{state['village_name']}表格模板</b></td></tr></table></body></html>"
         
         # 保存HTML模板到文件
-        html_filename = f"{state['village_name']}_表格模板_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-        html_path = Path("完整案列") / html_filename
+        html_filename = f"{state['village_name']}_表格模板_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        html_path = Path(f"conversations/{state['session_id']}/user_uploaded_files/") / html_filename
         
         try:
+            # Ensure directory exists
+            html_path.parent.mkdir(parents=True, exist_ok=True)
+            
             with open(html_path, "w", encoding="utf-8") as f:
                 f.write(cleaned_response)
             print(f"✅ HTML模板已保存到: {html_path}")
@@ -322,5 +389,44 @@ class DesignExcelAgent:
     
 
 if __name__ == "__main__":
+    # Test the HTML generation function
+    print("🧪 测试HTML生成功能")
+    print("=" * 50)
+    
+    # Test single level structure
+    test_single_level = {
+        "表格标题": "燕云村残疾人补贴申领登记",
+        "表格结构": {
+            "个人信息": ["姓名", "残疾类别", "监护人姓名"],
+            "补贴资格": ["残疾证号", "地址", "联系电话"],
+            "申领信息": ["补贴金额", "备注"]
+        }
+    }
+    
+    # Test multi level structure  
+    test_multi_level = {
+        "表格标题": "燕云村党员补贴申领登记",
+        "表格结构": {
+            "个人信息": {
+                "基本信息": ["姓名", "年龄", "性别"],
+                "联系信息": ["地址", "电话"]
+            },
+            "党员信息": {
+                "党籍信息": ["入党时间", "党龄", "支部"]
+            }
+        }
+    }
+    
+    print("📝 单级表头HTML:")
+    single_html = generate_html_from_json(test_single_level)
+    print(single_html)
+    print("\n" + "=" * 50)
+    
+    print("📝 多级表头HTML:")
+    multi_html = generate_html_from_json(test_multi_level)
+    print(multi_html)
+    print("\n" + "=" * 50)
+    
+    # Original agent test
     designExcelAgent = DesignExcelAgent()
-    designExcelAgent.run_design_excel_agent(session_id="1", village_name="燕云村")
+    # designExcelAgent.run_design_excel_agent(session_id="1", village_name="燕云村")
