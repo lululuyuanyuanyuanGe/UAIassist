@@ -8,8 +8,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from typing import Dict, List, Optional, Any, TypedDict, Annotated, Union
 from datetime import datetime
 
-from utilities.modelRelated import invoke_model, invoke_model_with_tools
+from utilities.modelRelated import invoke_model
 from utilities.clean_response import clean_json_response
+from utilities.html_generator import generate_header_html
+from utilities.file_process import extract_summary_for_each_file
 
 from pathlib import Path
 # Create an interactive chatbox using gradio
@@ -30,112 +32,6 @@ from agents.processUserInput import ProcessUserInputAgent
 load_dotenv()
 
 
-def generate_html_from_json(json_data: dict) -> str:
-    """
-    Generate HTML table structure from JSON data.
-    
-    Args:
-        json_data: Dictionary containing 表格标题 and 表格结构
-        
-    Returns:
-        str: HTML table code
-    """
-    try:
-        # Parse JSON if it's a string
-        if isinstance(json_data, str):
-            data = json.loads(json_data)
-        else:
-            data = json_data
-        
-        table_title = data.get("表格标题", "表格")
-        table_structure = data.get("表格结构", {})
-        
-        # Count total columns
-        total_columns = 0
-        is_multilevel = False
-        
-        # Check if structure is multilevel (nested dict) or single level (list)
-        for key, value in table_structure.items():
-            if isinstance(value, dict):
-                is_multilevel = True
-                for subkey, subvalue in value.items():
-                    if isinstance(subvalue, list):
-                        total_columns += len(subvalue)
-            elif isinstance(value, list):
-                total_columns += len(value)
-        
-        # Generate colgroup
-        colgroup_html = "\n".join([f"<colgroup></colgroup>" for _ in range(total_columns)])
-        
-        # Generate HTML
-        html_lines = [
-            "<html><body><table>",
-            colgroup_html,
-            # Title row
-            f'<tr>\n<td colspan="{total_columns}"><b>{table_title}</b></td>\n</tr>'
-        ]
-        
-        if is_multilevel:
-            # Generate multilevel structure
-            # Second row: main categories
-            main_categories_row = ["<tr>"]
-            # Third row: subcategories  
-            sub_categories_row = ["<tr>"]
-            # Fourth row: fields
-            fields_row = ["<tr>"]
-            
-            for main_cat, sub_cats in table_structure.items():
-                if isinstance(sub_cats, dict):
-                    # Count total fields under this main category
-                    main_cat_span = sum(len(fields) for fields in sub_cats.values() if isinstance(fields, list))
-                    main_categories_row.append(f'<td colspan="{main_cat_span}"><b>{main_cat}</b></td>')
-                    
-                    # Add subcategories and fields
-                    for sub_cat, fields in sub_cats.items():
-                        if isinstance(fields, list):
-                            sub_categories_row.append(f'<td colspan="{len(fields)}"><b>{sub_cat}</b></td>')
-                            for field in fields:
-                                fields_row.append(f'<td><b>{field}</b></td>')
-            
-            main_categories_row.append("</tr>")
-            sub_categories_row.append("</tr>")
-            fields_row.append("</tr>")
-            
-            html_lines.extend([
-                "\n".join(main_categories_row),
-                "\n".join(sub_categories_row), 
-                "\n".join(fields_row)
-            ])
-        
-        else:
-            # Generate single level structure
-            # Second row: categories
-            categories_row = ["<tr>"]
-            # Third row: fields
-            fields_row = ["<tr>"]
-            
-            for category, fields in table_structure.items():
-                if isinstance(fields, list):
-                    categories_row.append(f'<td colspan="{len(fields)}"><b>{category}</b></td>')
-                    for field in fields:
-                        fields_row.append(f'<td><b>{field}</b></td>')
-            
-            categories_row.append("</tr>")
-            fields_row.append("</tr>")
-            
-            html_lines.extend([
-                "\n".join(categories_row),
-                "\n".join(fields_row)
-            ])
-        
-        html_lines.append("</table></body></html>")
-        
-        return "\n".join(html_lines)
-        
-    except Exception as e:
-        print(f"❌ HTML生成错误: {e}")
-        # Fallback simple structure
-        return f"<html><body><table><tr><td><b>表格生成错误</b></td></tr></table></body></html>"
 
 
 class DesignExcelState(TypedDict):
@@ -185,6 +81,7 @@ class DesignExcelAgent:
         with open("agents/data.json", "r", encoding="utf-8") as f:
             data = json.load(f)
             related_files = data.get(state["village_name"], {"表格": {}, "文档": {}})
+            related_files = extract_summary_for_each_file(related_files)
 
         system_prompt = f"""你是一个专业的Excel表格设计专家，专门为村级行政管理设计高质量的数据表格模板。
 
@@ -194,11 +91,7 @@ class DesignExcelAgent:
 ## 📊 可用数据资源
 以下是{state["village_name"]}的知识库资源：
 
-### 📋 现有表格数据：
-{json.dumps(related_files.get("表格", {}), ensure_ascii=False, indent=2)}
-
-### 📄 政策文档资料：
-{json.dumps(related_files.get("文档", {}), ensure_ascii=False, indent=2)}
+{related_files}
 
 ## 🔍 设计原则
 1. **数据可追溯性**：每个表头字段必须有明确的数据来源
@@ -352,7 +245,7 @@ class DesignExcelAgent:
             
             # Generate HTML using code instead of LLM
             print("🔧 正在使用代码生成HTML...")
-            cleaned_response = generate_html_from_json(template_structure)
+            cleaned_response = generate_header_html(template_structure)
             print(f"✅ HTML代码生成成功，长度: {len(cleaned_response)} 字符")
             print(f"🔍 生成的HTML预览: {cleaned_response[:200]}...")
             
@@ -389,44 +282,6 @@ class DesignExcelAgent:
     
 
 if __name__ == "__main__":
-    # Test the HTML generation function
-    print("🧪 测试HTML生成功能")
-    print("=" * 50)
-    
-    # Test single level structure
-    test_single_level = {
-        "表格标题": "燕云村残疾人补贴申领登记",
-        "表格结构": {
-            "个人信息": ["姓名", "残疾类别", "监护人姓名"],
-            "补贴资格": ["残疾证号", "地址", "联系电话"],
-            "申领信息": ["补贴金额", "备注"]
-        }
-    }
-    
-    # Test multi level structure  
-    test_multi_level = {
-        "表格标题": "燕云村党员补贴申领登记",
-        "表格结构": {
-            "个人信息": {
-                "基本信息": ["姓名", "年龄", "性别"],
-                "联系信息": ["地址", "电话"]
-            },
-            "党员信息": {
-                "党籍信息": ["入党时间", "党龄", "支部"]
-            }
-        }
-    }
-    
-    print("📝 单级表头HTML:")
-    single_html = generate_html_from_json(test_single_level)
-    print(single_html)
-    print("\n" + "=" * 50)
-    
-    print("📝 多级表头HTML:")
-    multi_html = generate_html_from_json(test_multi_level)
-    print(multi_html)
-    print("\n" + "=" * 50)
-    
     # Original agent test
     designExcelAgent = DesignExcelAgent()
-    # designExcelAgent.run_design_excel_agent(session_id="1", village_name="燕云村")
+    designExcelAgent.run_design_excel_agent(session_id="1", village_name="燕云村")

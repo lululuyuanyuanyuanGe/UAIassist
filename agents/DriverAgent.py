@@ -107,7 +107,12 @@ class FrontdeskAgent:
 
         graph.add_edge(START, "entry")
         graph.add_edge("entry", "initial_collect_user_input")
-        graph.add_conditional_edges("initial_collect_user_input", self._route_after_initial_collect_user_input)
+        graph.add_conditional_edges("initial_collect_user_input", self._route_after_initial_collect_user_input,
+                                    {
+                                        "simple_template": "simple_template_handle",
+                                        "complex_template": "simple_template_handle",
+                                        "design_excel_template": "chat_with_user_to_determine_template"
+                                    })
         graph.add_conditional_edges("collect_user_input", self._route_after_collect_user_input)
         graph.add_conditional_edges("chat_with_user_to_determine_template", self._route_after_chat_with_user_to_determine_template)
         graph.add_edge("simple_template_handle", "recall_files_agent")
@@ -217,7 +222,7 @@ class FrontdeskAgent:
             elif next_node == "simple_template":
                 return "simple_template_handle"
             else:
-                return state.get("previous_node", "entry")  # Fallback to previous node
+                return next_node  # Fallback to previous node
                 
         except json.JSONDecodeError:
             # Content is plain text error message, not JSON

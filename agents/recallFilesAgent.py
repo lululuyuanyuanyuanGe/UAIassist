@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 from typing import Dict, TypedDict, Annotated
-from utilities.file_process import fetch_related_files_content, extract_file_from_recall
+from utilities.file_process import fetch_related_files_content, extract_file_from_recall, extract_summary_for_each_file
 from utilities.modelRelated import invoke_model, invoke_model_with_tools
 
 import json
@@ -91,31 +91,7 @@ class RecallFilesAgent:
 
     def _create_initial_state(self, template_structure: str) -> RecallFilesState:
 
-        def extract_summary_for_each_file(file_content: dict) -> str:
-            """提取文件内容的摘要信息"""
-            summary = ""
-            
-            # 提取表格summary
-            if "表格" in file_content and file_content["表格"]:
-                summary += "表格: \n"
-                tables = file_content["表格"]
-                for table_name in tables:
-                    if isinstance(tables[table_name], dict) and "summary" in tables[table_name]:
-                        summary += f"  {tables[table_name]['summary']}\n"
-                    else:
-                        summary += f"  {table_name}: [无摘要信息]\n"
-            
-            # 提取文档summary
-            if "文档" in file_content and file_content["文档"]:
-                summary += "\n文档: \n"
-                documents = file_content["文档"]
-                for doc_name in documents:
-                    if isinstance(documents[doc_name], dict) and "summary" in documents[doc_name]:
-                        summary += f"  {documents[doc_name]['summary']}\n"
-                    else:
-                        summary += f"  {doc_name}: [无摘要信息]\n"
-            
-            return summary
+        
         
         # 只读取相关村的文件
         with open(r'agents\data.json', 'r', encoding = 'utf-8') as f:

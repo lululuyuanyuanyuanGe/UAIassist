@@ -15,6 +15,13 @@ from utilities.message_process import build_BaseMessage_type, filter_out_system_
 from utilities.file_process import (read_txt_file, 
                                     process_excel_files_with_chunking)
 from utilities.modelRelated import invoke_model
+from utilities.html_generator import (
+    extract_empty_row_html_code_based,
+    extract_headers_html_code_based,
+    extract_footer_html_code_based,
+    transform_data_to_html_code_based,
+    combine_html_parts
+)
 import uuid
 import json
 import os
@@ -25,6 +32,7 @@ from pathlib import Path
 import gradio as gr
 from dotenv import load_dotenv
 import re
+import csv
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
@@ -83,10 +91,10 @@ class FilloutTableAgent:
         # Add nodes
         graph.add_node("combine_data_split_into_chunks", self._combine_data_split_into_chunks)
         graph.add_node("generate_CSV_based_on_combined_data", self._generate_CSV_based_on_combined_data)
-        graph.add_node("transform_data_to_html", self._transform_data_to_html)
-        graph.add_node("extract_empty_row_html", self._extract_empty_row_html)
-        graph.add_node("extract_headers_html", self._extract_headers_html)
-        graph.add_node("extract_footer_html", self._extract_footer_html)
+        graph.add_node("transform_data_to_html", self._transform_data_to_html_code_based)  # Use code-based function
+        graph.add_node("extract_empty_row_html", self._extract_empty_row_html_code_based)
+        graph.add_node("extract_headers_html", self._extract_headers_html_code_based)
+        graph.add_node("extract_footer_html", self._extract_footer_html_code_based)
         graph.add_node("combine_html_tables", self._combine_html_tables)
         graph.add_node("shield_for_transform_data_to_html", self._shield_for_transform_data_to_html)
         
@@ -148,7 +156,7 @@ class FilloutTableAgent:
         try:
             # Get Excel file paths from state
             excel_file_paths = []
-            print(f"📋 开始处理 {len(state['data_file_path'])} 个数据文件")
+            print(f"📋 开始处理 {len(state["data_file_path"])} 个数据文件")
             
             # Convert data files to Excel paths if they're not already
             for file_path in state["data_file_path"]:
@@ -404,284 +412,38 @@ class FilloutTableAgent:
             "CSV_data": sorted_results
         }
     
-    def _extract_empty_row_html(self, state: FilloutTableState) -> FilloutTableState:
-        """提取模板表格中的空行html代码"""
-        template_file_content = read_txt_file(state["template_file"])
-        system_prompt = """你是一个专业的HTML表格模板分析专家。
-
-【任务目标】
-从Excel表格的HTML模板中提取出表示空白数据行的HTML代码。
-
-【提取规则】
-1. 识别模板中用于填写数据的空白行（通常包含<br/>或空白内容）,只需要识别出一个
-2. 清理掉任何已填入的示例数据，只保留空白行结构
-3. 保持原始HTML标签结构和属性不变
-4. 忽略表头、标题行、结尾行等非数据行
-
-【输出要求】
-- 仅输出纯HTML代码，不要包裹在```html```中
-- 不要输出任何解释、注释或其他文本
-- 确保输出的HTML代码格式正确且可直接使用
-- 如果有多个空白行只需要输出一个
-
-【示例】
-输入HTML模板包含：
-<tr>
-<td>1</td>
-<td>张三</td>
-<td>男</td>
-<td>25</td>
-</tr>
-<tr>
-<td>2</td>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-</tr>
-
-应该输出：
-<tr>
-<td></td>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-</tr>
-有时输入的html模板中没有空白行，你需要根据表头来构建空白行，规则非常简单，只需要把表头中的每个字段都填充为<br/>即可
-        """
-        response = invoke_model(
-            model_name="deepseek-ai/DeepSeek-V3",
-            messages=[SystemMessage(content=system_prompt), HumanMessage(content=template_file_content)]
-        )
-        return {"empty_row_html": response}
-        
-
-    def _extract_headers_html(self, state: FilloutTableState) -> FilloutTableState:
-        """提取出html模板表格的表头html代码"""
-        system_prompt = """你是一个专业的HTML表格模板分析专家。
-
-【任务目标】
-从Excel表格的HTML模板中提取出表头部分的HTML代码（从开始到第一个空白数据行之前的所有内容）。
-
-【提取规则】
-1. 包含HTML文档的开始标签（<html><body><table>）
-2. 包含所有列组定义（<colgroup>）
-3. 包含表格标题行（通常使用colspan的标题）
-4. 包含表格列头行（定义各列名称）
-5. 停止在第一个空白数据行之前
-6. 保持原始HTML标签结构和属性不变
-
-【输出要求】
-- 仅输出纯HTML代码，不要包裹在```html```中
-- 不要输出任何解释、注释或其他文本
-- 确保输出的HTML代码格式正确且可直接使用
-- 一定不要自动补全，例如<table>标签，不要加上</table>标签
-
-【示例】
-输入HTML模板包含：
-<html><body><table>
-<colgroup></colgroup>
-<colgroup></colgroup>
-<colgroup></colgroup>
-<tr>
-<td colspan="3">员工信息表</td>
-</tr>
-<tr>
-<td>姓名</td>
-<td>年龄</td>
-<td>部门</td>
-</tr>
-<tr>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-</tr>
-<tr>
-<td colspan="3">制表人：XXX</td>
-</tr>
-</table></body></html>
-
-应该输出：
-<html><body><table>
-<colgroup></colgroup>
-<colgroup></colgroup>
-<colgroup></colgroup>
-<tr>
-<td colspan="3">员工信息表</td>
-</tr>
-<tr>
-<td>姓名</td>
-<td>年龄</td>
-<td>部门</td>
-</tr>
-        """
-        template_file_content = read_txt_file(state["template_file"])
-        response = invoke_model(
-            model_name="deepseek-ai/DeepSeek-V3",
-            messages=[SystemMessage(content=system_prompt), HumanMessage(content=template_file_content)]
-        )
-        return {"headers_html": response}
-    
-    def _extract_footer_html(self, state: FilloutTableState) -> FilloutTableState:
-        """提取出html模板表格的结尾html代码"""
-        system_prompt = """你是一个专业的HTML表格模板分析专家。
-
-【任务目标】
-从Excel表格的HTML模板中提取出页脚部分的HTML代码（从最后一个数据行之后到HTML文档结束的所有内容）。
-
-【提取规则】
-1. 识别最后一个数据行（空白行）的位置
-2. 提取该行之后的所有内容
-3. 通常包含签名行、统计行、审核信息等
-4. 包含HTML文档的结束标签（</table></body></html>）
-5. 保持原始HTML标签结构和属性不变
-
-【输出要求】
-- 仅输出纯HTML代码，不要包裹在```html```中
-- 不要输出任何解释、注释或其他文本
-- 确保输出的HTML代码格式正确且可直接使用
-
-【示例】
-输入HTML模板包含：
-<html><body><table>
-<colgroup></colgroup>
-<colgroup></colgroup>
-<colgroup></colgroup>
-<tr>
-<td colspan="3">员工信息表</td>
-</tr>
-<tr>
-<td>姓名</td>
-<td>年龄</td>
-<td>部门</td>
-</tr>
-<tr>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-</tr>
-<tr>
-<td colspan="3">制表人：XXX审核人：YYY</td>
-</tr>
-</table></body></html>
-
-应该输出：
-<tr>
-<td colspan="3">制表人：XXX审核人：YYY</td>
-</tr>
-</table></body></html>
-        """
-        template_file_content = read_txt_file(state["template_file"])
-        print("模板文件内容：", template_file_content)
-        response = invoke_model(
-            model_name="deepseek-ai/DeepSeek-V3",
-            messages=[SystemMessage(content=system_prompt), HumanMessage(content=template_file_content)]
-        )
-        return {"footer_html": response}
-    
-    def _shield_for_transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
-        """屏蔽transform_data_to_html的执行"""
-        print("\n🔄 开始执行: _shield_for_transform_data_to_html")
-        print("=" * 50)
-        print("摘取到的表头：", state["headers_html"])
-        print("摘取到的表尾：", state["footer_html"])
-        print("摘取到的空白行：", state["empty_row_html"])
-        return state
-    
-
-    def _transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
-        """将数据转换为html代码"""
-        # return state
-        system_prompt = """你是一个专业的HTML表格数据处理和美化专家。你需要将CSV数据填入HTML模板中，并为表格添加现代化的CSS样式装饰，使其美观专业。
-
-【核心任务】
-1. 将提供的CSV数据准确填入HTML模板
-2. 为表格添加现代化的CSS样式，提升视觉效果
-
-【美化设计原则】
-- 简洁现代：采用简约设计风格，避免过度装饰
-- 清晰易读：确保文字清晰，对比度良好
-- 专业美观：适合正式场合的表格样式
-- 响应式友好：适配不同屏幕尺寸
-
-【CSS样式要求】
-请为表格添加以下样式特性：
-1. **边框设计**: 细线边框，统一颜色，圆角设计
-2. **间距优化**: 合适的内边距(padding)和行高(line-height)
-3. **字体设置**: 清晰易读的字体族，合适的字体大小
-4. **颜色搭配**: 
-   - 表头：优雅的背景色(如#f8f9fa或#e9ecef)
-   - 数据行：交替行颜色或统一浅色背景
-   - 文字：深色文字确保可读性
-5. **对齐方式**: 文本居中或左对齐，保持一致性
-6. **悬停效果**: 鼠标悬停时的高亮效果
-7. **阴影效果**: 轻微的box-shadow增加立体感
-8. **宽度控制**: 表格宽度自适应，列宽均匀分布
-
-【输出要求】
-- 仅输出完整的HTML代码，包含内联CSS样式
-- 不要输出任何解释、注释或其他文本
-- 不要包裹在```html```中
-- CSS样式使用内联style或<style>标签
-- 确保数据填入准确无误
-
-【示例】
-输入数据：1,张三,男,汉族,123456,1990-01-01,无
-输入模板：
-<tr>
-<td>1</td>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-<td><br/></td>
-</tr>
-
-输出结果：
-<tr style="background-color: #ffffff; transition: background-color 0.3s ease;">
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">张三</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">男</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">汉族</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">123456</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">1990-01-01</td>
-<td style="padding: 12px 15px; border: 1px solid #ddd; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #333;">无</td>
-</tr>
-
-【特别注意】
-- 保持数据的准确性，不得修改或遗漏任何数据
-- CSS样式要统一一致，所有单元格使用相同的样式
-- 确保输出的HTML在浏览器中能正确显示和美观呈现
-        """
-        
+    def _extract_empty_row_html_code_based(self, state: FilloutTableState) -> FilloutTableState:
+        """提取模板表格中的空行html代码 - 基于代码的高效实现"""
         try:
-            # Read CSV data
+            empty_row_html = extract_empty_row_html_code_based(state["template_file"])
+            return {"empty_row_html": empty_row_html}
+        except Exception as e:
+            print(f"❌ _extract_empty_row_html_code_based 执行失败: {e}")
+            return {"empty_row_html": ""}
+
+    def _extract_headers_html_code_based(self, state: FilloutTableState) -> FilloutTableState:
+        """提取出html模板表格的表头html代码 - 基于代码的高效实现"""
+        try:
+            headers_html = extract_headers_html_code_based(state["template_file"])
+            return {"headers_html": headers_html}
+        except Exception as e:
+            print(f"❌ _extract_headers_html_code_based 执行失败: {e}")
+            return {"headers_html": ""}
+
+    def _extract_footer_html_code_based(self, state: FilloutTableState) -> FilloutTableState:
+        """提取出html模板表格的结尾html代码 - 基于代码的高效实现"""
+        try:
+            footer_html = extract_footer_html_code_based(state["template_file"])
+            return {"footer_html": footer_html}
+        except Exception as e:
+            print(f"❌ _extract_footer_html_code_based 执行失败: {e}")
+            return {"footer_html": ""}
+
+    def _transform_data_to_html_code_based(self, state: FilloutTableState) -> FilloutTableState:
+        """将数据转换为html代码 - 基于代码的高效实现"""
+        try:
+            # Read CSV data file path
             csv_file_path = f"conversations/{state['session_id']}/CSV_files/synthesized_table_with_only_data.csv"
-            print(f"📄 读取CSV文件: {csv_file_path}")
-            
-            with open(csv_file_path, 'r', encoding='utf-8') as file:
-                csv_data = file.read().strip().split('\n')
-            
-            print(f"📊 CSV数据行数: {len(csv_data)}")
-            
-            # Dynamically adjust chunking based on data size
-            max_chunks = 15  # Maximum number of chunks we want to create
-            total_rows = len(csv_data)
-            
-            if total_rows <= max_chunks:
-                # If we have fewer rows than max chunks, create one chunk per row
-                chunks = [[row] for row in csv_data]
-                print(f"📦 数据行数({total_rows})小于等于最大分块数({max_chunks})，创建 {len(chunks)} 个单行分块")
-            else:
-                # If we have more rows than max chunks, distribute evenly
-                chunk_size = max(1, total_rows // max_chunks)
-                chunks = [csv_data[i:i + chunk_size] for i in range(0, total_rows, chunk_size)]
-                print(f"📦 数据行数({total_rows})大于最大分块数({max_chunks})，创建 {len(chunks)} 个分块，每块约 {chunk_size} 行")
-            
-            # Dynamically adjust max_workers based on actual number of chunks
-            max_workers = min(15, len(chunks))
-            print(f"🚀 将创建 {len(chunks)} 个并行LLM调用任务")
-            print(f"👥 使用 {max_workers} 个并发工作者")
             
             # Get empty row HTML template from state
             empty_row_html = state.get("empty_row_html", "")
@@ -689,233 +451,71 @@ class FilloutTableAgent:
                 print("⚠️ 未找到空行HTML模板")
                 return {"filled_row": ""}
             
-            def process_single_chunk(chunk_data):
-                """处理单个chunk的函数"""
-                chunk, index = chunk_data
-                try:
-                    # Join chunk data with newlines
-                    chunk_csv = '\n'.join(chunk)
-                    
-                    user_input = f"""
-                    代填数据：
-                    {chunk_csv}
-                    html模板：
-                    {empty_row_html}
-                    """
-                    
-                    print(f"🤖 Processing chunk {index + 1}/{len(chunks)}...")
-                    response = invoke_model(
-                        model_name="deepseek-ai/DeepSeek-V3", 
-                        messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                        temperature=0.2
-                    )
-                    print(f"✅ Completed chunk {index + 1}")
-                    return (index, response)
-                except Exception as e:
-                    print(f"❌ Error processing chunk {index + 1}: {e}")
-                    return (index, f"Error processing chunk {index + 1}: {e}")
+            # Use the utility function to transform data
+            filled_row_html = transform_data_to_html_code_based(
+                csv_file_path=csv_file_path,
+                empty_row_html=empty_row_html,
+                session_id=state["session_id"]
+            )
             
-            # Prepare chunk data with indices
-            chunks_with_indices = [(chunk, i) for i, chunk in enumerate(chunks)]
-            
-            if not chunks_with_indices:
-                print("⚠️ 没有数据块需要处理")
-                return {"filled_row": ""}
-            
-            print(f"🚀 开始并发处理 {len(chunks_with_indices)} 个数据块...")
-            
-            # Use ThreadPoolExecutor for concurrent processing
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-            
-            results = {}
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all tasks
-                future_to_index = {executor.submit(process_single_chunk, chunk_data): chunk_data[1] 
-                                  for chunk_data in chunks_with_indices}
-                print(f"✅ 已提交 {len(future_to_index)} 个并发任务")
-                
-                # Collect results as they complete
-                completed_count = 0
-                for future in as_completed(future_to_index):
-                    try:
-                        index, response = future.result()
-                        results[index] = response
-                        completed_count += 1
-                        print(f"✅ 完成第 {completed_count}/{len(chunks_with_indices)} 个任务")
-                    except Exception as e:
-                        index = future_to_index[future]
-                        print(f"❌ 第 {index + 1} 个数据块处理异常: {e}")
-                        results[index] = f"数据块 {index + 1} 处理异常: {e}"
-            
-            # Sort results by index and combine into single HTML string
-            sorted_results = [results[i] for i in sorted(results.keys())]
-            combined_html = '\n'.join(sorted_results)
-            
-            print(f"🎉 成功并发处理 {len(sorted_results)} 个数据块")
-            print(f"📄 合并后HTML长度: {len(combined_html)} 字符")
-            
-            print("✅ _transform_data_to_html 执行完成")
-            print("=" * 50)
-            
-            return {"filled_row": combined_html}
+            return {"filled_row": filled_row_html}
             
         except Exception as e:
-            print(f"❌ _transform_data_to_html 执行失败: {e}")
+            print(f"❌ _transform_data_to_html_code_based 执行失败: {e}")
             import traceback
             print(f"错误详情: {traceback.format_exc()}")
             return {"filled_row": ""}
     
     def _combine_html_tables(self, state: FilloutTableState) -> FilloutTableState:
         """将表头，数据，表尾html整合在一起，并添加全局美化样式"""
-        
-        print("\n🔄 开始执行: _combine_html_tables")
+        try:
+            # 获取各部分HTML
+            headers_html = state.get("headers_html", "")
+            data_html = state.get("filled_row", "")
+            footer_html = state.get("footer_html", "")
+            
+            # Use the utility function to combine HTML parts
+            combined_html = combine_html_parts(
+                headers_html=headers_html,
+                data_html=data_html,
+                footer_html=footer_html
+            )
+            
+            # 保存到文件
+            output_path = f"conversations/{state['session_id']}/output/combined_html.html"
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as file:
+                file.write(combined_html)
+            
+            print(f"✅ 美化表格已保存到: {output_path}")
+            
+            return {"combined_html": combined_html}
+        except Exception as e:
+            print(f"❌ _combine_html_tables 执行失败: {e}")
+            import traceback
+            print(f"错误详情: {traceback.format_exc()}")
+            return {"combined_html": ""}
+    
+    def _shield_for_transform_data_to_html(self, state: FilloutTableState) -> FilloutTableState:
+        """Shield node for transform_data_to_html"""
+        print("\n🔄 开始执行: _shield_for_transform_data_to_html")
         print("=" * 50)
         
-        # 获取各部分HTML
-        headers_html = state.get("headers_html", "")
-        data_html = state.get("filled_row", "")
-        footer_html = state.get("footer_html", "")
-        
-        # 创建完整的HTML文档，包含全局样式
-        complete_html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>表格报告</title>
-    <style>
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-            line-height: 1.6;
-        }}
-        
-        .table-container {{
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            margin: 0 auto;
-            max-width: 1200px;
-            padding: 20px;
-        }}
-        
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background-color: white;
-        }}
-        
-        /* 表头样式 */
-        table tr:first-child td {{
-            background-color: #2c3e50 !important;
-            color: white !important;
-            font-weight: bold;
-            text-align: center;
-            padding: 15px 12px;
-            font-size: 16px;
-        }}
-        
-        /* 列头样式 */
-        table tr:nth-child(2) td,
-        table tr:nth-child(3) td {{
-            background-color: #34495e !important;
-            color: white !important;
-            font-weight: 600;
-            text-align: center;
-            padding: 12px 10px;
-            font-size: 14px;
-        }}
-        
-        /* 数据行样式 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child) {{
-            background-color: #ffffff;
-        }}
-        
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child):nth-child(even) {{
-            background-color: #f8f9fa;
-        }}
-        
-        /* 数据单元格样式 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) td {{
-            padding: 12px 15px;
-            border: 1px solid #dee2e6;
-            text-align: center;
-            font-size: 14px;
-            color: #333;
-            transition: background-color 0.3s ease;
-        }}
-        
-        /* 悬停效果 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):hover {{
-            background-color: #e3f2fd !important;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        
-        /* 页脚样式 */
-        table tr:last-child td {{
-            background-color: #ecf0f1 !important;
-            color: #2c3e50 !important;
-            font-weight: 500;
-            padding: 15px 12px;
-            font-size: 13px;
-            border-top: 2px solid #bdc3c7;
-        }}
-        
-        /* 响应式设计 */
-        @media (max-width: 768px) {{
-            .table-container {{
-                padding: 10px;
-                margin: 10px;
-            }}
+        try:
+            # Ensure all required components are available
+            if not state["CSV_data"] or not state["empty_row_html"] or not state["headers_html"] or not state["footer_html"]:
+                print("❌ 缺少必要组件，无法转换为HTML")
+                return state
             
-            table td {{
-                padding: 8px 6px;
-                font-size: 12px;
-            }}
-            
-            table tr:first-child td {{
-                font-size: 14px;
-            }}
-        }}
+            print("✅ _shield_for_transform_data_to_html 执行完成")
+            print("=" * 50)
+            return state
         
-        /* 打印样式 */
-        @media print {{
-            body {{
-                background-color: white;
-                padding: 0;
-            }}
-            
-            .table-container {{
-                box-shadow: none;
-                border: 1px solid #ccc;
-            }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="table-container">
-        {headers_html}
-        {data_html}
-        {footer_html}
-    </div>
-</body>
-</html>"""
-        
-        # 保存到文件
-        output_path = f"conversations/{state['session_id']}/output/combined_html.html"
-        with open(output_path, "w", encoding="utf-8") as file:
-            file.write(complete_html)
-        
-        print(f"✅ 美化表格已保存到: {output_path}")
-        print("✅ _combine_html_tables 执行完成")
-        print("=" * 50)
-        
-        return {"combined_html": complete_html}
+        except Exception as e:
+            print(f"❌ _shield_for_transform_data_to_html 执行失败: {e}")
+            import traceback
+            print(f"错误详情: {traceback.format_exc()}")
+            return state
     
     def run_fillout_table_agent(self, session_id: str,
                                 template_file: str,
