@@ -511,4 +511,4 @@ graph = frontdesk_agent.graph
 
 if __name__ == "__main__":
     frontdesk_agent = FrontdeskAgent()
-    frontdesk_agent.run_frontdesk_agent(village_name="燕云村")
+    frontdesk_agent.run_frontdesk_agent(village_name="七田村")
