@@ -228,6 +228,9 @@ system_message = SystemMessage(content="""
 
 """)
 
+# Next add the prompt to generate the subtitle and the footer
+
+
 
 
 message = [system_message, human_message]
