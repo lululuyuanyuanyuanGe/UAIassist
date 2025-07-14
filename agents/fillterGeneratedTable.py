@@ -50,6 +50,12 @@ from agents.filloutTable import FilloutTableAgent
 
 class FillterGeneratedTableState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    table_structure: str
+    user_requirement: str
+    village_name: str
+    session_id: str
+    route_decision: str
+
 
 
 class FillterGeneratedTableAgent:
@@ -73,12 +79,18 @@ class FillterGeneratedTableAgent:
 
     def _collect_user_requirement(self, state: FillterGeneratedTableState) -> FillterGeneratedTableState:
         """这个节点用于收集用户的需求"""
+        ai_message = AIMessage(content="你对表格生成结果满意吗？要做修改吗？")
         process_user_input_agent = ProcessUserInputAgent()
-        process_user_input_agent.run_process_user_input_agent(state["messages"])
-        return state
+        final_state = process_user_input_agent.run_process_user_input_agent(session_id=state["session_id"], 
+                                                              previous_AI_messages=[ai_message], 
+                                                              current_node="modify_generated_table", 
+                                                              village_name=state["village_name"])
+        return {"route_decision": final_state["next_node"]}
     
     def _route_after_collect_user_requirement(self, state: FillterGeneratedTableState) -> str:
         """这个节点用于路由到下一个节点"""
+        sends = []
+        if state["route_decision"] == "reconstruct_table_structure":
         sends = []
         sends.append(Send("modify_template", state))
         sends.append(Send("generate_code_to_filter_csv_data", state))
@@ -96,7 +108,7 @@ class FillterGeneratedTableAgent:
         你是一个经验丰富的数据分析师，现在需要你根据用户的需求，生成代码在synthesized_table.csv中过滤数据。
         用户的需求是：{state["user_requirement"]}
         """
-        response = invoke_model(model="deepseek-ai/DeepSeek-V3")
+        response = invoke_model(model="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=state["user_requirement"])])
 
     def _execute_code_to_filter_csv_data(self, state: FillterGeneratedTableState) -> FillterGeneratedTableState:
         """这个节点用于执行代码在synthesized_table.csv中过滤数据"""

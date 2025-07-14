@@ -256,7 +256,7 @@ class DesignExcelAgent:
         
         # 保存HTML模板到文件
         html_filename = f"{state['village_name']}_表格模板_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        html_path = Path(f"conversations/{state['session_id']}/user_uploaded_files/") / html_filename
+        html_path = Path(f"conversations/{state['session_id']}/user_uploaded_files/template/") / html_filename
         
         try:
             # Ensure directory exists

@@ -567,6 +567,7 @@ def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, s
 def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> str:
     """
     Combine HTML parts with enhanced modern styling.
+    Dynamically detects header structure instead of assuming fixed levels.
     
     Args:
         headers_html: HTML for headers
@@ -580,6 +581,101 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
     print("=" * 50)
     
     try:
+        # Parse headers to detect actual header structure
+        header_row_count = 0
+        if headers_html:
+            soup = BeautifulSoup(headers_html, 'html.parser')
+            table = soup.find('table')
+            if table:
+                rows = table.find_all('tr')
+                header_row_count = len(rows)
+                print(f"📋 检测到 {header_row_count} 行表头")
+        
+        # Generate dynamic CSS for headers based on actual structure
+        header_css_rules = []
+        
+        if header_row_count > 0:
+            # First row (main title) - always dark blue
+            header_css_rules.append(f"""
+        /* 主标题行 */
+        table tr:first-child td {{
+            background-color: #2c3e50 !important;
+            color: white !important;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            padding: 18px 15px;
+            border: 1px solid #2c3e50;
+            border-right: 2px solid #1a252f;
+        }}
+        
+        table tr:first-child td:last-child {{
+            border-right: 1px solid #2c3e50;
+        }}""")
+        
+        if header_row_count > 1:
+            # Second row (category headers) - medium dark blue
+            header_css_rules.append(f"""
+        /* 分类标题行 */
+        table tr:nth-child(2) td {{
+            background-color: #34495e !important;
+            color: white !important;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+            padding: 14px 12px;
+            border: 1px solid #34495e;
+            border-right: 2px solid #2c3e50;
+        }}
+        
+        table tr:nth-child(2) td:last-child {{
+            border-right: 1px solid #34495e;
+        }}""")
+        
+        if header_row_count > 2:
+            # Third row (field headers) - light gray
+            header_css_rules.append(f"""
+        /* 字段标题行 */
+        table tr:nth-child(3) td {{
+            background-color: #ecf0f1 !important;
+            color: #2c3e50 !important;
+            font-weight: 600;
+            font-size: 13px;
+            text-align: center;
+            padding: 12px 10px;
+            border: 1px solid #bdc3c7;
+            border-right: 2px solid #95a5a6;
+        }}
+        
+        table tr:nth-child(3) td:last-child {{
+            border-right: 1px solid #bdc3c7;
+        }}""")
+        
+        # For additional header rows (if any), apply similar styling
+        if header_row_count > 3:
+            for i in range(4, header_row_count + 1):
+                header_css_rules.append(f"""
+        /* 第{i}行表头 */
+        table tr:nth-child({i}) td {{
+            background-color: #f8f9fa !important;
+            color: #2c3e50 !important;
+            font-weight: 600;
+            font-size: 13px;
+            text-align: center;
+            padding: 12px 10px;
+            border: 1px solid #bdc3c7;
+            border-right: 2px solid #95a5a6;
+        }}
+        
+        table tr:nth-child({i}) td:last-child {{
+            border-right: 1px solid #bdc3c7;
+        }}""")
+        
+        # Generate selector for data rows (everything after header rows)
+        data_row_selector = f"table tr:nth-child(n+{header_row_count + 1}):not(:last-child)"
+        if header_row_count == 0:
+            data_row_selector = "table tr:not(:last-child)"
+        
         # Create complete HTML document with professional formal styling
         complete_html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -629,141 +725,41 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             font-size: 14px;
         }}
         
-        /* 表头样式 - 主标题 */
-        table tr:first-child td {{
-            background-color: #2c3e50 !important;
-            color: white !important;
-            font-weight: 600;
-            font-size: 16px;
-            text-align: center;
-            padding: 18px 15px;
-            border: 1px solid #2c3e50;
-            border-right: 2px solid #1a252f;
-        }}
-        
-        table tr:first-child td:last-child {{
-            border-right: 1px solid #2c3e50;
-        }}
-        
-        /* 分类标题行 */
-        table tr:nth-child(2) td {{
-            background-color: #34495e !important;
-            color: white !important;
-            font-weight: 600;
-            font-size: 14px;
-            text-align: center;
-            padding: 14px 12px;
-            border: 1px solid #34495e;
-            border-right: 2px solid #2c3e50;
-        }}
-        
-        table tr:nth-child(2) td:last-child {{
-            border-right: 1px solid #34495e;
-        }}
-        
-        /* 字段标题行 */
-        table tr:nth-child(3) td {{
-            background-color: #ecf0f1 !important;
-            color: #2c3e50 !important;
-            font-weight: 600;
-            font-size: 13px;
-            text-align: center;
-            padding: 12px 10px;
-            border: 1px solid #bdc3c7;
-            border-right: 2px solid #95a5a6;
-        }}
-        
-        table tr:nth-child(3) td:last-child {{
-            border-right: 1px solid #bdc3c7;
-        }}
+        {chr(10).join(header_css_rules)}
         
         /* 数据行基础样式 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child) {{
+        {data_row_selector} {{
             background-color: white;
             transition: background-color 0.2s ease;
         }}
         
         /* 交替行颜色 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):not(:last-child):nth-child(even) {{
+        {data_row_selector}:nth-child(even) {{
             background-color: #f8f9fa;
         }}
         
-        /* 数据单元格样式 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) td {{
-            padding: 12px 15px;
-            border: 1px solid #dee2e6;
-            text-align: center;
-            font-size: 13px;
-            color: #495057;
-            font-weight: 400;
-            vertical-align: middle;
-        }}
-        
-        /* 第一列特殊样式 - 序号列 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) td:first-child {{
-            background-color: #f1f3f4;
-            font-weight: 500;
-            color: #5f6368;
-            border-right: 2px solid #dadce0;
-        }}
-        
         /* 数据行悬停效果 */
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):hover {{
-            background-color: #e8f4f8 !important;
+        {data_row_selector}:hover {{
+            background-color: #e3f2fd;
         }}
         
-        table tr:not(:first-child):not(:nth-child(2)):not(:nth-child(3)):hover td {{
-            color: #1a73e8;
+        /* 数据单元格样式 */
+        {data_row_selector} td {{
+            padding: 12px 10px;
+            text-align: left;
+            border: 1px solid #e0e0e0;
+            font-size: 13px;
+            color: #333;
+            font-weight: 400;
+            vertical-align: top;
         }}
         
-        /* 页脚样式 */
+        /* 底部边框增强 */
         table tr:last-child td {{
-            background-color: #f8f9fa !important;
-            color: #495057 !important;
-            font-weight: 500;
-            padding: 15px 12px;
-            font-size: 12px;
-            border-top: 2px solid #dee2e6;
-            text-align: center;
-        }}
-        
-        /* 表格外边框 */
-        table {{
-            border: 2px solid #2c3e50;
-        }}
-        
-        /* 水平滚动条样式 */
-        .table-wrapper::-webkit-scrollbar {{
-            height: 12px;
-        }}
-        
-        .table-wrapper::-webkit-scrollbar-track {{
-            background: #f1f1f1;
-            border-radius: 6px;
-        }}
-        
-        .table-wrapper::-webkit-scrollbar-thumb {{
-            background: #c1c1c1;
-            border-radius: 6px;
-            border: 2px solid #f1f1f1;
-        }}
-        
-        .table-wrapper::-webkit-scrollbar-thumb:hover {{
-            background: #a8a8a8;
-        }}
-        
-        .table-wrapper::-webkit-scrollbar-corner {{
-            background: #f1f1f1;
+            border-bottom: 2px solid #2c3e50;
         }}
         
         /* 响应式设计 */
-        @media (max-width: 1200px) {{
-            .table-container {{
-                padding: 20px;
-                margin: 15px;
-            }}
-        }}
-        
         @media (max-width: 768px) {{
             body {{
                 padding: 15px 10px;
@@ -771,58 +767,56 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             
             .table-container {{
                 padding: 15px;
-                margin: 10px;
-                border-radius: 6px;
-            }}
-            
-            .table-wrapper {{
-                border-radius: 4px;
             }}
             
             table {{
                 min-width: 600px;
+                font-size: 13px;
             }}
             
-            table td {{
-                padding: 8px 6px;
-                font-size: 11px;
-            }}
-            
-            table tr:first-child td {{
-                font-size: 14px;
-                padding: 15px 10px;
-            }}
-            
-            table tr:nth-child(2) td {{
+            {data_row_selector} td {{
+                padding: 10px 8px;
                 font-size: 12px;
-                padding: 12px 8px;
-            }}
-            
-            table tr:nth-child(3) td {{
-                font-size: 11px;
-                padding: 10px 6px;
             }}
         }}
         
         @media (max-width: 480px) {{
+            body {{
+                padding: 10px 5px;
+            }}
+            
             .table-container {{
                 padding: 10px;
-                margin: 5px;
             }}
             
             table {{
                 min-width: 500px;
-            }}
-            
-            table td {{
-                padding: 6px 4px;
-                font-size: 10px;
-            }}
-            
-            table tr:first-child td {{
                 font-size: 12px;
-                padding: 12px 8px;
             }}
+            
+            {data_row_selector} td {{
+                padding: 8px 6px;
+                font-size: 11px;
+            }}
+        }}
+        
+        /* 自定义滚动条 */
+        .table-wrapper::-webkit-scrollbar {{
+            height: 8px;
+        }}
+        
+        .table-wrapper::-webkit-scrollbar-track {{
+            background: #f1f1f1;
+            border-radius: 4px;
+        }}
+        
+        .table-wrapper::-webkit-scrollbar-thumb {{
+            background: #c1c1c1;
+            border-radius: 4px;
+        }}
+        
+        .table-wrapper::-webkit-scrollbar-thumb:hover {{
+            background: #a8a8a8;
         }}
         
         /* 打印样式 */
@@ -834,44 +828,12 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
             
             .table-container {{
                 box-shadow: none;
-                border: 1px solid #000;
-                background: white;
+                border: none;
                 padding: 0;
-                width: 100%;
-            }}
-            
-            .table-wrapper {{
-                overflow: visible;
             }}
             
             table {{
-                border: 1px solid #000;
                 min-width: auto;
-                width: 100%;
-            }}
-            
-            table td {{
-                border: 1px solid #000;
-            }}
-            
-            table tr:hover {{
-                background: white !important;
-            }}
-        }}
-        
-        /* 轻微的入场动画 */
-        .table-container {{
-            animation: fadeIn 0.3s ease-out;
-        }}
-        
-        @keyframes fadeIn {{
-            from {{
-                opacity: 0;
-                transform: translateY(10px);
-            }}
-            to {{
-                opacity: 1;
-                transform: translateY(0);
             }}
         }}
     </style>
@@ -887,8 +849,7 @@ def combine_html_parts(headers_html: str, data_html: str, footer_html: str) -> s
 </body>
 </html>"""
         
-        print(f"✅ 成功合并HTML文档 - 应用正式专业设计")
-        print(f"📄 总长度: {len(complete_html)} 字符")
+        print(f"✅ 生成完整HTML文档 (表头行数: {header_row_count})")
         print("✅ combine_html_parts 执行完成")
         print("=" * 50)
         

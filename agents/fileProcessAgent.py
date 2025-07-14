@@ -501,6 +501,7 @@ class FileProcessAgent:
                 file_content = source_path.read_text(encoding='utf-8')
                 file_content = file_content[:2000] if len(file_content) > 2000 else file_content
                 file_name = extract_filename(table_file)
+                print(f"🔍 表格文件名: {file_name}")
                 
                 # Determine location for this file
                 location = state["village_name"]
@@ -509,7 +510,7 @@ class FileProcessAgent:
                 json_template = '''{{
   "{file_name}": {{
     "表格结构": {{
-      "顶层表头名称": {{
+      "顶层表头名称或标题": {{
         "二级表头名称": [
           "字段1",
           "字段2",
@@ -527,22 +528,36 @@ class FileProcessAgent:
 
                 system_prompt = f"""你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
 
-1. 提取表格的多级表头结构；
+【重要要求】
+1. 必须使用指定的文件名称 "{file_name}" 作为JSON输出的根键名，不要修改或变更此名称；
+2. 必须提取完整的表格结构，包括表格标题、所有层级的表头信息；
+
+【具体任务】
+1. 提取表格的完整多级表头结构：
+   - 从表格标题开始，逐层提取所有表头信息；
    - 使用嵌套的 key-value 形式表示层级关系；
    - 每一级表头应以对象形式展示其子级字段或子表头；
+   - 确保包含表格的主标题、分类标题、字段标题等所有层级；
    - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
 
-2. 提供一个对该表格内容的简要总结；
+2. 提供一个对该表格内容的简要总结：
    - 内容应包括表格用途、主要信息类别、适用范围等；
    - 语言简洁，不超过 150 字；
 
-输出要求:
-返回内容不要包裹在```json中，直接返回json格式即可
+【输出要求】
+- 返回内容不要包裹在```json中，直接返回json格式即可；
+- JSON的根键名必须严格使用 "{file_name}"，不得更改；
+- 确保表格结构完整，从顶层标题到最底层字段都要包含；
+- 如果表格有多个层级，请确保层级关系清晰准确；
 
-输出格式如下：
+【输出格式】
+严格按照以下格式输出，其中 "{file_name}" 必须保持不变：
 {json_template}
 
-请忽略所有 HTML 样式标签，只关注表格结构和语义信息。
+请忽略所有 HTML 样式标签，只关注表格结构和语义信息。特别注意：
+- 表格标题通常在第一行，跨越多列
+- 分类表头通常在中间层级，可能有colspan属性
+- 字段表头通常在最底层，对应实际数据列
 
 文件内容:
 {file_content}"""

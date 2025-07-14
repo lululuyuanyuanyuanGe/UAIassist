@@ -872,12 +872,7 @@ def combine_chunk_content(chunk_pairs: list[tuple[str, str]], largest_structure_
     """
     chunk_combined = []
     
-    # 1. Add other files' complete content (already includes structure)
-    for other_content in other_files_content:
-        if other_content.strip():
-            chunk_combined.append(other_content)
-    
-    # 2. Add largest file structure + data chunk
+    # 1. Add largest file structure + data chunk as PRIMARY DATA SOURCE
     if chunk_pairs:
         largest_file_chunk_content = ""
         
@@ -885,8 +880,9 @@ def combine_chunk_content(chunk_pairs: list[tuple[str, str]], largest_structure_
         if largest_structure_info.strip():
             largest_file_chunk_content += largest_structure_info.strip() + "\n\n"
         
-        # Add data header and reconstruct the header+data format
-        largest_file_chunk_content += f"=== {largest_filename} 的表格数据 ===\n"
+        # Add data header with clear main data source label
+        largest_file_chunk_content += f"=== 核心数据源：{largest_filename} ===\n"
+        largest_file_chunk_content += "【说明】以下为主要数据源，请优先基于此数据进行合成和填充\n\n"
         
         # Reconstruct the alternating header+data format
         for header, data in chunk_pairs:
@@ -894,12 +890,24 @@ def combine_chunk_content(chunk_pairs: list[tuple[str, str]], largest_structure_
         
         chunk_combined.append(largest_file_chunk_content.rstrip())  # Remove trailing newline
     
-    # 3. Add supplement information last
+    # 2. Add other files' complete content as REFERENCE DATA
+    for other_content in other_files_content:
+        if other_content.strip():
+            # Add clear reference data label
+            reference_content = other_content.replace("=== ", "=== 参考数据源：")
+            reference_content = "【说明】以下为参考数据源，用于补充和验证核心数据源中的信息\n\n" + reference_content
+            chunk_combined.append(reference_content)
+    
+    # 3. Add supplement information as ADDITIONAL CONTEXT
     if supplement_files_summary:
+        supplement_content = ""
         if supplement_files_summary.strip().startswith("=== 补充文件内容 ==="):
-            chunk_combined.append(supplement_files_summary)
+            supplement_content = supplement_files_summary.replace("=== 补充文件内容 ===", "=== 补充信息和上下文 ===")
         else:
-            chunk_combined.append(f"=== 补充文件内容 ===\n{supplement_files_summary}")
+            supplement_content = f"=== 补充信息和上下文 ===\n{supplement_files_summary}"
+        
+        supplement_content = "【说明】以下为补充信息，用于理解业务背景和填充规则\n\n" + supplement_content
+        chunk_combined.append(supplement_content)
     
     return "\n\n".join(chunk_combined)
 
@@ -1173,8 +1181,13 @@ def _clean_csv_data(csv_data: str) -> str:
             if line and not line.startswith("==="):
                 cleaned_lines.append(line)
     
-    # Join the cleaned lines
-    return '\n'.join(cleaned_lines)
+    # Join the cleaned lines and apply LLM error message cleaning
+    initial_cleaned = '\n'.join(cleaned_lines)
+    
+    # Apply comprehensive error message cleaning
+    final_cleaned = clean_llm_error_messages(initial_cleaned)
+    
+    return final_cleaned
 
 def save_csv_to_output(csv_data_list: list[str], session_id: str = "1") -> str:
     """
@@ -1205,6 +1218,9 @@ def save_csv_to_output(csv_data_list: list[str], session_id: str = "1") -> str:
     
     # Combine all CSV data and clean up
     combined_csv = '\n'.join(csv_data_list)
+    
+    # Apply comprehensive error message cleaning first
+    # combined_csv = clean_llm_error_messages(combined_csv)
     
     # Remove unnecessary newlines and clean up the CSV content
     lines = combined_csv.split('\n')
@@ -1858,12 +1874,38 @@ def reconstruct_csv_with_headers(analysis_response: str, original_filename: str,
 【你的目标】
 请根据提供的表头结构，为每一行 CSV 数据补上一行其对应的表头信息，从而生成一个新的 CSV 文件，满足如下要求：
 
+【🚨 关键规则 - 必须严格遵守】
+当遇到以下任一情况时，**绝对不要输出任何内容**（包括解释、说明、注释等）：
+- 数据块不包含任何实际数据，只有表头行
+- 数据块数据不完整或格式错误  
+- 数据块只包含重复的表头信息，没有新的数据行
+- 数据行数量少于表头字段数量
+- 数据格式不符合CSV标准
+
+⚠️ **严禁输出解释性文字**：
+- 不要解释为什么跳过
+- 不要说明数据不完整
+- 不要输出"根据规则"等说明文字
+- 直接返回空白，什么都不要输出
+
+✅ **唯一允许的输出**：
+只有当数据块包含**完整且有效的CSV数据行**时，才输出标准的表头+数据格式。
+
 【输出要求】
 - 每一行数据的**上一行必须是该行对应的完整表头**；
 - 表头应严格按照原始结构中的**最底层字段顺序**排列；
 - 表头与数据的列数、顺序完全一致；
 - 输出结果为纯净的 CSV 格式（英文逗号分隔，每行以换行符结尾）；
-- 不要添加任何额外注释或解释性文本；
+- 严格禁止添加任何解释、注释或说明文字
+
+【判断标准】
+数据行的识别标准：
+✅ **有效数据行**：包含实际业务数据（如人名、数字、日期等具体信息）
+❌ **无效数据行**：
+  - 只包含字段名称的行
+  - 空行或只有逗号的行
+  - 重复的表头信息
+  - 格式错误或不完整的行
 
 【输入示例】
 表头结构格式如下：
@@ -1890,19 +1932,20 @@ CSV数据示例如下：
 csv数据1，csv数据2，csv数据3，...，csv数据10
 
 【输出示例】
-字段1,字段2,字段3,...,字段10  
-数据1,数据2,数据3,...,数据10  
-字段1,字段2,字段3,...,字段10  
-数据11,数据12,数据13,...,数据20  
-（如此类推）
+情况1 - 有有效数据时的输出：
+字段1,字段2,字段3,字段10
+数据1,数据2,数据3,数据10
+字段1,字段2,字段3,字段10
+数据11,数据12,数据13,数据20
 
-请注意：
-- 只需要处理"最底层字段"，无需在输出中包含中间层级表头；
-- 每一组字段必须严格对应一组数据，不要出现数据行与表头行不匹配的情况
-- 对于数据块中的表头行（判断标准为字段和表头结构完全一致），不要做任何处理，跳过这一行，处理下一行
-- 如果数据块里面只有表头行（判断标准为字段和表头结构完全一致），没有任何实际数据，直输出空值，不要输出任何其他的内容
-- 只有当数据块包含有效的CSV数据行时，才输出对应的表头+数据格式
-- 生成的表头行应保持一致性，始终与原始字段顺序匹配。
+情况2 - 无有效数据时的输出：
+（什么都不输出，完全空白）
+
+【🔥 最重要的要求】
+- 遇到无效数据时：**完全静默**，什么都不要输出
+- 不要解释原因，不要说明情况
+- 只在有完整有效数据时才输出CSV格式
+- 宁可什么都不输出，也不要输出错误或解释性内容
 """
                 
                 # Prepare input for this chunk using validated data
@@ -1960,6 +2003,9 @@ csv数据1，csv数据2，csv数据3，...，csv数据10
         # Join all chunks
         final_csv_content = '\n'.join(combined_csv)
         
+        # Apply comprehensive error message cleaning
+        final_csv_content = clean_llm_error_messages(final_csv_content)
+        
         # Save to CSV file
         csv_filename = Path(original_filename).stem + ".csv"
         csv_output_path = csv_output_dir / csv_filename
@@ -2000,3 +2046,234 @@ def extract_summary_for_each_file(file_content: dict) -> str:
                         summary += f"  {doc_name}: [无摘要信息]\n"
             
             return summary
+
+def clean_llm_error_messages(csv_content: str) -> str:
+    """
+    Clean LLM error messages and artifacts from CSV content.
+    
+    This function removes common LLM error messages, thinking process artifacts,
+    and other non-CSV content that might contaminate the output.
+    
+    Args:
+        csv_content: Raw CSV content string that may contain error messages
+        
+    Returns:
+        str: Cleaned CSV content with error messages removed
+    """
+    if not csv_content or not isinstance(csv_content, str):
+        return ""
+    
+    # Common LLM error messages and artifacts to remove
+    error_patterns = [
+        # Chinese error messages
+        r'（什么都不输出，完全空白）',
+        r'（什么都不输出，完全空白）',
+        r'完全静默',
+        r'什么都不输出',
+        r'根据规则.*不输出',
+        r'数据不完整.*跳过',
+        r'无有效数据.*跳过',
+        r'根据.*规则.*静默',
+        r'没有.*数据.*输出',
+        r'数据格式.*错误',
+        r'无法.*处理.*跳过',
+        r'遇到.*情况.*静默',
+        r'按照.*要求.*不输出',
+        
+        # English error messages
+        r'(?i)no output',
+        r'(?i)silent mode',
+        r'(?i)skip.*empty.*data',
+        r'(?i)invalid.*data.*format',
+        r'(?i)incomplete.*data.*skip',
+        r'(?i)according.*rules.*silent',
+        r'(?i)data.*incomplete.*skip',
+        r'(?i)no.*valid.*data',
+        r'(?i)error.*processing.*skip',
+        r'(?i)cannot.*process.*skip',
+        
+        # Thinking process artifacts
+        r'=== 推理过程 ===',
+        r'=== 思考过程 ===',
+        r'=== 分析过程 ===',
+        r'=== 处理过程 ===',
+        r'=== 最终答案 ===',
+        r'=== 结果 ===',
+        r'=== THINKING ===',
+        r'=== ANALYSIS ===',
+        r'=== RESULT ===',
+        r'=== FINAL ANSWER ===',
+        
+        # Processing status messages
+        r'正在处理.*',
+        r'处理完成.*',
+        r'开始处理.*',
+        r'跳过.*行',
+        r'添加.*结果',
+        r'生成.*数据',
+        r'Processing.*',
+        r'Completed.*',
+        r'Starting.*',
+        r'Skipping.*',
+        r'Adding.*result',
+        r'Generated.*data',
+        
+        # Markdown artifacts
+        r'```csv',
+        r'```',
+        r'```.*',
+        
+        # Other common artifacts
+        r'数据块.*处理.*异常',
+        r'Error.*processing.*chunk',
+        r'Failed.*to.*process',
+        r'处理失败.*',
+        r'异常.*处理',
+        r'错误.*跳过',
+        r'Warning.*skip',
+        r'⚠️.*',
+        r'❌.*',
+        r'✅.*',
+        r'🔍.*',
+        r'📊.*',
+        r'🎉.*',
+        r'💾.*',
+        r'📄.*',
+        r'🚀.*',
+        r'🔄.*',
+        r'⚡.*',
+        r'📋.*',
+        r'📤.*',
+        r'📥.*',
+        r'🔧.*',
+        r'🛠️.*',
+        r'🔬.*',
+        r'🎯.*',
+        r'💡.*',
+        r'⭐.*',
+        r'🎪.*',
+        r'🎨.*',
+        r'🎭.*',
+        r'🌟.*',
+        r'🔥.*',
+        r'💪.*',
+        r'🚨.*',
+        r'⚠️.*',
+        r'❗.*',
+        r'‼️.*',
+        r'💯.*',
+        r'🎊.*',
+        r'🎈.*',
+        r'🎁.*',
+        r'🎀.*',
+        r'🎂.*',
+        r'🍰.*',
+        r'🎃.*',
+        r'🎄.*',
+        r'🎆.*',
+        r'🎇.*',
+        r'🧨.*',
+        r'✨.*',
+        r'🎉.*',
+        r'🎊.*',
+        r'🎈.*',
+        r'🎁.*',
+        r'🎀.*',
+        r'🎂.*',
+        r'🍰.*',
+        r'🎃.*',
+        r'🎄.*',
+        r'🎆.*',
+        r'🎇.*',
+        r'🧨.*',
+        r'✨.*',
+    ]
+    
+    # Split content into lines for processing
+    lines = csv_content.split('\n')
+    cleaned_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Skip empty lines
+        if not line:
+            continue
+        
+        # Check if line matches any error pattern
+        is_error_line = False
+        for pattern in error_patterns:
+            if re.search(pattern, line):
+                is_error_line = True
+                break
+        
+        # Skip error lines
+        if is_error_line:
+            continue
+        
+        # Additional checks for valid CSV lines
+        if is_valid_csv_line(line):
+            cleaned_lines.append(line)
+    
+    # Join cleaned lines
+    cleaned_content = '\n'.join(cleaned_lines)
+    
+    # Additional cleanup for any remaining artifacts
+    cleaned_content = re.sub(r'\n\s*\n', '\n', cleaned_content)  # Remove extra blank lines
+    cleaned_content = cleaned_content.strip()
+    
+    return cleaned_content
+
+def is_valid_csv_line(line: str) -> bool:
+    """
+    Check if a line is a valid CSV line.
+    
+    Args:
+        line: Line to check
+        
+    Returns:
+        bool: True if line appears to be valid CSV data
+    """
+    if not line or not isinstance(line, str):
+        return False
+    
+    line = line.strip()
+    
+    # Skip obviously invalid lines
+    if not line:
+        return False
+    
+    # Skip lines that are pure symbols or decorations
+    if re.match(r'^[=\-\*\+\s]+$', line):
+        return False
+    
+    # Skip lines that are just section headers
+    if line.startswith('===') and line.endswith('==='):
+        return False
+    
+    # Skip lines that are just markdown
+    if line.startswith('```') or line == '```':
+        return False
+    
+    # Skip lines that are just comments or explanations
+    if line.startswith('#') or line.startswith('//'):
+        return False
+    
+    # Skip lines that are clearly status messages
+    if any(keyword in line.lower() for keyword in ['processing', '处理', 'error', '错误', 'skip', '跳过', 'warning', '警告']):
+        return False
+    
+    # Check if line contains commas (basic CSV structure)
+    if ',' not in line:
+        return False
+    
+    # Check if line has reasonable structure
+    parts = line.split(',')
+    if len(parts) < 2:  # Should have at least 2 columns
+        return False
+    
+    # Check if all parts are just empty or whitespace
+    if all(not part.strip() for part in parts):
+        return False
+    
+    return True

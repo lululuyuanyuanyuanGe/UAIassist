@@ -435,6 +435,12 @@ class ProcessUserInputAgent:
   - 文件相关/确认使用 → `determine_the_mapping_of_headers`（进行字段映射）
   - 文件不相关/需要重新查找 → `recall_relative_files`（重新召回文件）
 
+### 4. 当前节点为modify_generated_table时
+- **触发条件**：用户想要修改生成的表格，并提出相应的需求
+- **用户反馈判断**：
+  - 需要对表格添加新的表头 → `reconstruct_table_structure`（重新修改表格结构）
+  - 需要对表格进行删除或者过滤 → `filter_generated_table`（重新过滤表格）
+
 ## 当前节点
 {state["current_node"]}
 
