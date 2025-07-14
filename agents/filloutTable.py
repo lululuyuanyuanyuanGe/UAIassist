@@ -54,7 +54,6 @@ class FilloutTableState(TypedDict):
     data_file_path: list[str]
     supplement_files_summary: str
     template_file: str
-    template_file_completion_code: str
     fill_CSV_2_template_code: str
     combined_data: str
     filled_row: str
@@ -126,7 +125,6 @@ class FilloutTableAgent:
             "session_id": session_id,
             "data_file_path": data_file_path, # excel files(xls) that has raw data
             "template_file": template_file, # txt file of template file in html format
-            "template_file_completion_code": "",
             "fill_CSV_2_template_code": "",
             "combined_data": "",
             "filled_row": "",
@@ -527,7 +525,8 @@ class FilloutTableAgent:
             filled_row_html = transform_data_to_html_code_based(
                 csv_file_path=csv_file_path,
                 empty_row_html=empty_row_html,
-                session_id=state["session_id"]
+                session_id=state["session_id"],
+                template_file_path=state["template_file"]
             )
             
             return {"filled_row": filled_row_html}

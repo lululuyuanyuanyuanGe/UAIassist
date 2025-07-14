@@ -447,7 +447,7 @@ def parse_csv_row_safely(row_text: str) -> list:
             return []
 
 
-def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, session_id: str) -> str:
+def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, session_id: str, template_file_path: str = None) -> str:
     """
     Transform CSV data to HTML using code-based approach with robust error handling.
     
@@ -487,6 +487,32 @@ def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, s
         expected_columns = len(template_cells)
         print(f"📋 模板列数: {expected_columns}")
         
+        # Check if template has "序号" column and detect its position
+        sequence_column_index = None
+        if template_file_path and os.path.exists(template_file_path):
+            try:
+                with open(template_file_path, 'r', encoding='utf-8') as f:
+                    template_content = f.read()
+                
+                # Parse template to find "序号" column
+                template_soup = BeautifulSoup(template_content, 'html.parser')
+                # Find all table rows to locate header structure
+                all_rows = template_soup.find_all('tr')
+                
+                for row in all_rows:
+                    cells = row.find_all(['td', 'th'])
+                    for i, cell in enumerate(cells):
+                        cell_text = cell.get_text(strip=True)
+                        if '序号' in cell_text and sequence_column_index is None:
+                            sequence_column_index = i
+                            print(f"🔢 检测到序号列，位置: {sequence_column_index}")
+                            break
+                    if sequence_column_index is not None:
+                        break
+                        
+            except Exception as e:
+                print(f"⚠️ 读取模板文件失败: {e}")
+        
         filled_rows = []
         valid_row_count = 0
         skipped_row_count = 0
@@ -516,18 +542,47 @@ def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, s
             new_row = BeautifulSoup(empty_row_html, 'html.parser').find('tr')
             cells = new_row.find_all('td')
             
-            # Fill in the data
-            for i, cell in enumerate(cells):
-                if i < len(row_data):
-                    # Replace <br/> or empty content with actual data
-                    if cell.find('br'):
-                        cell.clear()
-                    cell.string = row_data[i] if row_data[i] else ''
+            # Log sequence column detection
+            if sequence_column_index is not None:
+                if sequence_column_index == 0:
+                    print(f"🔢 检测到序号列在第一列，将跳过CSV第一列数据，使用自动编号")
                 else:
-                    # If we have fewer data fields than template columns, fill with empty
+                    print(f"🔢 检测到序号列在第{sequence_column_index + 1}列，将使用自动编号")
+            
+            # Fill in the data
+            csv_data_pointer = 0  # Track which CSV column we should use next
+            
+            for i, cell in enumerate(cells):
+                if sequence_column_index is not None and i == sequence_column_index:
+                    # Use auto-enumeration for sequence column
                     if cell.find('br'):
                         cell.clear()
-                    cell.string = ''
+                    cell.string = str(valid_row_count)
+                    if valid_row_count <= 5:  # Only log first 5 rows to avoid spam
+                        print(f"🔢 序号列 (列{i}) 自动编号: {valid_row_count}")
+                    # Don't increment csv_data_pointer for sequence column
+                else:
+                    # Use CSV data for non-sequence columns
+                    # Skip the first CSV column if it corresponds to the sequence column
+                    if sequence_column_index == 0 and csv_data_pointer == 0:
+                        csv_data_pointer = 1  # Skip the first CSV column (original 序号 data)
+                        if valid_row_count <= 3:  # Log for first few rows
+                            print(f"🔢 跳过CSV第1列数据 '{row_data[0]}' (原序号数据)")
+                    
+                    if csv_data_pointer < len(row_data):
+                        # Replace <br/> or empty content with actual data
+                        if cell.find('br'):
+                            cell.clear()
+                        cell_value = row_data[csv_data_pointer] if row_data[csv_data_pointer] else ''
+                        cell.string = cell_value
+                        if valid_row_count <= 3:  # Log for first few rows
+                            print(f"🔢 模板列{i} ← CSV列{csv_data_pointer}: '{cell_value}'")
+                        csv_data_pointer += 1
+                    else:
+                        # If we have fewer data fields than template columns, fill with empty
+                        if cell.find('br'):
+                            cell.clear()
+                        cell.string = ''
             
             # No inline styles needed - CSS handles all styling
             filled_rows.append(str(new_row))
@@ -543,6 +598,10 @@ def transform_data_to_html_code_based(csv_file_path: str, empty_row_html: str, s
         print(f"   - 有效行数: {valid_row_count}")
         print(f"   - 跳过行数: {skipped_row_count}")
         print(f"   - 生成HTML长度: {len(combined_html)} 字符")
+        if sequence_column_index is not None:
+            print(f"   - 序号列处理: 第{sequence_column_index + 1}列使用自动编号 (1-{valid_row_count})")
+        else:
+            print("   - 序号列处理: 未检测到序号列")
         
         # Save a sample to file for debugging
         if session_id:
