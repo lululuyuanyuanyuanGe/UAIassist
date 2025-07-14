@@ -36,13 +36,46 @@ def clean_json_response(response: str) -> str:
             # Take the middle part (index 1)
             cleaned_response = parts[1].strip()
     
-    # If there are multiple JSON objects, take the first valid one
-    if '}{' in cleaned_response:
-        print("⚠️ 检测到多个JSON对象，取第一个")
-        cleaned_response = cleaned_response.split('}{')[0] + '}'
+    # Handle multiple JSON objects with proper JSON parsing instead of naive string splitting
+    import json
     
-    print(f"🔍 清理后的JSON响应长度: {len(cleaned_response)} 字符")
-    return cleaned_response
+    # Try to parse as single JSON first
+    try:
+        json.loads(cleaned_response)
+        # If successful, it's a single valid JSON object
+        print(f"🔍 清理后的JSON响应长度: {len(cleaned_response)} 字符")
+        return cleaned_response
+    except json.JSONDecodeError:
+        # If failed, try to extract the first valid JSON object
+        print("⚠️ 检测到可能的多个JSON对象或格式问题，尝试提取第一个有效JSON")
+        
+        # Try to find the first complete JSON object
+        brace_count = 0
+        start_pos = -1
+        
+        for i, char in enumerate(cleaned_response):
+            if char == '{':
+                if start_pos == -1:
+                    start_pos = i
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0 and start_pos != -1:
+                    # Found a complete JSON object
+                    potential_json = cleaned_response[start_pos:i+1]
+                    try:
+                        json.loads(potential_json)
+                        print(f"🔍 提取的JSON响应长度: {len(potential_json)} 字符")
+                        return potential_json
+                    except json.JSONDecodeError:
+                        # Continue looking for the next complete JSON object
+                        start_pos = -1
+                        continue
+        
+        # If no valid JSON found, return the original cleaned response
+        print("⚠️ 无法提取有效的JSON对象，返回原始清理后的响应")
+        print(f"🔍 清理后的JSON响应长度: {len(cleaned_response)} 字符")
+        return cleaned_response
 
 
 def clean_html_response(response: str) -> str:
