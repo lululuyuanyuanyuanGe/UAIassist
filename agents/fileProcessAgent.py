@@ -901,7 +901,7 @@ class FileProcessAgent:
             
             try:
                 move_result = move_supplement_files_to_final_destination(
-                    table_file, corresponding_original_file, "table"
+                    table_file, corresponding_original_file, "table", village_name=state["village_name"]
                 )
                 print(f"✅ 表格文件已移动到最终位置: {Path(table_file).name}")
                 
@@ -926,7 +926,7 @@ class FileProcessAgent:
             
             try:
                 move_result = move_supplement_files_to_final_destination(
-                    document_file, corresponding_original_file, "document"
+                    document_file, corresponding_original_file, "document", village_name=state["village_name"]
                 )
                 print(f"✅ 文档文件已移动到最终位置: {Path(document_file).name}")
                 

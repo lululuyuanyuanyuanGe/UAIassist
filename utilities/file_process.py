@@ -98,7 +98,7 @@ def save_original_file(source_path: Path, original_files_dir: Path) -> str:
     Args:
         source_path: Path to the source file
         original_files_dir: Path to the original_file directory
-        
+
     Returns:
         str: Path to the saved original file, empty string if failed
     """
@@ -1614,7 +1614,8 @@ def move_template_files_to_final_destination(processed_file_path: str, original_
 
 
 
-def move_supplement_files_to_final_destination(processed_file_path: str, original_file_path: str, file_type: str) -> dict[str, str]:
+def move_supplement_files_to_final_destination(processed_file_path: str, original_file_path: str, file_type: str,
+                                               village_name: str) -> dict[str, str]:
     """Move supplement files from staging area to final destination with simple override strategy.
     
     Destinations:
@@ -1625,7 +1626,7 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         processed_file_path: Path to processed supplement file in staging area
         original_file_path: Path to original supplement file in staging area
         file_type: Either "table" or "document"
-        
+        village_name: Name of the village
     Returns:
         dict: {
             "processed_supplement_path": str,  # Final path of processed supplement
@@ -1653,11 +1654,11 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         project_root = Path.cwd()
         
         if file_type == "table":
-            processed_content_dir = project_root / "files" / "table_files" / "html_content"
-            original_dir = project_root / "files" / "table_files" / "original"
+            processed_content_dir = project_root / "files" / village_name / "table_files" / "html_content"
+            original_dir = project_root / "files" / village_name / "table_files" / "original"
         elif file_type == "document":
-            processed_content_dir = project_root / "files" / "document_files" / "txt_content"
-            original_dir = project_root / "files" / "document_files" / "original"
+            processed_content_dir = project_root / "files" / village_name / "document_files" / "txt_content"
+            original_dir = project_root / "files" / village_name / "document_files" / "original"
         else:
             print(f"❌ 无效的文件类型: {file_type}")
             return {
