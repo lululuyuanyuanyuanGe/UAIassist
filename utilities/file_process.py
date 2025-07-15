@@ -1753,7 +1753,8 @@ def delete_files_from_staging_area(file_paths: list[str]) -> dict[str, list[str]
 
 
 
-def reconstruct_csv_with_headers(analysis_response: str, original_filename: str, original_excel_file_path: str = None) -> str:
+def reconstruct_csv_with_headers(analysis_response: str, original_filename: str, 
+                                 original_excel_file_path: str = None, village_name: str = None) -> str:
     """
     Reconstruct CSV file with headers using the analyzed table structure.
     
@@ -1762,14 +1763,14 @@ def reconstruct_csv_with_headers(analysis_response: str, original_filename: str,
         analysis_response: JSON response from LLM containing table structure
         original_filename: Original filename for the output CSV
         original_excel_file_path: Path to the original Excel file for CSV conversion
-        
+        village_name: Name of the village
     Returns:
         str: Path to the reconstructed CSV file
     """
     try:
         # Create output directory
         project_root = Path.cwd()
-        csv_output_dir = project_root / "files" / "table_files" / "CSV_files"
+        csv_output_dir = project_root / "files" / village_name / "table_files" / "CSV_files"
         csv_output_dir.mkdir(parents=True, exist_ok=True)
         
         # Parse the analysis response to extract table structure
@@ -2278,3 +2279,5 @@ def is_valid_csv_line(line: str) -> bool:
         return False
     
     return True
+
+
