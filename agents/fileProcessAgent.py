@@ -450,7 +450,6 @@ class FileProcessAgent:
         """This node will process the supplement files, it will analyze the supplement files and summarize the content of the files as well as stored the summary in data.json"""
         print("\n🔍 开始执行: _process_supplement")
         print("=" * 50)
-        print("Debug: Start to process_supplement")
         
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
@@ -488,12 +487,9 @@ class FileProcessAgent:
             """Process a single table file and return (file_path, file_type, result_data)"""
             try:
                 source_path = Path(table_file)
+                print(f"🔍 表格文件路径: {source_path}")
                 print(f"🔍 正在处理表格文件: {source_path.name}")
                 
-                file_content = source_path.read_text(encoding='utf-8')
-                file_content = file_content[:2000] if len(file_content) > 2000 else file_content
-                file_name = extract_filename(table_file)
-                print(f"🔍 表格文件名: {file_name}")
                 
                 # Determine location for this file
                 location = state["village_name"]
@@ -502,7 +498,11 @@ class FileProcessAgent:
                 print("📤 正在调用LLM进行表格分析...")
                 
                 try:
-                    analysis_response = invoke_model_with_screenshot(model_name="Qwen/Qwen2.5-VL-72B-Instruct", file_path=table_file)
+                    file_name = source_path.name
+                    print(f"🔍 表格文件名: {file_name}")
+                    original_excel_file = Path(source_path).with_suffix(".xls")
+
+                    analysis_response = invoke_model_with_screenshot(model_name="Qwen/Qwen2.5-VL-72B-Instruct", file_path=original_excel_file)
                     print("📥 表格分析响应接收成功")
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
@@ -537,18 +537,18 @@ class FileProcessAgent:
                         break
                 
                 # Reconstruct CSV with headers using the analyzed structure
-                try:
-                    reconstructed_csv_path = reconstruct_csv_with_headers(
-                        analysis_response, source_path.name, original_excel_file, village_name=state["village_name"]
-                    )
-                    if reconstructed_csv_path:
-                        result_data["reconstructed_csv_path"] = reconstructed_csv_path
-                        print(f"📊 CSV重构完成: {reconstructed_csv_path}")
-                except Exception as csv_error:
-                    print(f"❌ CSV重构失败: {csv_error}")
-                    result_data["reconstructed_csv_path"] = ""
+                # try:
+                #     reconstructed_csv_path = reconstruct_csv_with_headers(
+                #         analysis_response, source_path.name, original_excel_file, village_name=state["village_name"]
+                #     )
+                #     if reconstructed_csv_path:
+                #         result_data["reconstructed_csv_path"] = reconstructed_csv_path
+                #         print(f"📊 CSV重构完成: {reconstructed_csv_path}")
+                # except Exception as csv_error:
+                #     print(f"❌ CSV重构失败: {csv_error}")
+                #     result_data["reconstructed_csv_path"] = ""
                 
-                return table_file, "table", result_data
+                # return table_file, "table", result_data
                 
             except Exception as e:
                 print(f"❌ 处理表格文件出错 {table_file}: {e}")

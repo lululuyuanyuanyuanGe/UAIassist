@@ -5,14 +5,14 @@
                 "summary": "```json\n{\n  \"农保名册.txt\": {\n    \"表格结构\": {\n      \"序号\": [],\n      \"户主姓名\": [],\n      \"低保证号\": [],\n      \"身份证号码\": [],\n      \"保障人数\": {\n        \"值\": [],\n        \"分解\": {\n          \"重点保障人数\": [],\n          \"残疾人数\": []\n        }\n      },\n      \"领取金额\": {\n        \"值\": [],\n        \"分解\": {\n          \"家庭补差\": [],\n          \"重点救助60元\": [],\n          \"重点救助100元\": [],\n          \"残疾人救助\": []\n        }\n      },\n      \"领款人签字(章)\": [],\n      \"领款时间\": []\n    }\n  }\n}\n```",
                 "file_path": "D:\\asianInfo\\ExcelAssist\\files\\七田村\\table_files\\html_content\\农保名册.txt",
                 "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\七田村\\table_files\\original\\农保名册.xls",
-                "timestamp": "2025-07-17T10:47:12.113101",
+                "timestamp": "2025-07-17T11:38:16.012885",
                 "file_size": 7282
             },
             "1城保名册.txt": {
                 "summary": "```json\n{\n  \"1城保名册.txt\": {\n    \"表格结构\": {\n      \"序号\": [],\n      \"户主姓名\": [],\n      \"低保证号\": [],\n      \"身份证号码\": [],\n      \"保障人数\": {\n        \"值\": [],\n        \"分解\": {\n          \"重点保障人数\": [],\n          \"残疾人数\": []\n        }\n      },\n      \"领取金额\": {\n        \"值\": [],\n        \"分解\": {\n          \"家庭补差\": [],\n          \"重点救助60元\": [],\n          \"重点救助100元\": [],\n          \"残疾人救助\": []\n        }\n      },\n      \"领款人签字(章)\": [],\n      \"领款时间\": []\n    }\n  }\n}\n```",
                 "file_path": "D:\\asianInfo\\ExcelAssist\\files\\七田村\\table_files\\html_content\\1城保名册.txt",
                 "original_file_path": "D:\\asianInfo\\ExcelAssist\\files\\七田村\\table_files\\original\\1城保名册.xls",
-                "timestamp": "2025-07-17T10:47:28.209558",
+                "timestamp": "2025-07-17T11:37:27.155067",
                 "file_size": 3512
             }
         },

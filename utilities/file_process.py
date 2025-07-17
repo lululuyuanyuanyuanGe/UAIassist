@@ -563,7 +563,7 @@ def fetch_files_content(related_files: List[str], base_path: str = r"D:\asianInf
         return files_content
 
 
-def excel_to_csv(excel_file, csv_file, sheet_name="Sheet1"):
+def excel_to_csv(excel_file, csv_file, sheet_name=0):
     """Enhanced Excel to CSV conversion with proper date handling"""
     import re
     
