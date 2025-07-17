@@ -1,11 +1,15 @@
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 import os
 import time
 import threading
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from pathlib import Path
+import base64
+
+from utilities.screen_shot import ExcelTableScreenshot
 
 
 # Cross-platform timeout context manager using threading
@@ -102,6 +106,7 @@ def invoke_model(model_name : str, messages : List[BaseMessage], temperature: fl
         raise
     
     return full_response
+
 
 def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tools : List[str], temperature: float = 0.2) -> Any:
     """调用大模型并使用工具"""
@@ -244,3 +249,130 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
         import traceback
         traceback.print_exc()
         raise
+
+
+def invoke_model_with_screenshot(model_name : str, file_path : str, temperature: float = 0.2) -> Any:
+    """调用大模型并使用截图"""
+    print(f"🚀 开始调用LLM(带截图): {model_name} (temperature={temperature})")
+
+    path = Path(file_path)
+    screen_shot_path = path.with_suffix(".png")
+
+    file_name = path.name
+
+    excelTableScreenshot = ExcelTableScreenshot()
+    excelTableScreenshot.take_screenshot(file_path, screen_shot_path)
+
+    with open(screen_shot_path, "rb") as image_file:
+        image_data = image_file.read()
+        image_base64 = base64.b64encode(image_data).decode("utf-8")
+
+    human_message = HumanMessage(content=[
+    {
+        "type": "text",
+        "text": "请识别图片中的文字"
+    },
+    {
+        "type": "image_url",
+        "image_url": {
+            "url": f"data:image/png;base64,{image_base64}"
+        }
+    }
+    ])
+
+    system_message = SystemMessage(content="""
+你是一位专业的表格结构分析专家，擅长从复杂的 Excel 或 HTML 表格中提取完整的多级表头结构，并结合数据内容辅助理解字段含义、层级和分类汇总关系。
+
+请根据用户提供的表格，完成以下任务：
+
+【任务目标】
+
+1. 提取完整的表头层级结构：
+   - 从表格主标题开始，逐层提取所有分类表头、字段表头；
+   - 结合实际数据，辅助判断字段的含义、分类、层级归属，确保结构理解准确；
+   - 使用嵌套的 key-value 结构，表达表头的层级关系；
+   - 每一级表头都应清晰反映其子级字段或子分类，避免遗漏或误分类。
+
+2. 采用「值 / 分解」结构识别分类汇总关系：
+   - 如果某个父级字段**自身有数据**，同时又包含多个子字段（如“保障人数”、“领取金额”），必须采用以下格式：
+
+   {
+     "字段名": {
+       "值": [],          // 表示该字段自身的数据（即原表格中该字段的单元格数据）
+       "分解": {           // 表示该字段下的子分类或子字段
+         "子字段1": [],
+         "子字段2": [],
+         ...
+       }
+     }
+   }
+
+   - 如果父级字段只是分类（自身无数据），只输出 "分解"；
+   - 如果某个字段既没有子分类，也没有子字段拆分，直接输出为：
+
+   {
+     "字段名": []
+   }
+
+3. 辅助判断字段含义：
+   - 结合数据内容辅助判断字段用途，避免仅依赖表头文字表面拆分；
+   - 识别重复字段、并列字段、合并单元格带来的结构层级；
+   - 对于存在数据但表头描述模糊的情况，尽量根据数据判断其真实分类。
+
+【输出格式要求】
+
+- 严格输出为**标准 JSON 格式**，不能有 markdown、代码块标记或其他多余文字；
+- 只输出表头结构，**不要输出表格总结、描述、用途说明或数据样例**；
+- JSON 的根键名必须为 {file_name}（严格保留，不能更改）；
+- 每一层级都以对象形式描述，遵循以下结构：
+
+【输出示例】
+
+{
+  "{file_name}": {
+    "表格结构": {
+      "序号": [],
+      "户主姓名": [],
+      "低保证号": [],
+      "身份证号码": [],
+      "保障人数": {
+        "值": [],
+        "分解": {
+          "重点保障人数": [],
+          "残疾人数": []
+        }
+      },
+      "领取金额": {
+        "值": [],
+        "分解": {
+          "家庭补差": [],
+          "重点救助60元": [],
+          "重点救助100元": [],
+          "残疾人救助": []
+        }
+      },
+      "领款人签字(章)": [],
+      "领款时间": []
+    }
+  }
+}
+
+【特别注意】
+
+- 所有输出必须为严格的 JSON 结构；
+- 不允许输出表格总结、描述、元数据或用途说明；
+- 不允许有 markdown、代码块标记或多余的格式符号；
+- 保持层级结构清晰，完整保留所有分类表头、子表头和字段表头；
+- **父级字段有数据时，必须采用 "值 / 分解" 结构，确保数据与分类信息都保留**；
+- 必须结合数据辅助判断字段含义，确保分类、层级和汇总逻辑准确。
+
+""")
+
+    messages = [system_message, human_message]
+
+    response = invoke_model(model_name, messages)
+
+    return response
+    
+    
+    
