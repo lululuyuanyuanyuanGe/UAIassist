@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.modelRelated import invoke_model
+from utilities.modelRelated import invoke_model, invoke_model_with_screenshot
 from utilities.file_process import (retrieve_file_content, save_original_file,
                                     extract_filename, 
                                     ensure_location_structure, check_file_exists_in_data,
@@ -16,15 +16,7 @@ from utilities.file_process import (retrieve_file_content, save_original_file,
                                     move_supplement_files_to_final_destination, delete_files_from_staging_area,
                                     reconstruct_csv_with_headers)
 
-
-import uuid
 import json
-import os
-# Create an interactive chatbox using gradio
-import gradio as gr
-from dotenv import load_dotenv
-import re
-import pandas as pd
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.constants import Send
@@ -506,83 +498,11 @@ class FileProcessAgent:
                 # Determine location for this file
                 location = state["village_name"]
                 
-                # Define the JSON template separately to avoid f-string nesting issues
-                json_template = '''{{
-  "{file_name}": {{
-    "表格结构": {{
-      "顶层表头名称或标题": {{
-        "二级表头名称": [
-          "字段1",
-          "字段2",
-          "..."
-        ],
-        "更多子表头": [
-          "字段A",
-          "字段B"
-        ]
-      }}
-    }},
-    "表格总结": "该表格的主要用途及内容说明..."
-  }}
-}}'''.format(file_name=file_name)
-
-                system_prompt = f"""你是一位专业的文档分析专家。请阅读用户上传的 HTML 格式的 Excel 文件，并完成以下任务：
-
-【重要要求】
-1. 必须使用指定的文件名称 "{file_name}" 作为JSON输出的根键名，不要修改或变更此名称；
-2. 必须提取完整的表格结构，包括表格标题、所有层级的表头信息；
-
-【具体任务】
-1. 提取表格的完整多级表头结构：
-   - 从表格标题开始，逐层提取所有表头信息；
-   - 使用嵌套的 key-value 形式表示层级关系；
-   - 每一级表头应以对象形式展示其子级字段或子表头；
-   - 确保包含表格的主标题、分类标题、字段标题等所有层级；
-   - 不需要额外字段（如 null、isParent 等），仅保留结构清晰的层级映射；
-   - **重要**：严格区分表头结构和元数据/副标题信息，只有真正定义数据列的内容才是表头；
-
-2. 提供一个对该表格内容的简要总结：
-   - 内容应包括表格用途、主要信息类别、适用范围等；
-   - 语言简洁，不超过 150 字；
-
-【输出要求】
-- 返回内容不要包裹在```json中，直接返回json格式即可；
-- JSON的根键名必须严格使用 "{file_name}"，不得更改；
-- 确保表格结构完整，从顶层标题到最底层字段都要包含；
-- 如果表格有多个层级，请确保层级关系清晰准确；
-
-【特殊结构】
-
-【输出格式】
-严格按照以下格式输出，其中 "{file_name}" 必须保持不变：
-{json_template}
-
-请忽略所有 HTML 样式标签，只关注表格结构和语义信息。特别注意：
-
-🔍 **表头结构识别（这些才是真正的表头）**：
-- 表格主标题：通常在第一行，跨越多列，定义整个表格的用途
-- 分类表头：中间层级，可能有colspan属性，定义数据分类
-- 字段表头：最底层，对应实际数据列，如"序号"、"姓名"、"身份证号"等
-
-❌ **元数据/副标题信息（不是表头，应忽略）**：
-- 所属地区、制表单位、填报时间等说明性信息
-- 跨越多列的说明文字（如"所属地区：一品街道　乡镇（街道）　七田　村（居）委会"）
-- 制表信息、统计范围、填报说明等元数据
-- 经办人签字、备注说明等底部信息
-- 汇总行或小计行
-
-🎯 **识别标准**：
-- 如果一行内容是为了说明表格的背景信息、适用范围、制表单位等，它不是表头
-- 如果一行内容是为了定义数据列的含义和结构，它才是表头
-- 元数据通常跨越多列但不形成数据列的定义结构
-
-文件内容:
-{file_content}"""
 
                 print("📤 正在调用LLM进行表格分析...")
                 
                 try:
-                    analysis_response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt)])
+                    analysis_response = invoke_model_with_screenshot(model_name="Qwen/Qwen2.5-VL-72B-Instruct", file_path=table_file)
                     print("📥 表格分析响应接收成功")
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
@@ -908,7 +828,8 @@ class FileProcessAgent:
                 # Store moved file info for later data.json update
                 moved_files_info[Path(table_file).name] = {
                     "new_processed_path": move_result["processed_supplement_path"],
-                    "new_original_path": move_result["original_supplement_path"]
+                    "new_original_path": move_result["original_supplement_path"],
+                    "new_screen_shot_path": move_result["screen_shot_path"]
                 }
             except Exception as e:
                 print(f"❌ 移动表格文件失败 {table_file}: {e}")

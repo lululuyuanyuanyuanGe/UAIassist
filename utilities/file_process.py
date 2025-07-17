@@ -1656,6 +1656,7 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         if file_type == "table":
             processed_content_dir = project_root / "files" / village_name / "table_files" / "html_content"
             original_dir = project_root / "files" / village_name / "table_files" / "original"
+            screen_shot_dir = project_root / "files" / village_name / "table_files" / "screen_shot"
         elif file_type == "document":
             processed_content_dir = project_root / "files" / village_name / "document_files" / "txt_content"
             original_dir = project_root / "files" / village_name / "document_files" / "original"
@@ -1669,7 +1670,8 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         # Create destination directories
         processed_content_dir.mkdir(parents=True, exist_ok=True)
         original_dir.mkdir(parents=True, exist_ok=True)
-        
+        screen_shot_dir.mkdir(parents=True, exist_ok=True)
+
         result = {
             "processed_supplement_path": "",
             "original_supplement_path": ""
@@ -1703,6 +1705,15 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
             result["original_supplement_path"] = str(original_target)
             print(f"✅ 原始补充文件已移动到: {original_target}")
         
+        # Move screen shot file
+        if screen_shot_dir and Path(screen_shot_dir).exists():
+            screen_shot_source = original_source.with_suffix(".png")
+            screen_shot_target = screen_shot_dir / screen_shot_source.name
+            
+            shutil.move(str(screen_shot_source), str(screen_shot_target))
+            result["screen_shot_path"] = str(screen_shot_target)
+            print(f"✅ 屏幕截图已移动到: {screen_shot_target}")
+
         return result
         
     except Exception as e:

@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from utilities.modelRelated import invoke_model
 import base64
 
-with open(r"D:\asianInfo\ExcelAssist\agents\images\Screenshot 2025-07-15 164842.png", "rb") as image_file:
+with open(r"D:\asianInfo\ExcelAssist\agents\test\1城保名册.png", "rb") as image_file:
     image_data = image_file.read()
     base64_image = base64.b64encode(image_data).decode("utf-8")
 
@@ -234,7 +234,7 @@ system_message = SystemMessage(content="""
 
 
 message = [system_message, human_message]
-response = invoke_model(model_name="Qwen/Qwen2.5-VL-72B-Instruct", messages=message)
+response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=message)
 print(response)
 
 
