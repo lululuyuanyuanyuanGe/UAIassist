@@ -7,3 +7,6 @@ conversations/
 燕云村case/
 复杂表格/
 完整案例/
+.cursor/
+.langgraph_api/
+.gitignore

@@ -1708,6 +1708,7 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         # Move screen shot file
         if screen_shot_dir and Path(screen_shot_dir).exists():
             screen_shot_source = original_source.with_suffix(".png")
+
             screen_shot_target = screen_shot_dir / screen_shot_source.name
             
             shutil.move(str(screen_shot_source), str(screen_shot_target))
