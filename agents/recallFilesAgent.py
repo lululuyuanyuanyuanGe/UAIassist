@@ -280,6 +280,7 @@ class RecallFilesAgent:
         
         # 获取所有相关文件的内容
         print("📖 正在读取相关文件内容...")
+        # We need to store the file strucure instead of the html to use for headers mapping
         files_content = fetch_related_files_content(classified_files)
 
         # 获取文档内容：
