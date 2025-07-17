@@ -106,8 +106,12 @@ class RecallFilesAgent:
         self.location = village_name
         self.files_under_location = file_content[village_name]
         file_content = extract_summary_for_each_file(self.files_under_location)
-        print("===========================")
+        print("=========================== file_content")
+        print(file_content)
+        print("=========================== locations")
         print(self.files_under_location)
+        print("=========================== village_name")
+        print(village_name)
         
 
         return {
@@ -237,16 +241,23 @@ class RecallFilesAgent:
             print("=" * 50)
             return "determine_the_mapping_of_headers"
 
-    def _classify_files_by_type(self, file_list: list[str], file_content:str ) -> dict[str, list[str]]:
+    def _classify_files_by_type(self, file_list: list[str], file_content:dict[str, dict[str, str]] ) -> dict[str, list[str]]:
         """Classify the files as 表格 or 文档"""
 
         classified_files = {
             "表格": [],
             "文档": []
         }
-
+        
         for file in file_list:
-            if file in file_content["文档"]:
+            file = file.split(".")[0]
+            file = file + ".txt"
+            print("file_name111111111: \n", file)
+            print("file_content['文档']: \n", file_content["文档"])
+            print("file_content['文档']的类型: \n", type(file_content["文档"]))
+            print("file_content['表格']: \n", file_content["表格"])
+            print("file_content['表格']的类型: \n", type(file_content["表格"]))
+            if file in file_content["文档"].keys():
                 classified_files["文档"].append(file)
             elif file in file_content["表格"]:
                 classified_files["表格"].append(file)
@@ -263,6 +274,7 @@ class RecallFilesAgent:
         # Extract related files from response
         related_files = extract_file_from_recall(state["related_files_str"])
         print(f"📋 需要处理的相关文件: {related_files}")
+        print(f"📋 目标村文件库: {self.files_under_location}")
         classified_files = self._classify_files_by_type(related_files, self.files_under_location)
         print("dEBUGBUGBBUBUGB", classified_files)
         

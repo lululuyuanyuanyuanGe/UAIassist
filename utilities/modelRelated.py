@@ -366,7 +366,7 @@ def invoke_model_with_screenshot(model_name : str, file_path : str, temperature:
 
 【特别注意】
 
-- 所有输出必须为严格的 JSON 结构；
+- 所有输出必须为严格的 JSON 结构，但不要将输出包裹在 ```json 和 ``` 中；
 - 不允许输出表格总结、描述、元数据或用途说明；
 - 不允许有 markdown、代码块标记或多余的格式符号；
 - 保持层级结构清晰，完整保留所有分类表头、子表头和字段表头；
