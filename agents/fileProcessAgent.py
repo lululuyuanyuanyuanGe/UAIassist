@@ -537,18 +537,18 @@ class FileProcessAgent:
                         break
                 
                 # Reconstruct CSV with headers using the analyzed structure
-                # try:
-                #     reconstructed_csv_path = reconstruct_csv_with_headers(
-                #         analysis_response, source_path.name, original_excel_file, village_name=state["village_name"]
-                #     )
-                #     if reconstructed_csv_path:
-                #         result_data["reconstructed_csv_path"] = reconstructed_csv_path
-                #         print(f"📊 CSV重构完成: {reconstructed_csv_path}")
-                # except Exception as csv_error:
-                #     print(f"❌ CSV重构失败: {csv_error}")
-                #     result_data["reconstructed_csv_path"] = ""
+                try:
+                    reconstructed_csv_path = reconstruct_csv_with_headers(
+                        analysis_response, source_path.name, original_excel_file, village_name=state["village_name"]
+                    )
+                    if reconstructed_csv_path:
+                        result_data["reconstructed_csv_path"] = reconstructed_csv_path
+                        print(f"📊 CSV重构完成: {reconstructed_csv_path}")
+                except Exception as csv_error:
+                    print(f"❌ CSV重构失败: {csv_error}")
+                    result_data["reconstructed_csv_path"] = ""
                 
-                # return table_file, "table", result_data
+                return table_file, "table", result_data
                 
             except Exception as e:
                 print(f"❌ 处理表格文件出错 {table_file}: {e}")
@@ -749,7 +749,7 @@ class FileProcessAgent:
             for future in as_completed(future_to_file):
                 file_path, file_type = future_to_file[future]
                 try:
-                    processed_file_path, processed_file_type, result_data = future.result()
+                    file_path, processed_file_type, result_data = future.result()
                     
                     # Add to new_messages
                     new_messages.append(AIMessage(content=result_data["analysis_response"]))
