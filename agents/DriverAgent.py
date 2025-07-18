@@ -8,13 +8,11 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated, Union
-from datetime import datetime
 
 from utils.modelRelated import invoke_model, invoke_model_with_tools
 
 from pathlib import Path
 # Create an interactive chatbox using gradio
-import gradio as gr
 from dotenv import load_dotenv
 
 
@@ -465,7 +463,8 @@ class FrontdeskAgent:
             session_id=state["session_id"],
             headers_mapping=state["headers_mapping"],
             data_file_path=state["recalled_xls_files"],
-            template_file=state["template_file_path"]                                                                       
+            template_file=state["template_file_path"],
+            village_name=state["village_name"]
                                                                                           )
         print(f"🔍 填充表格响应: {filloutTableAgent_final_state}")
 
@@ -510,5 +509,13 @@ graph = frontdesk_agent.graph
 
 
 if __name__ == "__main__":
+    print("开始运行FrontdeskAgent")
+
+    print("开始运行FrontdeskAgent")
+
+    print("开始运行FrontdeskAgentend")
+    print("开始运行FrontdeskAgentend+1")
+
+
     frontdesk_agent = FrontdeskAgent()
     frontdesk_agent.run_frontdesk_agent(village_name="七田村")

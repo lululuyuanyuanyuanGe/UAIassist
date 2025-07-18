@@ -57,8 +57,6 @@ class FilloutTableState(TypedDict):
     fill_CSV_2_template_code: str
     combined_data: str
     filled_row: str
-    error_message: str
-    error_message_summary: str
     template_completion_code_execution_successful: bool
     CSV2Teplate_template_completion_code_execution_successful: bool
     retry: int
@@ -72,7 +70,7 @@ class FilloutTableState(TypedDict):
     footer_html: Annotated[str, lambda old, new: new if new else old]
     CSV_data: Annotated[list[str], lambda old, new: new if new else old]
     modify_after_first_fillout: bool
-
+    village_name: str
 
 
 class FilloutTableAgent:
@@ -118,7 +116,8 @@ class FilloutTableAgent:
                                  data_file_path: list[str] = None,
                                  headers_mapping: dict[str, str] = None,
                                  supplement_files_summary: str = "",
-                                 modify_after_first_fillout: bool = False) -> FilloutTableState:
+                                 modify_after_first_fillout: bool = False,
+                                 village_name: str = "") -> FilloutTableState:
         """This node will initialize the state of the graph"""
         return {
             "messages": [],
@@ -128,8 +127,6 @@ class FilloutTableAgent:
             "fill_CSV_2_template_code": "",
             "combined_data": "",
             "filled_row": "",
-            "error_message": "",
-            "error_message_summary": "",
             "template_completion_code_execution_successful": False,
             "CSV2Teplate_template_completion_code_execution_successful": False,
             "retry": 0,
@@ -142,8 +139,8 @@ class FilloutTableAgent:
             "headers_html": "",
             "footer_html": "",
             "combined_html": "",
-            "modify_after_first_fillout": False
-            
+            "modify_after_first_fillout": False,
+            "village_name": village_name
         }
     
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
@@ -192,7 +189,8 @@ class FilloutTableAgent:
                 chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
                                                                 session_id=state["session_id"],
                                                                 chunk_nums=15, largest_file=None,  # Let function auto-detect
-                                                                data_json_path="agents/data.json")
+                                                                data_json_path="agents/data.json",
+                                                                village_name=state["village_name"])
                 
                 # Extract chunks and row count from the result
                 chunked_data = chunked_result["combined_chunks"]
@@ -252,7 +250,7 @@ class FilloutTableAgent:
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
         if not state["modify_after_first_fillout"]:
-            # return state
+            return state
             print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
             print("=" * 50)
             
@@ -412,7 +410,7 @@ class FilloutTableAgent:
                     response = invoke_model(
                         model_name="deepseek-ai/DeepSeek-V3", 
                         messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                        temperature=0.2
+                        temperature=0.2, silent_mode=True
                     )
                     print(f"✅ Completed chunk {index + 1}")
                     return (index, response)
@@ -592,7 +590,8 @@ class FilloutTableAgent:
                                 template_file: str,
                                 data_file_path: list[str],
                                 headers_mapping: dict[str, str],
-                                modify_after_first_fillout: bool = False
+                                modify_after_first_fillout: bool = False,
+                                village_name: str = ""
                                 ) -> None:
         """This function will run the fillout table agent using invoke method with manual debug printing"""
         print("\n🚀 启动 FilloutTableAgent")
@@ -604,7 +603,8 @@ class FilloutTableAgent:
             template_file = template_file,
             data_file_path = data_file_path,
             headers_mapping=headers_mapping,
-            modify_after_first_fillout=modify_after_first_fillout
+            modify_after_first_fillout=modify_after_first_fillout,
+            village_name=village_name
         )
 
         config = {"configurable": {"thread_id": session_id}}

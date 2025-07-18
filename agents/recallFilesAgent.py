@@ -358,27 +358,15 @@ class RecallFilesAgent:
         try:
             # Use invoke instead of stream
             final_state = self.graph.invoke(initial_state, config=config)
-
-            # 提取对应的原始xls文件
-            def extract_original_xls_file(files_under_location: dict[str, dict[str, str]], related_files: list[str]) -> list[str]:
-                """Extract the original xls table file from the related files"""
-                table_file = files_under_location["表格"]
-                extract_original_xls_file = []
-                for file in related_files:
-                    file = file.split(".")[0]
-                    if file in table_file:
-                        extract_original_xls_file.append(table_file[file]["original_file_path"])
-                return extract_original_xls_file
-                    
             
-            original_xls_files = extract_original_xls_file(self.files_under_location, final_state.get('related_files', []))
+            original_xls_files = final_state.get("related_files", "")
             print("original_xls_files有这些: \n", original_xls_files)
             
             print("\n🎉 RecallFilesAgent 执行完成！")
             print("=" * 60)
             print("📊 最终结果:")
-            print(f"- 召回文件数量: {len(final_state.get('related_files', []))}")
-            print(f"- 相关文件: {final_state.get('related_files', [])}")
+            print(f"- 召回文件数量: {len(original_xls_files)}")
+            print(f"- 相关文件: {original_xls_files}")
             print(f"- 表头映射已生成: {'是' if final_state.get('headers_mapping') else '否'}")
             print(f"- 转换的Excel文件数量: {len(original_xls_files)}")
             print(f"- 转换的Excel文件: {original_xls_files}")

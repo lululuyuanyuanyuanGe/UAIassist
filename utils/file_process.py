@@ -933,7 +933,7 @@ def find_largest_file(csv_files: list[str], row_counts: list[int], largest_file:
 
 def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
                                       session_id: str = "1", chunk_nums: int = 5, largest_file: str = None,
-                                      data_json_path: str = "agents/data.json") -> dict:
+                                      data_json_path: str = "agents/data.json", village_name: str = "") -> dict:
     """
     Process Excel files by reading their corresponding pre-generated CSV files,
     finding the one with most rows, chunking the largest file, and combining everything.
@@ -945,7 +945,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         chunk_nums: Number of chunks to create (default 5)
         largest_file: Optional pre-specified largest file path
         data_json_path: Path to data.json file containing structure information
-        
+        village_name: Name of the village to process
     Returns:
         dict: {
             "combined_chunks": List of strings, each containing combined content of one chunk with other files
@@ -959,7 +959,7 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
     # Map Excel file paths to corresponding CSV files in CSV_files directory
     csv_files = []
     row_counts = []
-    csv_base_dir = Path("files/table_files/CSV_files")
+    csv_base_dir = Path(f"files/{village_name}/table_files/CSV_files")
     
     if not csv_base_dir.exists():
         print(f"❌ CSV files directory not found: {csv_base_dir}")
