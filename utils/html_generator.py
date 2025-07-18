@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from utilities.file_process import read_txt_file
+from utils.file_process import read_txt_file
 
 
 def generate_header_html(json_data: dict) -> str:

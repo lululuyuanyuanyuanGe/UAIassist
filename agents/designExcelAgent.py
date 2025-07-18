@@ -8,10 +8,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from typing import Dict, List, Optional, Any, TypedDict, Annotated, Union
 from datetime import datetime
 
-from utilities.modelRelated import invoke_model
-from utilities.clean_response import clean_json_response
-from utilities.html_generator import generate_header_html
-from utilities.file_process import extract_summary_for_each_file
+from utils.modelRelated import invoke_model
+from utils.clean_response import clean_json_response
+from utils.html_generator import generate_header_html
+from utils.file_process import extract_summary_for_each_file
 
 from pathlib import Path
 # Create an interactive chatbox using gradio

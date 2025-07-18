@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from pathlib import Path
 import base64
 
-from utilities.screen_shot import ExcelTableScreenshot
+from utils.screen_shot import ExcelTableScreenshot
 
 
 # Cross-platform timeout context manager using threading

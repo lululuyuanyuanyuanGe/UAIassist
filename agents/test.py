@@ -1,7 +1,7 @@
 #测试图片识别api
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from utilities.modelRelated import invoke_model
+from utils.modelRelated import invoke_model
 import base64
 
 with open(r"D:\asianInfo\ExcelAssist\agents\test\1城保名册.png", "rb") as image_file:

@@ -12,7 +12,7 @@ import pandas as pd
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from utilities.modelRelated import invoke_model
+from utils.modelRelated import invoke_model
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -1816,7 +1816,7 @@ def reconstruct_csv_with_headers(analysis_response: str, original_filename: str,
         temp_csv_path = csv_output_dir / f"temp_{excel_file_path.stem}.csv"
         
         # Import the helper function
-        from utilities.file_process import excel_to_csv
+        from utils.file_process import excel_to_csv
         
         try:
             # Use the existing helper function to convert Excel to CSV

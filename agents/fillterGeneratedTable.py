@@ -10,12 +10,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.visualize_graph import save_graph_visualization
-from utilities.message_process import build_BaseMessage_type, filter_out_system_messages
-from utilities.file_process import (read_txt_file, 
+from utils.visualize_graph import save_graph_visualization
+from utils.message_process import build_BaseMessage_type, filter_out_system_messages
+from utils.file_process import (read_txt_file, 
                                     process_excel_files_with_chunking)
-from utilities.modelRelated import invoke_model
-from utilities.html_generator import (
+from utils.modelRelated import invoke_model
+from utils.html_generator import (
     extract_empty_row_html_code_based,
     extract_headers_html_code_based,
     extract_footer_html_code_based,

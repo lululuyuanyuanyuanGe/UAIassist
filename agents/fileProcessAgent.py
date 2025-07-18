@@ -8,8 +8,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.modelRelated import invoke_model, invoke_model_with_screenshot
-from utilities.file_process import (retrieve_file_content, save_original_file,
+from utils.modelRelated import invoke_model, invoke_model_with_screenshot
+from utils.file_process import (retrieve_file_content, save_original_file,
                                     extract_filename, 
                                     ensure_location_structure, check_file_exists_in_data,
                                     get_available_locations, move_template_files_to_final_destination,
@@ -517,7 +517,7 @@ class FileProcessAgent:
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(table_file),  # This will be updated after moving
-                        "original_file_path": str(source_path),  # This will be updated after moving
+                        "original_file_path": str(original_excel_file),  # This will be updated after moving
                         "timestamp": datetime.now().isoformat(),
                         "file_size": source_path.stat().st_size
                     },

@@ -8,8 +8,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
 from datetime import datetime
-from utilities.modelRelated import invoke_model
-from utilities.file_process import (detect_and_process_file_paths)
+from utils.modelRelated import invoke_model
+from utils.file_process import (detect_and_process_file_paths)
 from agents.fileProcessAgent import FileProcessAgent
 
 import uuid

@@ -7,8 +7,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 from typing import Dict, TypedDict, Annotated
-from utilities.file_process import fetch_related_files_content, extract_file_from_recall, extract_summary_for_each_file
-from utilities.modelRelated import invoke_model, invoke_model_with_tools
+from utils.file_process import fetch_related_files_content, extract_file_from_recall, extract_summary_for_each_file
+from utils.modelRelated import invoke_model, invoke_model_with_tools
 
 import json
 import tempfile
