@@ -484,6 +484,7 @@ class FilloutTableAgent:
         """提取模板表格中的空行html代码 - 基于代码的高效实现"""
         try:
             empty_row_html = extract_empty_row_html_code_based(state["template_file"])
+            print("")
             return {"empty_row_html": empty_row_html}
         except Exception as e:
             print(f"❌ _extract_empty_row_html_code_based 执行失败: {e}")

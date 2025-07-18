@@ -31,52 +31,61 @@ def generate_header_html(json_data: dict) -> str:
         table_title = data.get("表格标题", "表格")
         table_structure = data.get("表格结构", {})
         
-        # Count total columns
-        total_columns = 0
+        # Determine if this is multilevel or single level structure
         is_multilevel = False
+        total_columns = 0
         
-        # Check if structure is multilevel (nested dict) or single level (list)
+        # Check each top-level item in table_structure
         for key, value in table_structure.items():
             if isinstance(value, dict):
+                # This is multilevel: main category -> subcategories -> fields
                 is_multilevel = True
                 for subkey, subvalue in value.items():
                     if isinstance(subvalue, list):
                         total_columns += len(subvalue)
             elif isinstance(value, list):
+                # This is single level: category -> fields
                 total_columns += len(value)
         
-        # Generate colgroup
+        # Generate colgroup for each column
         colgroup_html = "\n".join([f"<colgroup></colgroup>" for _ in range(total_columns)])
         
-        # Generate HTML
+        # Generate complete HTML structure
         html_lines = [
             "<html><body><table>",
             colgroup_html,
             # Title row
-            f'<tr>\n<td colspan="{total_columns}"><b>{table_title}</b></td>\n</tr>'
+            f'<tr><td colspan="{total_columns}"><b>{table_title}</b></td></tr>'
         ]
         
         if is_multilevel:
-            # Generate multilevel structure
-            # Second row: main categories
+            # For mixed structure, we need to handle both direct lists and nested dicts
+            # Generate three rows: main categories, subcategories, fields
             main_categories_row = ["<tr>"]
-            # Third row: subcategories  
             sub_categories_row = ["<tr>"]
-            # Fourth row: fields
             fields_row = ["<tr>"]
             
-            for main_cat, sub_cats in table_structure.items():
-                if isinstance(sub_cats, dict):
-                    # Count total fields under this main category
-                    main_cat_span = sum(len(fields) for fields in sub_cats.values() if isinstance(fields, list))
+            for main_cat, value in table_structure.items():
+                if isinstance(value, dict):
+                    # This is a nested structure
+                    main_cat_span = sum(len(fields) for fields in value.values() if isinstance(fields, list))
                     main_categories_row.append(f'<td colspan="{main_cat_span}"><b>{main_cat}</b></td>')
                     
                     # Add subcategories and fields
-                    for sub_cat, fields in sub_cats.items():
+                    for sub_cat, fields in value.items():
                         if isinstance(fields, list):
                             sub_categories_row.append(f'<td colspan="{len(fields)}"><b>{sub_cat}</b></td>')
                             for field in fields:
                                 fields_row.append(f'<td><b>{field}</b></td>')
+                
+                elif isinstance(value, list):
+                    # This is a direct list - spans across subcategory and field rows
+                    main_categories_row.append(f'<td colspan="{len(value)}"><b>{main_cat}</b></td>')
+                    # For subcategory row, we need to span all fields under this category
+                    sub_categories_row.append(f'<td colspan="{len(value)}"></td>')
+                    # Add the fields directly
+                    for field in value:
+                        fields_row.append(f'<td><b>{field}</b></td>')
             
             main_categories_row.append("</tr>")
             sub_categories_row.append("</tr>")
@@ -89,10 +98,8 @@ def generate_header_html(json_data: dict) -> str:
             ])
         
         else:
-            # Generate single level structure
-            # Second row: categories
+            # Generate single level structure (2 rows: categories, fields)
             categories_row = ["<tr>"]
-            # Third row: fields
             fields_row = ["<tr>"]
             
             for category, fields in table_structure.items():
@@ -114,9 +121,8 @@ def generate_header_html(json_data: dict) -> str:
         return "\n".join(html_lines)
         
     except Exception as e:
-        print(f"❌ HTML生成错误: {e}")
         # Fallback simple structure
-        return f"<html><body><table><tr><td><b>表格生成错误</b></td></tr></table></body></html>"
+        return f"<html><body><table><tr><td><b>表格生成错误: {str(e)}</b></td></tr></table></body></html>"
 
 
 def extract_empty_row_html_code_based(template_file_path: str) -> str:
