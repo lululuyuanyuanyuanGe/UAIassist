@@ -280,8 +280,6 @@ class RecallFilesAgent:
         
         # 获取所有相关文件的内容
         print("📖 正在读取相关文件内容...")
-        # We need to store the file strucure instead of the html to use for headers mapping
-        files_content = fetch_related_files_content(classified_files)
 
         # 获取文档内容：
         print("classified_files有什么: \n", classified_files)
@@ -291,13 +289,10 @@ class RecallFilesAgent:
             print("document_files_content: \n", document_files_content)
         
         # 构建用于分析表头映射的提示
-        table_files_content_str = ""
-        for filename, content in files_content.items():
-            if content:  # 只包含成功读取的文件
-                table_files_content_str += f"\n\n=== {filename} ===\n{content[:1000]}..."  # 限制内容长度避免过长
+        table_files_content_str = state["file_content"]
+
 
         files_content_str = table_files_content_str + "\n\n" + document_files_content
-        print(f"📝 构建了 {len(files_content)} 个文件的内容摘要")
 
         
         system_prompt = f"""
@@ -370,6 +365,7 @@ class RecallFilesAgent:
                 table_file = files_under_location["表格"]
                 extract_original_xls_file = []
                 for file in related_files:
+                    file = file.split(".")[0]
                     if file in table_file:
                         extract_original_xls_file.append(table_file[file]["original_file_path"])
                 return extract_original_xls_file

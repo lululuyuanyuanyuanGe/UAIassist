@@ -234,7 +234,7 @@ system_message = SystemMessage(content="""
 
 
 message = [system_message, human_message]
-response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", messages=message)
+response = invoke_model(model_name="Qwen/Qwen2.5-VL-72B-Instruct", messages=message)
 print(response)
 
 

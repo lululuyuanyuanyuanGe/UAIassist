@@ -185,6 +185,8 @@ class DesignExcelAgent:
         print("📤 正在调用LLM进行表格结构设计...")
         print("提示词：", system_prompt)
         user_input = state["user_feedback"]
+        # extract only the summary of the user_input
+        user_input = json.loads(user_input)["summary"]
         print("用户输入：", user_input)
         response = invoke_model(model_name="deepseek-ai/DeepSeek-V3", 
                                messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])

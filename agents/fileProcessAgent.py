@@ -512,7 +512,7 @@ class FileProcessAgent:
                 # Create result data with location information
                 # Note: file_path will be updated after moving to final destination
                 result_data = {
-                    "file_key": source_path.name,
+                    "file_key": source_path.name.split(".")[0],
                     "location": location,
                     "new_entry": {
                         "summary": analysis_response,
