@@ -304,6 +304,7 @@ class ProcessUserInputAgent:
         try:
             print("📤 正在调用LLM进行文本输入验证...")
             # Get LLM validation
+            print("系统提示词验证用户输入: \n" + system_prompt)
             user_input = "用户输入：" + user_input
             print("analyze_text_input时调用模型的输入: \n" + user_input)              
             validation_response = invoke_model(model_name="Pro/deepseek-ai/DeepSeek-V3", messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)])

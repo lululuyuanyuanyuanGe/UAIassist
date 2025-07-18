@@ -509,13 +509,6 @@ graph = frontdesk_agent.graph
 
 
 if __name__ == "__main__":
-    print("开始运行FrontdeskAgent")
-
-    print("开始运行FrontdeskAgent")
-
-    print("开始运行FrontdeskAgentend")
-    print("开始运行FrontdeskAgentend+1")
-
 
     frontdesk_agent = FrontdeskAgent()
     frontdesk_agent.run_frontdesk_agent(village_name="七田村")
