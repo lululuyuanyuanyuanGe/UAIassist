@@ -142,7 +142,9 @@ class FilloutTableAgent:
             "modify_after_first_fillout": False,
             "village_name": village_name
         }
-    
+    def _determine_strategy_for_data_combination(self, state: FilloutTableState) -> FilloutTableState:
+        """根据我们要填写的表格来决定数据整合的策略"""
+        system_prompt = """你是一个智能的表格填写专家，接下来你需要根据我们的"""
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
         """整合所有需要用到的数据，并生将其分批，用于分批生成表格"""
         # return
@@ -250,7 +252,7 @@ class FilloutTableAgent:
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
         if not state["modify_after_first_fillout"]:
-            # return state
+            return state
             print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
             print("=" * 50)
             
@@ -484,7 +486,7 @@ class FilloutTableAgent:
         """提取模板表格中的空行html代码 - 基于代码的高效实现"""
         try:
             empty_row_html = extract_empty_row_html_code_based(state["template_file"])
-            print("")
+            print("empty_row_html", empty_row_html)
             return {"empty_row_html": empty_row_html}
         except Exception as e:
             print(f"❌ _extract_empty_row_html_code_based 执行失败: {e}")
@@ -494,6 +496,7 @@ class FilloutTableAgent:
         """提取出html模板表格的表头html代码 - 基于代码的高效实现"""
         try:
             headers_html = extract_headers_html_code_based(state["template_file"])
+            print("headers_html", headers_html)
             return {"headers_html": headers_html}
         except Exception as e:
             print(f"❌ _extract_headers_html_code_based 执行失败: {e}")
@@ -503,6 +506,7 @@ class FilloutTableAgent:
         """提取出html模板表格的结尾html代码 - 基于代码的高效实现"""
         try:
             footer_html = extract_footer_html_code_based(state["template_file"])
+            print("footer_html", footer_html)
             return {"footer_html": footer_html}
         except Exception as e:
             print(f"❌ _extract_footer_html_code_based 执行失败: {e}")
