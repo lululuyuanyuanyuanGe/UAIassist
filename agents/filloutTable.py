@@ -144,7 +144,16 @@ class FilloutTableAgent:
         }
     def _determine_strategy_for_data_combination(self, state: FilloutTableState) -> FilloutTableState:
         """根据我们要填写的表格来决定数据整合的策略"""
-        system_prompt = """你是一个智能的表格填写专家，接下来你需要根据我们的"""
+        system_prompt = """你是一个智能的表格填写专家，接下来你需要根据我们的表头结构映射，来决定数据整合的策略，
+        你需要决定的事情是这样的我会给你一个json格式的文件，这个文件详细说明了我们要填写的表格结构，他的表头关系由Json组织，
+        另外里面还有填写各个表头所需要的数据来源，这些数据都来自于我们文件库里面已经填写好的excel文件，接下来你需要根据这些信息来判断
+        我们要填写的表格是什么类型的，一共有两种类型，第一种是'多表整合' 另一种是'多表合并' 他们的区别是这样的，第一种情况是我们要填写的
+        表格不论他的数据眼 只有一个主体的核心数据"""
+
+    def _route_after_determine_strategy_for_data_combination(self, state: FilloutTableState) -> str:
+
+    
+    def _combine_data_for_multitable_integration(self, state: FilloutTableState) -> FilloutTableState:
     def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
         """整合所有需要用到的数据，并生将其分批，用于分批生成表格"""
         # return
