@@ -147,7 +147,7 @@ class FilloutTableAgent:
             "strategy_for_data_combination": ""
         }
     def _determine_strategy_for_data_combination(self, state: FilloutTableState) -> FilloutTableState:
-        """根据我们要填写的表格来决定数据整合的策略"""
+        """Determine data integration strategy based on table structure"""
         system_prompt = """你是一个专业的数据整合策略分析专家。
 
 【任务】
@@ -182,23 +182,25 @@ class FilloutTableAgent:
 输入："表头1": ["表格1:字段A"]，"表头2": ["表格2:字段B"] → 输出：多表整合
 输入："表头1": ["表格1:字段A/表格2:字段A"] → 输出：多表合并
         """
-        table_structure = state["headers_mapping"]
+        table_structure = str(state["headers_mapping"])
         response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", 
                                 messages = [SystemMessage(content = system_prompt), HumanMessage(content = table_structure)])
+        print(f"🔍 数据整合策略: {response}")
         return {
             "strategy_for_data_combination": response
         }
 
     def _route_after_determine_strategy_for_data_combination(self, state: FilloutTableState) -> str:
-        if state["strategy_for_data_combination"] == "多表整合":
+        strategy = state["strategy_for_data_combination"].strip()
+        if "多表整合" in strategy:
             return "combine_data_for_multitable_integration"
-        elif state["strategy_for_data_combination"] == "多表合并":
+        elif "多表合并" in strategy:
             return "combine_data_for_multitable_merge"
         else:
             return "combine_data_for_multitable_integration"  # default fallback
     
     def _combine_data_for_multitable_integration(self, state: FilloutTableState) -> FilloutTableState:
-        """将多个表格整合"""
+        """Integrate multiple tables"""
         # return
         print("\n🔄 开始执行: _combine_data_split_into_chunks")
         print("=" * 50)
@@ -383,7 +385,6 @@ class FilloutTableAgent:
     def _generate_CSV_based_on_combined_data(self, state: FilloutTableState) -> FilloutTableState:
         """根据整合的数据，映射关系，模板生成新的数据"""
         if not state["modify_after_first_fillout"]:
-            return state
             print("\n🔄 开始执行: _generate_CSV_based_on_combined_data")
             print("=" * 50)
             
@@ -538,7 +539,7 @@ class FilloutTableAgent:
                     数据级：
                     {chunk}
                     """             
-                    print("用户输入提示词", system_prompt)
+                    # print("用户输入提示词", system_prompt)
                     print(f"🤖 Processing chunk {index + 1}/{len(state['combined_data_array'])}...")
                     response = invoke_model(
                         model_name="deepseek-ai/DeepSeek-V3", 
@@ -803,7 +804,7 @@ if __name__ == "__main__":
     # combined_data = fillout_table_agent._combine_data_split_into_chunks(file_list)
     # print(combined_data)
     fillout_table_agent = FilloutTableAgent()
-    fillout_table_agent.run_fillout_table_agent(session_id = "1",
+    fillout_table_agent.run_fillout_table_agent(session_id = "1", village_name="七田村",
                                                 template_file = r"conversations\1\user_uploaded_files\template\七田村_表格模板_20250721_161945.txt",
                                                 data_file_path = ['城保名册.xls', '农保名册.xls'],
                                                 headers_mapping={

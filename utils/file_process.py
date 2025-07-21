@@ -1101,7 +1101,7 @@ def process_excel_files_for_integration(excel_file_paths: list[str], supplement_
     }
 
 
-def process_excel_files_for_merge(self, excel_file_paths: list[str], session_id: str = "1", 
+def process_excel_files_for_merge(excel_file_paths: list[str], session_id: str = "1", 
                                       village_name: str = "", chunk_nums: int = 5) -> dict:
         """
         处理Excel文件进行合并 - 将所有文件作为核心数据进行合并而不是分为核心和参考数据
