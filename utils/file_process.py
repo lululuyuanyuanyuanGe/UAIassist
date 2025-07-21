@@ -931,7 +931,7 @@ def find_largest_file(csv_files: list[str], row_counts: list[int], largest_file:
     
     return largest_file
 
-def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_files_summary: str = "", 
+def process_excel_files_for_integration(excel_file_paths: list[str], supplement_files_summary: str = "", 
                                       session_id: str = "1", chunk_nums: int = 5, largest_file: str = None,
                                       data_json_path: str = "agents/data.json", village_name: str = "") -> dict:
     """
@@ -1100,6 +1100,116 @@ def process_excel_files_with_chunking(excel_file_paths: list[str], supplement_fi
         "largest_file_row_count": largest_file_row_count
     }
 
+
+def process_excel_files_for_merge(self, excel_file_paths: list[str], session_id: str = "1", 
+                                      village_name: str = "", chunk_nums: int = 5) -> dict:
+        """
+        处理Excel文件进行合并 - 将所有文件作为核心数据进行合并而不是分为核心和参考数据
+        
+        Args:
+            excel_file_paths: Excel文件路径列表
+            session_id: 会话ID
+            village_name: 村庄名称
+            chunk_nums: 分块数量
+        Returns:
+            dict: {
+                "combined_chunks": 合并后的数据块列表
+                "total_row_count": 总行数
+            }
+        """
+        print(f"🔄 合并处理 {len(excel_file_paths)} 个Excel文件...")
+        
+        # Map Excel file paths to corresponding CSV files in CSV_files directory
+        csv_files = []
+        row_counts = []
+        csv_base_dir = Path(f"files/{village_name}/table_files/CSV_files")
+        
+        if not csv_base_dir.exists():
+            print(f"❌ CSV files directory not found: {csv_base_dir}")
+            return {"combined_chunks": [], "total_row_count": 0}
+        
+        # Step 1: Load all CSV files and their content
+        file_contents = {}  # {original_excel_path: csv_content}
+        all_data_rows = []  # 存储所有数据行用于合并
+        
+        for excel_path in excel_file_paths:
+            excel_filename = Path(excel_path).stem
+            csv_file_path = csv_base_dir / f"{excel_filename}.csv"
+            
+            if csv_file_path.exists():
+                try:
+                    # Read CSV content
+                    with open(csv_file_path, 'r', encoding='utf-8') as f:
+                        csv_content = f.read()
+                    
+                    # Count data rows using helper function from file_process.py
+                    csv_lines = csv_content.strip().split('\n')
+                    # We need to import the helper functions
+                    from utils.file_process import detect_csv_format, parse_header_data_pairs
+                    
+                    is_repeated_header, data_rows = detect_csv_format(csv_lines)
+                    
+                    csv_files.append(excel_path)
+                    row_counts.append(data_rows)
+                    
+                    # Store content with proper headers
+                    combined_content = f"=== {Path(excel_path).name} 的核心数据 ===\n{csv_content}"
+                    file_contents[excel_path] = combined_content
+                    
+                    # Parse header+data pairs for merging
+                    header_data_pairs = parse_header_data_pairs(csv_lines, is_repeated_header)
+                    
+                    # Add all data pairs to the combined list with file identifier
+                    for header, data in header_data_pairs:
+                        all_data_rows.append({
+                            'source_file': Path(excel_path).name,
+                            'header': header,
+                            'data': data,
+                            'combined_entry': f"文件来源: {Path(excel_path).name}\n表头: {header}\n数据: {data}"
+                        })
+                    
+                    print(f"✅ 加载CSV文件 {Path(excel_path).name}: {data_rows} 数据行")
+                    
+                except Exception as e:
+                    print(f"❌ 读取CSV文件错误 {Path(excel_path).name}: {e}")
+                    file_contents[excel_path] = f"Error reading CSV file: {e}"
+                    csv_files.append(excel_path)
+                    row_counts.append(0)
+            else:
+                print(f"⚠️ 未找到对应的CSV文件 {Path(excel_path).name}")
+        
+        if not all_data_rows:
+            print("❌ 没有找到可合并的数据")
+            return {"combined_chunks": [], "total_row_count": 0}
+        
+        print(f"📊 总共收集到 {len(all_data_rows)} 行数据用于合并")
+        
+        # Step 2: Create chunks from all merged data
+        total_rows = len(all_data_rows)
+        chunk_size = max(1, total_rows // chunk_nums)  # 确保每个chunk至少有1行
+        
+        combined_chunks = []
+        for i in range(0, total_rows, chunk_size):
+            chunk_end = min(i + chunk_size, total_rows)
+            chunk_data = all_data_rows[i:chunk_end]
+            
+            # Build chunk content
+            chunk_content = f"=== 合并数据块 {len(combined_chunks) + 1} ===\n"
+            chunk_content += f"包含 {len(chunk_data)} 行来自 {len(set([row['source_file'] for row in chunk_data]))} 个文件的数据\n\n"
+            
+            # Add all data entries in this chunk
+            for idx, row_data in enumerate(chunk_data):
+                chunk_content += f"--- 数据条目 {idx + 1} ---\n"
+                chunk_content += row_data['combined_entry'] + "\n\n"
+            
+            combined_chunks.append(chunk_content)
+        
+        print(f"🎉 成功创建 {len(combined_chunks)} 个合并数据块")
+        
+        return {
+            "combined_chunks": combined_chunks,
+            "total_row_count": total_rows
+        }
 
 
 def extract_file_from_recall(response: str) -> list:

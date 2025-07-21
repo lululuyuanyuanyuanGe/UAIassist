@@ -9,11 +9,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 
 from typing import Dict, List, Optional, Any, TypedDict, Annotated
-from datetime import datetime
-from utils.visualize_graph import save_graph_visualization
-from utils.message_process import build_BaseMessage_type, filter_out_system_messages
+
 from utils.file_process import (read_txt_file, 
-                                    process_excel_files_with_chunking)
+                                process_excel_files_for_integration,
+                                process_excel_files_for_merge)
 from utils.modelRelated import invoke_model
 from utils.html_generator import (
     extract_empty_row_html_code_based,
@@ -85,7 +84,9 @@ class FilloutTableAgent:
         graph = StateGraph(FilloutTableState)
         
         # Add nodes
-        graph.add_node("combine_data_split_into_chunks", self._combine_data_split_into_chunks)
+        graph.add_node("determine_strategy_for_data_combination", self._determine_strategy_for_data_combination)
+        graph.add_node("combine_data_for_multitable_integration", self._combine_data_for_multitable_integration)
+        graph.add_node("combine_data_for_multitable_merge", self._combine_data_for_multitable_merge)
         graph.add_node("generate_CSV_based_on_combined_data", self._generate_CSV_based_on_combined_data)
         graph.add_node("transform_data_to_html", self._transform_data_to_html_code_based)  # Use code-based function
         graph.add_node("extract_empty_row_html", self._extract_empty_row_html_code_based)
@@ -95,8 +96,10 @@ class FilloutTableAgent:
         graph.add_node("shield_for_transform_data_to_html", self._shield_for_transform_data_to_html)
         
         # Define the workflow
-        graph.add_edge(START, "combine_data_split_into_chunks")
-        graph.add_conditional_edges("combine_data_split_into_chunks", self._route_after_combine_data_split_into_chunks)
+        graph.add_edge(START, "determine_strategy_for_data_combination")
+        graph.add_conditional_edges("determine_strategy_for_data_combination", self._route_after_determine_strategy_for_data_combination)
+        graph.add_conditional_edges("combine_data_for_multitable_integration", self._route_after_chunking_data)
+        graph.add_conditional_edges("combine_data_for_multitable_merge", self._route_after_chunking_data)
         graph.add_edge("extract_empty_row_html", "shield_for_transform_data_to_html")
         graph.add_edge("extract_headers_html", "shield_for_transform_data_to_html")
         graph.add_edge("extract_footer_html", "shield_for_transform_data_to_html")
@@ -145,32 +148,39 @@ class FilloutTableAgent:
         }
     def _determine_strategy_for_data_combination(self, state: FilloutTableState) -> FilloutTableState:
         """根据我们要填写的表格来决定数据整合的策略"""
-        system_prompt = """你是一个智能的表格填写专家，接下来你需要根据我们的表头结构映射，来决定数据整合的策略，
-        你需要决定的事情是这样的我会给你一个json格式的文件，这个文件详细说明了我们要填写的表格结构，他的表头关系由Json组织，
-        另外里面还有填写各个表头所需要的数据来源，这些数据都来自于我们文件库里面已经填写好的excel文件，接下来你需要根据这些信息来判断
-        我们要填写的表格是什么类型的，一共有两种类型，第一种是'多表整合' 另一种是'多表合并' 他们的区别是这样的，第一种情况是我们要填写的
-        表格不论他的数据来子多少个表格，她总有一个主体数据，我们需要根据这个主体数据来填写，举个例子：
-        {   "表格标题": "表格标题",
-            "表格结构": {
-                "表头1": "表格1表头A",
-                "表头2": "表格2表头A",
-                "表头3": "表格3表头B"
-            }
-        }
-        这种情况我们称之为'多表整合'，第二种情况是我们要填写的表格，他的数据来源来自于多个表格，但是这些表格之间没有主体数据，
-        举个例子：
-        {   "表格标题": "表格标题",
-            "表格结构": {
-                "表头1": "表格1表头A/表格2表头A",
-                "表头2": "表格1表头B/表格2表头B",
-                "表头3": "表格1表头C/表格2表头C"
-            }
-        }
-        这种情况我们称之为'多表合并'，也就是说我们需要把两个或多个表格合并起来，然后填写。
+        system_prompt = """你是一个专业的数据整合策略分析专家。
 
-        你只需要做出判断并回答你的判断
-        多表整合 或 多表合并
-        不要返回任何其他的内容
+【任务】
+分析给定的表格结构映射，确定数据整合策略。
+
+【策略类型】
+有且仅有两种策略：
+
+1. **多表整合** - 特征：
+   - 存在一个主要数据源（通常是最大的表格或包含最多核心信息的表格）
+   - 其他表格作为补充数据源，用于填充缺失字段
+   - 各字段的数据来源相对独立，不存在跨表格的字段合并
+   - 示例：表格结构中字段来源格式为"表格A:字段X"、"表格B:字段Y"等
+
+2. **多表合并** - 特征：
+   - 多个表格地位相等，需要将它们的数据行合并到一张表
+   - 同一字段可能来自多个表格的相同字段
+   - 字段来源格式包含"/"分隔符，如"表格A:字段X/表格B:字段X"
+   - 最终表格的行数等于所有源表格的行数之和
+
+【分析步骤】
+1. 检查字段来源格式：是否包含"/"分隔符
+2. 判断数据源关系：是主从关系还是平等合并关系
+3. 确定最终策略
+
+【输出要求】
+仅输出以下两个选项之一，不得包含任何其他内容：
+- 多表整合
+- 多表合并
+
+【示例】
+输入："表头1": ["表格1:字段A"]，"表头2": ["表格2:字段B"] → 输出：多表整合
+输入："表头1": ["表格1:字段A/表格2:字段A"] → 输出：多表合并
         """
         table_structure = state["headers_mapping"]
         response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", 
@@ -181,11 +191,11 @@ class FilloutTableAgent:
 
     def _route_after_determine_strategy_for_data_combination(self, state: FilloutTableState) -> str:
         if state["strategy_for_data_combination"] == "多表整合":
-            return self._combine_data_for_multitable_integration(state)
+            return "combine_data_for_multitable_integration"
         elif state["strategy_for_data_combination"] == "多表合并":
-            return self._combine_data_for_multitable_merge(state)
+            return "combine_data_for_multitable_merge"
         else:
-            return state
+            return "combine_data_for_multitable_integration"  # default fallback
     
     def _combine_data_for_multitable_integration(self, state: FilloutTableState) -> FilloutTableState:
         """将多个表格整合"""
@@ -230,7 +240,7 @@ class FilloutTableAgent:
 
                 print("🔄 正在调用process_excel_files_with_chunking函数...")
                 print("state['headers_mapping']的类型: ", type(state["headers_mapping"]))
-                chunked_result = process_excel_files_with_chunking(excel_file_paths=excel_file_paths, 
+                chunked_result = process_excel_files_for_integration(excel_file_paths=excel_file_paths, 
                                                                 session_id=state["session_id"],
                                                                 chunk_nums=15, largest_file=None,  # Let function auto-detect
                                                                 data_json_path="agents/data.json",
@@ -268,13 +278,85 @@ class FilloutTableAgent:
             return state
     
     def _combine_data_for_multitable_merge(self, state: FilloutTableState) -> FilloutTableState:
-        """将多个表格合并起来"""
-        return state
-    
-    def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
-        
+        """将多个表格合并起来 - 所有data_file_path中的文件都作为核心数据进行合并"""
+        print("\n🔄 开始执行: _combine_data_for_multitable_merge")
+        print("=" * 50)
+        if not state["modify_after_first_fillout"]:
+            try:
+                # Get Excel file paths from state
+                excel_file_paths = []
+                print(f"📋 开始处理 {len(state["data_file_path"])} 个数据文件（全部作为核心数据）")
+                
+                # Convert data files to Excel paths if they're not already
+                for file_path in state["data_file_path"]:
+                    print(f"📄 检查文件: {file_path}")
+                    if file_path.endswith('.txt'):
+                        # Try to find corresponding Excel file
+                        excel_path = file_path.replace('.txt', '.xlsx')
+                        if Path(excel_path).exists():
+                            excel_file_paths.append(excel_path)
+                            print(f"✅ 找到对应的Excel文件: {excel_path}")
+                        else:
+                            # Try .xls extension
+                            excel_path = file_path.replace('.txt', '.xls')
+                            if Path(excel_path).exists():
+                                excel_file_paths.append(excel_path)
+                                print(f"✅ 找到对应的Excel文件: {excel_path}")
+                            else:
+                                print(f"⚠️ 未找到对应的Excel文件: {file_path}")
+                    elif file_path.endswith(('.xlsx', '.xls', '.xlsm')):
+                        excel_file_paths.append(file_path)
+                        print(f"✅ 直接使用Excel文件: {file_path}")
+                
+                if not excel_file_paths:
+                    print("❌ 没有找到可用的Excel文件")
+                    print("✅ _combine_data_for_multitable_merge 执行完成(错误)")
+                    print("=" * 50)
+                    return {"combined_data_array": []}
+                
+                print(f"📊 准备处理 {len(excel_file_paths)} 个Excel文件进行合并（全部作为核心数据）")
+                
+                # For multitable merge, we treat all files as core data and combine them together
+                # Rather than chunking based on one largest file, we merge all files row by row
+                combined_data_result = process_excel_files_for_merge(
+                    excel_file_paths=excel_file_paths,
+                    session_id=state["session_id"],
+                    village_name=state["village_name"],
+                    chunk_nums=15
+                )
+                
+                # Extract chunks and row count from the result
+                chunked_data = combined_data_result["combined_chunks"]
+                total_row_count = combined_data_result["total_row_count"]
+                
+                for chunk in chunked_data:
+                    print(f"==================🔍 合并数据块 ==================:")
+                    print(chunk)
 
-    def _route_after_combine_data_split_into_chunks(self, state: FilloutTableState) -> str:
+                print(f"✅ 成功生成 {len(chunked_data)} 个合并数据块")
+                print(f"📊 总行数: {total_row_count}")
+                print("✅ _combine_data_for_multitable_merge 执行完成")
+                print("=" * 50)
+                
+                return {
+                    "combined_data_array": chunked_data,
+                    "largest_file_row_num": total_row_count
+                }
+                
+            except Exception as e:
+                print(f"❌ _combine_data_for_multitable_merge 执行失败: {e}")
+                import traceback
+                print(f"错误详情: {traceback.format_exc()}")
+                print("✅ _combine_data_for_multitable_merge 执行完成(错误)")
+                print("=" * 50)
+                return {
+                    "combined_data_array": []
+                }
+        else:
+            return state
+    
+    
+    def _route_after_chunking_data(self, state: FilloutTableState) -> str:
         """并行执行模板代码的生成和CSV数据的合成"""
         print("\n🔀 开始执行: _route_after_combine_data_split_into_chunks")
         print("=" * 50)
@@ -722,21 +804,33 @@ if __name__ == "__main__":
     # print(combined_data)
     fillout_table_agent = FilloutTableAgent()
     fillout_table_agent.run_fillout_table_agent(session_id = "1",
-                                                template_file = r"D:\asianInfo\ExcelAssist\conversations\1\user_uploaded_files\template\种植险投保清单模版.txt",
-                                                data_file_path = [r"D:\asianInfo\ExcelAssist\files\table_files\original\2024年农作物登记.xlsx",
-                                                                  r"D:\asianInfo\ExcelAssist\files\table_files\original\种植户银行卡号登记.xlsx"],
+                                                template_file = r"conversations\1\user_uploaded_files\template\七田村_表格模板_20250721_161945.txt",
+                                                data_file_path = ['城保名册.xls', '农保名册.xls'],
                                                 headers_mapping={
+  "表格标题": "七田村低保补贴汇总表",
   "表格结构": {
-    "序号": ["2024年农作物登记.txt: 序号"],
-    "姓名": ["2024年农作物登记.txt: 姓名"],
-    "身份证号码": ["2024年农作物登记.txt: 身份证号码"],
-    "电话号码": ["2024年农作物登记.txt: 电话号码"],
-    "玉米（亩）": ["2024年农作物登记.txt: 玉米（亩）"],
-    "水稻（亩）": ["2024年农作物登记.txt: 水稻（亩）"],
-    "开户银行": ["种植户银行卡号登记.txt: 开户银行"],
-    "银行账号": ["种植户银行卡号登记.txt: 银行账号"],
-    "是否脱贫户": ["种植户银行卡号登记.txt: 是否脱贫户"],
-    "备注": ["推理规则: 根据玉米水稻种植保险相关说明.txt中的保险金额和赔偿计算规则，可以在此字段备注保险金额或赔偿相关信息。例如：玉米每亩保险金额为800元，水稻每亩保险金额为1000元；赔偿金额=每亩保险金额×损失面积×损失程度，累计赔偿不超过总保险金额。"]       
-  },
-  "表格总结": "该表格为燕云村2024年农作物保险投保清单，用于记录农户投保信息，包括个人基本信息、投保作物面积、银行账户信息及脱贫户标识等，适用于村级农作物保险投保管理。所有字段均来自2024年农作物登记.txt和种植户银行卡号登记.txt两个数据文件，备注字段根据玉米水稻种植保险相关说明.txt中的保险金额和赔偿计算规则进行推理填写。"
+    "基本信息": [
+      "城保名册.xls/农保名册.xls: 序号",
+      "城保名册.xls/农保名册.xls: 户主姓名",
+      "城保名册.xls/农保名册.xls: 身份证号码",
+      "城保名册.xls/农保名册.xls: 低保证号",
+      "推理规则: 居民类型(城保/农保) - 根据文件名自动判断，城保名册.xls对应'城保'，农保名册.xls对应'农保'"
+    ],
+    "保障情况": {
+      "保障人数": [
+        "城保名册.xls/农保名册.xls: 保障人数.分解.重点保障人数",
+        "城保名册.xls/农保名册.xls: 保障人数.分解.残疾人数"
+      ],
+      "领取金额": [
+        "城保名册.xls/农保名册.xls: 领取金额.分解.家庭补差",
+        "城保名册.xls/农保名册.xls: 领取金额.分解.重点救助60元",
+        "城保名册.xls/农保名册.xls: 领取金额.分解.重点救助100元",
+        "城保名册.xls/农保名册.xls: 领取金额.分解.残疾人救助"
+      ]
+    },
+    "领取信息": [
+      "城保名册.xls/农保名册.xls: 领款人签字(章)",
+      "城保名册.xls/农保名册.xls: 领款时间"
+    ]
+  }
 })
