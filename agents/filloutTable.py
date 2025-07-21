@@ -71,7 +71,7 @@ class FilloutTableState(TypedDict):
     CSV_data: Annotated[list[str], lambda old, new: new if new else old]
     modify_after_first_fillout: bool
     village_name: str
-
+    strategy_for_data_combination: str
 
 class FilloutTableAgent:
     def __init__(self):
@@ -140,7 +140,8 @@ class FilloutTableAgent:
             "footer_html": "",
             "combined_html": "",
             "modify_after_first_fillout": False,
-            "village_name": village_name
+            "village_name": village_name,
+            "strategy_for_data_combination": ""
         }
     def _determine_strategy_for_data_combination(self, state: FilloutTableState) -> FilloutTableState:
         """根据我们要填写的表格来决定数据整合的策略"""
@@ -148,14 +149,46 @@ class FilloutTableAgent:
         你需要决定的事情是这样的我会给你一个json格式的文件，这个文件详细说明了我们要填写的表格结构，他的表头关系由Json组织，
         另外里面还有填写各个表头所需要的数据来源，这些数据都来自于我们文件库里面已经填写好的excel文件，接下来你需要根据这些信息来判断
         我们要填写的表格是什么类型的，一共有两种类型，第一种是'多表整合' 另一种是'多表合并' 他们的区别是这样的，第一种情况是我们要填写的
-        表格不论他的数据眼 只有一个主体的核心数据"""
+        表格不论他的数据来子多少个表格，她总有一个主体数据，我们需要根据这个主体数据来填写，举个例子：
+        {   "表格标题": "表格标题",
+            "表格结构": {
+                "表头1": "表格1表头A",
+                "表头2": "表格2表头A",
+                "表头3": "表格3表头B"
+            }
+        }
+        这种情况我们称之为'多表整合'，第二种情况是我们要填写的表格，他的数据来源来自于多个表格，但是这些表格之间没有主体数据，
+        举个例子：
+        {   "表格标题": "表格标题",
+            "表格结构": {
+                "表头1": "表格1表头A/表格2表头A",
+                "表头2": "表格1表头B/表格2表头B",
+                "表头3": "表格1表头C/表格2表头C"
+            }
+        }
+        这种情况我们称之为'多表合并'，也就是说我们需要把两个或多个表格合并起来，然后填写。
+
+        你只需要做出判断并回答你的判断
+        多表整合 或 多表合并
+        不要返回任何其他的内容
+        """
+        table_structure = state["headers_mapping"]
+        response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", 
+                                messages = [SystemMessage(content = system_prompt), HumanMessage(content = table_structure)])
+        return {
+            "strategy_for_data_combination": response
+        }
 
     def _route_after_determine_strategy_for_data_combination(self, state: FilloutTableState) -> str:
-
+        if state["strategy_for_data_combination"] == "多表整合":
+            return self._combine_data_for_multitable_integration(state)
+        elif state["strategy_for_data_combination"] == "多表合并":
+            return self._combine_data_for_multitable_merge(state)
+        else:
+            return state
     
     def _combine_data_for_multitable_integration(self, state: FilloutTableState) -> FilloutTableState:
-    def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
-        """整合所有需要用到的数据，并生将其分批，用于分批生成表格"""
+        """将多个表格整合"""
         # return
         print("\n🔄 开始执行: _combine_data_split_into_chunks")
         print("=" * 50)
@@ -233,6 +266,13 @@ class FilloutTableAgent:
                 }
         else:
             return state
+    
+    def _combine_data_for_multitable_merge(self, state: FilloutTableState) -> FilloutTableState:
+        """将多个表格合并起来"""
+        return state
+    
+    def _combine_data_split_into_chunks(self, state: FilloutTableState) -> FilloutTableState:
+        
 
     def _route_after_combine_data_split_into_chunks(self, state: FilloutTableState) -> str:
         """并行执行模板代码的生成和CSV数据的合成"""
