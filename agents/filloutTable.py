@@ -181,8 +181,10 @@ class FilloutTableAgent:
 【示例】
 输入："表头1": ["表格1:字段A"]，"表头2": ["表格2:字段B"] → 输出：多表整合
 输入："表头1": ["表格1:字段A/表格2:字段A"] → 输出：多表合并
+输入："表头1": ["表格1:字段A, 表格2:字段A"] → 输出：多表合并
         """
         table_structure = str(state["headers_mapping"])
+        print(f"🔍 表头映射: {table_structure}")
         response = invoke_model(model_name = "deepseek-ai/DeepSeek-V3", 
                                 messages = [SystemMessage(content = system_prompt), HumanMessage(content = table_structure)])
         print(f"🔍 数据整合策略: {response}")

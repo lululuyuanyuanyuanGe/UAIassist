@@ -131,6 +131,22 @@ print(f"🔄 路由决定: {next_node}")
 - **Temperature Control**: Default 0.2 for consistent outputs, configurable per call
 - **Chunking Strategy**: Configurable chunk sizes for large dataset processing  
 - **Windows Encoding**: Automatic `chcp 65001` for Chinese character support
+- **Rate Limit Handling**: Automatic retry with exponential backoff for HTTP 429 errors
+
+### Rate Limiting and Error Handling
+
+**Automatic Rate Limit Recovery**: All model invoke functions (`invoke_model`, `invoke_model_with_tools`, `invoke_model_with_screenshot`) now include automatic rate limit handling:
+
+- **Error Detection**: Automatically detects HTTP 429 "Too Many Requests" errors
+- **Retry-After Support**: Respects server-provided retry-after headers when available
+- **Exponential Backoff**: Uses exponential backoff with jitter (1s → 2s → 4s → 8s → 16s → 60s max)
+- **Configurable Retries**: Default 5 retry attempts before final failure
+- **Graceful Degradation**: Non-rate-limit errors fail immediately without retries
+
+**Supported Error Patterns**:
+- OpenAI: `RateLimitError` exceptions and HTTP 429 responses with retry-after headers
+- SiliconFlow: HTTP 429 responses following standard retry-after header conventions
+- Generic: String matching for "rate limit", "too many requests", "429" in error messages
 
 ## Environment Variables
 

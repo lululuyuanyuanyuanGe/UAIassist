@@ -3,40 +3,113 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 import os
 import time
+import random
 from pathlib import Path
 import base64
+from openai import RateLimitError, APIError
+import requests
 
 from utils.screen_shot import ExcelTableScreenshot
 
 
+def _handle_rate_limit_with_backoff(func, max_retries: int = 5, base_delay: float = 1.0, max_delay: float = 60.0, silent_mode: bool = False):
+    """
+    Handle rate limit errors with exponential backoff retry logic.
+    
+    Args:
+        func: Function to execute with retry logic
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay in seconds for exponential backoff
+        max_delay: Maximum delay in seconds
+        silent_mode: Whether to suppress logging output
+        
+    Returns:
+        Function result on success
+        
+    Raises:
+        Exception: Re-raises the last exception if all retries failed
+    """
+    last_exception = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+            
+            # Check if this is a rate limit error
+            is_rate_limit_error = False
+            retry_after = None
+            
+            # Handle different types of rate limit errors
+            if hasattr(e, 'status_code') and e.status_code == 429:
+                is_rate_limit_error = True
+                # Try to extract retry-after header
+                if hasattr(e, 'response') and hasattr(e.response, 'headers'):
+                    retry_after = e.response.headers.get('retry-after')
+            elif 'rate limit' in str(e).lower() or '429' in str(e) or 'too many requests' in str(e).lower():
+                is_rate_limit_error = True
+            elif isinstance(e, RateLimitError):
+                is_rate_limit_error = True
+                
+            if not is_rate_limit_error or attempt >= max_retries:
+                # Not a rate limit error or max retries reached
+                break
+                
+            # Calculate delay with exponential backoff
+            if retry_after:
+                try:
+                    delay = float(retry_after)
+                    if not silent_mode:
+                        print(f"⏳ Rate limit hit, server requested {delay}s wait (attempt {attempt + 1}/{max_retries + 1})")
+                except (ValueError, TypeError):
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+            else:
+                # Exponential backoff with jitter
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                # Add jitter to prevent thundering herd
+                delay += random.uniform(0, delay * 0.1)
+                
+            if not silent_mode:
+                print(f"⏳ Rate limit detected, waiting {delay:.1f}s before retry (attempt {attempt + 1}/{max_retries + 1})")
+                
+            time.sleep(delay)
+    
+    # All retries failed, raise the last exception
+    if not silent_mode:
+        print(f"❌ All {max_retries + 1} attempts failed due to rate limiting")
+    raise last_exception
+
+
 def invoke_model(model_name : str, messages : List[BaseMessage], temperature: float = 0.2, silent_mode: bool = False) -> str:
-    """调用大模型"""
+    """调用大模型 with automatic rate limit retry"""
     if not silent_mode:
         print(f"🚀 开始调用LLM: {model_name} (temperature={temperature})")
-    start_time = time.time()
-    if model_name.startswith("gpt-"):  # ChatGPT 系列模型
-        if not silent_mode:
-            print("🔍 使用 OpenAI ChatGPT 模型")
-        base_url = "https://api.openai.com/v1"
-        api_key = os.getenv("OPENAI_API_KEY")
-    else:  # 其他模型，例如 deepseek, siliconflow...
-        if not silent_mode:
-            print("🔍 使用 SiliconFlow 模型")
-        base_url = "https://api.siliconflow.cn/v1"
-        api_key = os.getenv("SILICONFLOW_API_KEY")
     
-    llm = ChatOpenAI(
-        model = model_name,
-        api_key=api_key, 
-        base_url=base_url,
-        streaming=not silent_mode,  # Disable streaming in silent mode
-        temperature=temperature,
-        timeout=200  # 30 seconds network timeout
-    )
+    def _make_api_call():
+        start_time = time.time()
+        
+        if model_name.startswith("gpt-"):  # ChatGPT 系列模型
+            if not silent_mode:
+                print("🔍 使用 OpenAI ChatGPT 模型")
+            base_url = "https://api.openai.com/v1"
+            api_key = os.getenv("OPENAI_API_KEY")
+        else:  # 其他模型，例如 deepseek, siliconflow...
+            if not silent_mode:
+                print("🔍 使用 SiliconFlow 模型")
+            base_url = "https://api.siliconflow.cn/v1"
+            api_key = os.getenv("SILICONFLOW_API_KEY")
+        
+        llm = ChatOpenAI(
+            model = model_name,
+            api_key=api_key, 
+            base_url=base_url,
+            streaming=not silent_mode,  # Disable streaming in silent mode
+            temperature=temperature,
+            timeout=200  # network timeout
+        )
 
-    full_response = ""
-
-    try:
+        full_response = ""
         total_tokens_used = {"input": 0, "output": 0, "total": 0}
         
         if silent_mode:
@@ -63,7 +136,7 @@ def invoke_model(model_name : str, messages : List[BaseMessage], temperature: fl
                     total_tokens_used["input"] = usage.get('input_tokens', 0)
                     total_tokens_used["output"] = usage.get('output_tokens', 0)
                     total_tokens_used["total"] = usage.get('total_tokens', 0)
-            
+                
         end_time = time.time()
         execution_time = end_time - start_time
         
@@ -73,45 +146,42 @@ def invoke_model(model_name : str, messages : List[BaseMessage], temperature: fl
             if total_tokens_used["total"] > 0:
                 print(f"📊 Token使用: 输入={total_tokens_used['input']:,} | 输出={total_tokens_used['output']:,} | 总计={total_tokens_used['total']:,}")
         
-    except Exception as e:
-        end_time = time.time()
-        execution_time = end_time - start_time
-        if not silent_mode:
-            print(f"\n❌ LLM调用失败，耗时: {execution_time:.2f}秒，错误: {e}")
-            
-            # Print any token usage that was captured before failure
-            if total_tokens_used["total"] > 0:
-                print(f"📊 失败前Token使用: 输入={total_tokens_used['input']:,} | 输出={total_tokens_used['output']:,} | 总计={total_tokens_used['total']:,}")
-        
-        raise
+        return full_response
     
-    return full_response
+    # Use rate limit retry wrapper
+    try:
+        return _handle_rate_limit_with_backoff(_make_api_call, silent_mode=silent_mode)
+    except Exception as e:
+        if not silent_mode:
+            print(f"\n❌ LLM调用最终失败，错误: {e}")
+        raise
 
 
 def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tools : List[str], temperature: float = 0.2) -> Any:
-    """调用大模型并使用工具"""
+    """调用大模型并使用工具 with automatic rate limit retry"""
     print(f"🚀 开始调用LLM(带工具): {model_name} (temperature={temperature})")
-    start_time = time.time()
     
-    if model_name.startswith("gpt-"):  # ChatGPT 系列模型
-        print("🔍 使用 OpenAI ChatGPT 模型")
-        base_url = "https://api.openai.com/v1"
-        api_key = os.getenv("OPENAI_API_KEY")
-    else:  # 其他模型，例如 deepseek, siliconflow...
-        print("🔍 使用 SiliconFlow 模型")
-        base_url = "https://api.siliconflow.cn/v1"
-        api_key = os.getenv("SILICONFLOW_API_KEY")
+    def _make_api_call_with_tools():
+        start_time = time.time()
+        
+        if model_name.startswith("gpt-"):  # ChatGPT 系列模型
+            print("🔍 使用 OpenAI ChatGPT 模型")
+            base_url = "https://api.openai.com/v1"
+            api_key = os.getenv("OPENAI_API_KEY")
+        else:  # 其他模型，例如 deepseek, siliconflow...
+            print("🔍 使用 SiliconFlow 模型")
+            base_url = "https://api.siliconflow.cn/v1"
+            api_key = os.getenv("SILICONFLOW_API_KEY")
 
-    llm = ChatOpenAI(
-        model=model_name,
-        api_key=api_key,
-        base_url=base_url,
-        streaming=False,
-        temperature=temperature,
-        timeout=200
-    )
-    
-    try:
+        llm = ChatOpenAI(
+            model=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            streaming=False,
+            temperature=temperature,
+            timeout=200
+        )
+        
         # 绑定工具到模型
         llm_with_tools = llm.bind_tools(tools)
         
@@ -185,27 +255,19 @@ def invoke_model_with_tools(model_name : str, messages : List[BaseMessage], tool
         
         # 返回完整响应以便调用者处理
         return response
-        
+    
+    # Use rate limit retry wrapper
+    try:
+        return _handle_rate_limit_with_backoff(_make_api_call_with_tools, silent_mode=False)
     except Exception as e:
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"\n❌ LLM调用失败，耗时: {execution_time:.2f}秒，错误: {e}")
-        
-        # Try to extract token usage even from failed requests
-        if 'response' in locals() and hasattr(response, 'usage_metadata') and response.usage_metadata:
-            usage = response.usage_metadata
-            input_tokens = usage.get('input_tokens', 0)
-            output_tokens = usage.get('output_tokens', 0)
-            total_tokens = usage.get('total_tokens', 0)
-            print(f"📊 失败前Token使用: 输入={input_tokens:,} | 输出={output_tokens:,} | 总计={total_tokens:,}")
-        
+        print(f"\n❌ LLM调用最终失败，错误: {e}")
         import traceback
         traceback.print_exc()
         raise
 
 
 def invoke_model_with_screenshot(model_name : str, file_path : str, temperature: float = 0.2) -> Any:
-    """调用大模型并使用截图"""
+    """调用大模型并使用截图 with automatic rate limit retry"""
     print(f"🚀 开始调用LLM(带截图): {model_name} (temperature={temperature})")
 
     path = Path(file_path)
@@ -331,6 +393,7 @@ def invoke_model_with_screenshot(model_name : str, file_path : str, temperature:
 
     messages = [system_message, human_message]
 
+    # Use the rate limit retry invoke_model (which already has retry logic)
     response = invoke_model(model_name, messages)
 
     return response
