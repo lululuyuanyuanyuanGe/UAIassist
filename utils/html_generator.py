@@ -32,33 +32,63 @@ def generate_header_html(json_data: dict) -> str:
         table_title = data.get("表格标题", "表格")
         table_structure = data.get("表格结构", {})
         
-        # Analyze structure and count total columns
-        columns_info = []  # [(field_name, parent_field, is_parent)]
-        has_complex_fields = False
+        print(f"Processing table structure: {table_structure}")
         
-        for field_name, field_value in table_structure.items():
+        # Analyze structure and build column layout information
+        columns_layout = []  # [(field_name, parent_name, level, has_subfields)]
+        column_spans = {}  # field_name -> span count
+        max_levels = 1
+        
+        def analyze_field(field_name, field_value, parent_name=None, level=1):
+            nonlocal max_levels
+            max_levels = max(max_levels, level)
+            
             if isinstance(field_value, list):
                 # Simple field: field_name -> []
-                columns_info.append((field_name, None, False))
-            elif isinstance(field_value, dict):
-                # Complex field with 值/分解/规则 structure
-                has_complex_fields = True
-                fenjie = field_value.get("分解", {})
+                columns_layout.append((field_name, parent_name, level, False))
+                column_spans[field_name] = 1
+                return 1
                 
+            elif isinstance(field_value, dict) and "分解" in field_value:
+                # Complex field with sub-fields in "分解"
+                fenjie = field_value.get("分解", {})
                 if fenjie:
-                    # Parent field with sub-fields
-                    columns_info.append((field_name, None, True))  # Parent field itself
-                    for sub_field_name in fenjie.keys():
-                        columns_info.append((sub_field_name, field_name, False))  # Sub-fields
+                    # This is a parent field with sub-fields
+                    columns_layout.append((field_name, parent_name, level, True))
+                    
+                    # Process sub-fields
+                    total_sub_span = 0
+                    for sub_field_name, sub_field_value in fenjie.items():
+                        sub_span = analyze_field(sub_field_name, sub_field_value, field_name, level + 1)
+                        total_sub_span += sub_span
+                    
+                    column_spans[field_name] = total_sub_span
+                    return total_sub_span
                 else:
-                    # Complex field but no sub-fields (just has 值/分解/规则 structure)
-                    columns_info.append((field_name, None, False))
+                    # Complex field but no sub-fields (treat as simple)
+                    columns_layout.append((field_name, parent_name, level, False))
+                    column_spans[field_name] = 1
+                    return 1
+            else:
+                # Unknown structure, treat as simple
+                columns_layout.append((field_name, parent_name, level, False))
+                column_spans[field_name] = 1
+                return 1
         
-        total_columns = len(columns_info)
-        print(f"Table analysis: total_columns={total_columns}, has_complex_fields={has_complex_fields}")
-        print(f"Column info: {[(col[0], col[1], col[2]) for col in columns_info]}")
+        # Analyze all top-level fields
+        for field_name, field_value in table_structure.items():
+            analyze_field(field_name, field_value)
         
-        # Generate colgroup for each column
+        # Count total columns (only leaf fields count as actual columns)
+        total_columns = sum(1 for _, _, _, has_subfields in columns_layout if not has_subfields)
+        
+        print(f"📊 Table analysis:")
+        print(f"   - Total columns: {total_columns}")
+        print(f"   - Max levels: {max_levels}")
+        print(f"   - Column layout: {columns_layout}")
+        print(f"   - Column spans: {column_spans}")
+        
+        # Generate colgroup for each actual column
         colgroup_html = "\n".join([f"<colgroup></colgroup>" for _ in range(total_columns)])
         
         # Generate complete HTML structure
@@ -69,64 +99,41 @@ def generate_header_html(json_data: dict) -> str:
             f'<tr><td colspan="{total_columns}"><b>{table_title}</b></td></tr>'
         ]
         
-        if has_complex_fields:
-            # Multi-level structure needed
-            # Row 1: Parent categories (spans across their sub-fields)
-            # Row 2: Individual field names
-            parent_row = ["<tr>"]
-            field_row = ["<tr>"]
-            
-            i = 0
-            while i < len(columns_info):
-                field_name, parent_field, is_parent = columns_info[i]
+        # Generate header rows based on levels
+        if max_levels > 1:
+            # Multi-level header structure
+            for current_level in range(1, max_levels + 1):
+                row_html = ["<tr>"]
                 
-                if is_parent:
-                    # This is a parent field, count its sub-fields
-                    sub_field_count = 0
-                    j = i + 1
-                    while j < len(columns_info) and columns_info[j][1] == field_name:
-                        sub_field_count += 1
-                        j += 1
-                    
-                    # Parent field spans across all its sub-fields plus itself
-                    total_span = sub_field_count + 1
-                    parent_row.append(f'<td colspan="{total_span}"><b>{field_name}</b></td>')
-                    
-                    # Add the parent field itself in the field row
-                    field_row.append(f'<td><b>{field_name}</b></td>')
-                    i += 1
-                    
-                    # Add all sub-fields
-                    for k in range(sub_field_count):
-                        sub_field_name = columns_info[i][0]
-                        field_row.append(f'<td><b>{sub_field_name}</b></td>')
-                        i += 1
-                        
-                else:
-                    # Simple field (no parent or is a sub-field of already processed parent)
-                    if parent_field is None:
-                        # Independent simple field
-                        parent_row.append(f'<td><b>{field_name}</b></td>')
-                        field_row.append(f'<td><b>{field_name}</b></td>')
-                        i += 1
-                    else:
-                        # This should be handled by parent processing
-                        i += 1
-            
-            parent_row.append("</tr>")
-            field_row.append("</tr>")
-            
-            html_lines.extend([
-                "\n".join(parent_row),
-                "\n".join(field_row)
-            ])
+                for field_name, parent_name, level, has_subfields in columns_layout:
+                    if level == current_level:
+                        if has_subfields:
+                            # Parent field - use colspan for all its sub-fields
+                            span = column_spans[field_name]
+                            row_html.append(f'<td colspan="{span}"><b>{field_name}</b></td>')
+                        else:
+                            # Leaf field - check if it should appear at this level
+                            if current_level == max_levels or parent_name is None:
+                                # Either it's the final level (all leaves appear)
+                                # Or it's a top-level simple field that needs rowspan
+                                if parent_name is None and current_level < max_levels:
+                                    # Top-level simple field needs rowspan to cover remaining levels
+                                    levels_to_span = max_levels - current_level + 1
+                                    row_html.append(f'<td rowspan="{levels_to_span}"><b>{field_name}</b></td>')
+                                else:
+                                    # Regular leaf field at final level
+                                    row_html.append(f'<td><b>{field_name}</b></td>')
+                
+                row_html.append("</tr>")
+                html_lines.append("\n".join(row_html))
         
         else:
-            # Simple single-level structure (all fields are simple arrays)
+            # Single-level structure (all fields are simple)
             field_row = ["<tr>"]
             
-            for field_name, _, _ in columns_info:
-                field_row.append(f'<td><b>{field_name}</b></td>')
+            for field_name, _, _, has_subfields in columns_layout:
+                if not has_subfields:  # Only leaf fields
+                    field_row.append(f'<td><b>{field_name}</b></td>')
             
             field_row.append("</tr>")
             html_lines.append("\n".join(field_row))
@@ -141,13 +148,13 @@ def generate_header_html(json_data: dict) -> str:
         html_lines.append("</table></body></html>")
         
         result_html = "\n".join(html_lines)
-        print(f"HTML generation successful, length: {len(result_html)} characters")
+        print(f"✅ HTML generation successful, length: {len(result_html)} characters")
         return result_html
         
     except Exception as e:
         # Fallback simple structure
         error_msg = f"<html><body><table><tr><td><b>表格生成错误: {str(e)}</b></td></tr></table></body></html>"
-        print(f"HTML生成失败: {e}")
+        print(f"❌ HTML生成失败: {e}")
         import traceback
         print(f"错误详情: {traceback.format_exc()}")
         return error_msg
