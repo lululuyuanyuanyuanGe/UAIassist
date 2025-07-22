@@ -14,6 +14,7 @@ from utils.file_process import read_txt_file
 def generate_header_html(json_data: dict) -> str:
     """
     Generate HTML table structure from JSON data.
+    Supports mixed structure with simple fields (arrays) and complex fields (with 值/分解/规则).
     
     Args:
         json_data: Dictionary containing 表格标题 and 表格结构
@@ -31,21 +32,31 @@ def generate_header_html(json_data: dict) -> str:
         table_title = data.get("表格标题", "表格")
         table_structure = data.get("表格结构", {})
         
-        # Determine if this is multilevel or single level structure
-        is_multilevel = False
-        total_columns = 0
+        # Analyze structure and count total columns
+        columns_info = []  # [(field_name, parent_field, is_parent)]
+        has_complex_fields = False
         
-        # Check each top-level item in table_structure
-        for key, value in table_structure.items():
-            if isinstance(value, dict):
-                # This is multilevel: main category -> subcategories -> fields
-                is_multilevel = True
-                for subkey, subvalue in value.items():
-                    if isinstance(subvalue, list):
-                        total_columns += len(subvalue)
-            elif isinstance(value, list):
-                # This is single level: category -> fields
-                total_columns += len(value)
+        for field_name, field_value in table_structure.items():
+            if isinstance(field_value, list):
+                # Simple field: field_name -> []
+                columns_info.append((field_name, None, False))
+            elif isinstance(field_value, dict):
+                # Complex field with 值/分解/规则 structure
+                has_complex_fields = True
+                fenjie = field_value.get("分解", {})
+                
+                if fenjie:
+                    # Parent field with sub-fields
+                    columns_info.append((field_name, None, True))  # Parent field itself
+                    for sub_field_name in fenjie.keys():
+                        columns_info.append((sub_field_name, field_name, False))  # Sub-fields
+                else:
+                    # Complex field but no sub-fields (just has 值/分解/规则 structure)
+                    columns_info.append((field_name, None, False))
+        
+        total_columns = len(columns_info)
+        print(f"Table analysis: total_columns={total_columns}, has_complex_fields={has_complex_fields}")
+        print(f"Column info: {[(col[0], col[1], col[2]) for col in columns_info]}")
         
         # Generate colgroup for each column
         colgroup_html = "\n".join([f"<colgroup></colgroup>" for _ in range(total_columns)])
@@ -58,71 +69,88 @@ def generate_header_html(json_data: dict) -> str:
             f'<tr><td colspan="{total_columns}"><b>{table_title}</b></td></tr>'
         ]
         
-        if is_multilevel:
-            # For mixed structure, we need to handle both direct lists and nested dicts
-            # Generate three rows: main categories, subcategories, fields
-            main_categories_row = ["<tr>"]
-            sub_categories_row = ["<tr>"]
-            fields_row = ["<tr>"]
+        if has_complex_fields:
+            # Multi-level structure needed
+            # Row 1: Parent categories (spans across their sub-fields)
+            # Row 2: Individual field names
+            parent_row = ["<tr>"]
+            field_row = ["<tr>"]
             
-            for main_cat, value in table_structure.items():
-                if isinstance(value, dict):
-                    # This is a nested structure
-                    main_cat_span = sum(len(fields) for fields in value.values() if isinstance(fields, list))
-                    main_categories_row.append(f'<td colspan="{main_cat_span}"><b>{main_cat}</b></td>')
-                    
-                    # Add subcategories and fields
-                    for sub_cat, fields in value.items():
-                        if isinstance(fields, list):
-                            sub_categories_row.append(f'<td colspan="{len(fields)}"><b>{sub_cat}</b></td>')
-                            for field in fields:
-                                fields_row.append(f'<td><b>{field}</b></td>')
+            i = 0
+            while i < len(columns_info):
+                field_name, parent_field, is_parent = columns_info[i]
                 
-                elif isinstance(value, list):
-                    # This is a direct list - spans across subcategory and field rows
-                    main_categories_row.append(f'<td colspan="{len(value)}"><b>{main_cat}</b></td>')
-                    # For subcategory row, we need to span all fields under this category
-                    sub_categories_row.append(f'<td colspan="{len(value)}"></td>')
-                    # Add the fields directly
-                    for field in value:
-                        fields_row.append(f'<td><b>{field}</b></td>')
+                if is_parent:
+                    # This is a parent field, count its sub-fields
+                    sub_field_count = 0
+                    j = i + 1
+                    while j < len(columns_info) and columns_info[j][1] == field_name:
+                        sub_field_count += 1
+                        j += 1
+                    
+                    # Parent field spans across all its sub-fields plus itself
+                    total_span = sub_field_count + 1
+                    parent_row.append(f'<td colspan="{total_span}"><b>{field_name}</b></td>')
+                    
+                    # Add the parent field itself in the field row
+                    field_row.append(f'<td><b>{field_name}</b></td>')
+                    i += 1
+                    
+                    # Add all sub-fields
+                    for k in range(sub_field_count):
+                        sub_field_name = columns_info[i][0]
+                        field_row.append(f'<td><b>{sub_field_name}</b></td>')
+                        i += 1
+                        
+                else:
+                    # Simple field (no parent or is a sub-field of already processed parent)
+                    if parent_field is None:
+                        # Independent simple field
+                        parent_row.append(f'<td><b>{field_name}</b></td>')
+                        field_row.append(f'<td><b>{field_name}</b></td>')
+                        i += 1
+                    else:
+                        # This should be handled by parent processing
+                        i += 1
             
-            main_categories_row.append("</tr>")
-            sub_categories_row.append("</tr>")
-            fields_row.append("</tr>")
+            parent_row.append("</tr>")
+            field_row.append("</tr>")
             
             html_lines.extend([
-                "\n".join(main_categories_row),
-                "\n".join(sub_categories_row), 
-                "\n".join(fields_row)
+                "\n".join(parent_row),
+                "\n".join(field_row)
             ])
         
         else:
-            # Generate single level structure (2 rows: categories, fields)
-            categories_row = ["<tr>"]
-            fields_row = ["<tr>"]
+            # Simple single-level structure (all fields are simple arrays)
+            field_row = ["<tr>"]
             
-            for category, fields in table_structure.items():
-                if isinstance(fields, list):
-                    categories_row.append(f'<td colspan="{len(fields)}"><b>{category}</b></td>')
-                    for field in fields:
-                        fields_row.append(f'<td><b>{field}</b></td>')
+            for field_name, _, _ in columns_info:
+                field_row.append(f'<td><b>{field_name}</b></td>')
             
-            categories_row.append("</tr>")
-            fields_row.append("</tr>")
-            
-            html_lines.extend([
-                "\n".join(categories_row),
-                "\n".join(fields_row)
-            ])
+            field_row.append("</tr>")
+            html_lines.append("\n".join(field_row))
+        
+        # Add empty data row
+        empty_row = ["<tr>"]
+        for _ in range(total_columns):
+            empty_row.append("<td><br/></td>")
+        empty_row.append("</tr>")
+        html_lines.append("\n".join(empty_row))
         
         html_lines.append("</table></body></html>")
         
-        return "\n".join(html_lines)
+        result_html = "\n".join(html_lines)
+        print(f"HTML generation successful, length: {len(result_html)} characters")
+        return result_html
         
     except Exception as e:
         # Fallback simple structure
-        return f"<html><body><table><tr><td><b>表格生成错误: {str(e)}</b></td></tr></table></body></html>"
+        error_msg = f"<html><body><table><tr><td><b>表格生成错误: {str(e)}</b></td></tr></table></body></html>"
+        print(f"HTML生成失败: {e}")
+        import traceback
+        print(f"错误详情: {traceback.format_exc()}")
+        return error_msg
 
 
 def extract_empty_row_html_code_based(template_file_path: str) -> str:
