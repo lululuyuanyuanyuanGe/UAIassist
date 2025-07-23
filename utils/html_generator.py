@@ -1,12 +1,29 @@
 import json
 import csv
 import os
+import sys
 from bs4 import BeautifulSoup
 from pathlib import Path
 
 # Add root project directory to sys.path if needed
-import sys
 sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+# Safe print function that handles encoding issues
+def safe_print(*args, **kwargs):
+    """Print function that handles Unicode encoding issues on Windows"""
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        # Convert all args to ASCII-safe versions
+        safe_args = []
+        for arg in args:
+            if isinstance(arg, str):
+                # Replace problematic characters with safe alternatives
+                safe_arg = arg.encode('ascii', errors='replace').decode('ascii')
+                safe_args.append(safe_arg)
+            else:
+                safe_args.append(str(arg))
+        print(*safe_args, **kwargs)
 
 from utils.file_process import read_txt_file
 
@@ -32,11 +49,12 @@ def generate_header_html(json_data: dict) -> str:
         table_title = data.get("表格标题", "表格")
         table_structure = data.get("表格结构", {})
         
-        print(f"Processing table structure: {table_structure}")
+        safe_print(f"Processing table structure: {table_structure}")
         
         # Analyze structure and build column layout information
-        columns_layout = []  # [(field_name, parent_name, level, has_subfields)]
+        columns_layout = []  # [(field_name, parent_name, level, has_subfields, has_parent_value)]
         column_spans = {}  # field_name -> span count
+        parent_value_fields = set()  # track fields that have their own value cells
         max_levels = 1
         
         def analyze_field(field_name, field_value, parent_name=None, level=1):
@@ -45,16 +63,24 @@ def generate_header_html(json_data: dict) -> str:
             
             if isinstance(field_value, list):
                 # Simple field: field_name -> []
-                columns_layout.append((field_name, parent_name, level, False))
+                columns_layout.append((field_name, parent_name, level, False, False))
                 column_spans[field_name] = 1
                 return 1
                 
             elif isinstance(field_value, dict) and "分解" in field_value:
                 # Complex field with sub-fields in "分解"
                 fenjie = field_value.get("分解", {})
+                zhi = field_value.get("值", [])
+                
+                # Check if parent field has its own value (non-empty "值" array)
+                has_parent_value = isinstance(zhi, list) and len(zhi) > 0 and any(str(item).strip() for item in zhi)
+                
                 if fenjie:
                     # This is a parent field with sub-fields
-                    columns_layout.append((field_name, parent_name, level, True))
+                    columns_layout.append((field_name, parent_name, level, True, has_parent_value))
+                    
+                    if has_parent_value:
+                        parent_value_fields.add(field_name)
                     
                     # Process sub-fields
                     total_sub_span = 0
@@ -62,16 +88,18 @@ def generate_header_html(json_data: dict) -> str:
                         sub_span = analyze_field(sub_field_name, sub_field_value, field_name, level + 1)
                         total_sub_span += sub_span
                     
-                    column_spans[field_name] = total_sub_span
-                    return total_sub_span
+                    # If parent has its own value, add 1 to the span count
+                    parent_span = total_sub_span + (1 if has_parent_value else 0)
+                    column_spans[field_name] = parent_span
+                    return parent_span
                 else:
                     # Complex field but no sub-fields (treat as simple)
-                    columns_layout.append((field_name, parent_name, level, False))
+                    columns_layout.append((field_name, parent_name, level, False, False))
                     column_spans[field_name] = 1
                     return 1
             else:
                 # Unknown structure, treat as simple
-                columns_layout.append((field_name, parent_name, level, False))
+                columns_layout.append((field_name, parent_name, level, False, False))
                 column_spans[field_name] = 1
                 return 1
         
@@ -79,14 +107,20 @@ def generate_header_html(json_data: dict) -> str:
         for field_name, field_value in table_structure.items():
             analyze_field(field_name, field_value)
         
-        # Count total columns (only leaf fields count as actual columns)
-        total_columns = sum(1 for _, _, _, has_subfields in columns_layout if not has_subfields)
+        # Count total columns (leaf fields + parent value fields count as actual columns)
+        total_columns = 0
+        for field_name, parent_name, level, has_subfields, has_parent_value in columns_layout:
+            if not has_subfields:  # Leaf field
+                total_columns += 1
+            elif has_parent_value:  # Parent field with its own value cell
+                total_columns += 1
         
-        print(f"📊 Table analysis:")
-        print(f"   - Total columns: {total_columns}")
-        print(f"   - Max levels: {max_levels}")
-        print(f"   - Column layout: {columns_layout}")
-        print(f"   - Column spans: {column_spans}")
+        safe_print(f"Table analysis:")
+        safe_print(f"   - Total columns: {total_columns}")
+        safe_print(f"   - Max levels: {max_levels}")
+        safe_print(f"   - Column layout: {columns_layout}")
+        safe_print(f"   - Column spans: {column_spans}")
+        safe_print(f"   - Parent value fields: {parent_value_fields}")
         
         # Generate colgroup for each actual column
         colgroup_html = "\n".join([f"<colgroup></colgroup>" for _ in range(total_columns)])
@@ -105,24 +139,29 @@ def generate_header_html(json_data: dict) -> str:
             for current_level in range(1, max_levels + 1):
                 row_html = ["<tr>"]
                 
-                for field_name, parent_name, level, has_subfields in columns_layout:
-                    if level == current_level:
-                        if has_subfields:
-                            # Parent field - use colspan for all its sub-fields
-                            span = column_spans[field_name]
-                            row_html.append(f'<td colspan="{span}"><b>{field_name}</b></td>')
-                        else:
-                            # Leaf field - check if it should appear at this level
-                            if current_level == max_levels or parent_name is None:
-                                # Either it's the final level (all leaves appear)
-                                # Or it's a top-level simple field that needs rowspan
-                                if parent_name is None and current_level < max_levels:
-                                    # Top-level simple field needs rowspan to cover remaining levels
+                if current_level < max_levels:
+                    # Non-final levels: show parent fields with colspan and simple fields with rowspan
+                    for field_name, parent_name, level, has_subfields, has_parent_value in columns_layout:
+                        if level == current_level:
+                            if has_subfields:
+                                # Parent field - use colspan for all its sub-fields
+                                span = column_spans[field_name]
+                                row_html.append(f'<td colspan="{span}"><b>{field_name}</b></td>')
+                            else:
+                                # Simple field - needs rowspan to cover remaining levels
+                                if parent_name is None:
                                     levels_to_span = max_levels - current_level + 1
                                     row_html.append(f'<td rowspan="{levels_to_span}"><b>{field_name}</b></td>')
-                                else:
-                                    # Regular leaf field at final level
-                                    row_html.append(f'<td><b>{field_name}</b></td>')
+                else:
+                    # Final level: show all data cells (leaf fields + parent value fields)
+                    for field_name, parent_name, level, has_subfields, has_parent_value in columns_layout:
+                        if level == current_level:
+                            # Leaf field at final level
+                            if not has_subfields:
+                                row_html.append(f'<td><b>{field_name}</b></td>')
+                        elif has_subfields and has_parent_value and level < current_level:
+                            # Parent field with value - add its value cell at final level
+                            row_html.append(f'<td><b>{field_name}</b></td>')
                 
                 row_html.append("</tr>")
                 html_lines.append("\n".join(row_html))
@@ -131,14 +170,14 @@ def generate_header_html(json_data: dict) -> str:
             # Single-level structure (all fields are simple)
             field_row = ["<tr>"]
             
-            for field_name, _, _, has_subfields in columns_layout:
+            for field_name, _, _, has_subfields, has_parent_value in columns_layout:
                 if not has_subfields:  # Only leaf fields
                     field_row.append(f'<td><b>{field_name}</b></td>')
             
             field_row.append("</tr>")
             html_lines.append("\n".join(field_row))
         
-        # Add empty data row
+        # Add empty data row that matches the total column count
         empty_row = ["<tr>"]
         for _ in range(total_columns):
             empty_row.append("<td><br/></td>")
@@ -148,15 +187,15 @@ def generate_header_html(json_data: dict) -> str:
         html_lines.append("</table></body></html>")
         
         result_html = "\n".join(html_lines)
-        print(f"✅ HTML generation successful, length: {len(result_html)} characters")
+        safe_print(f"HTML generation successful, length: {len(result_html)} characters")
         return result_html
         
     except Exception as e:
         # Fallback simple structure
         error_msg = f"<html><body><table><tr><td><b>表格生成错误: {str(e)}</b></td></tr></table></body></html>"
-        print(f"❌ HTML生成失败: {e}")
+        safe_print(f"HTML生成失败: {e}")
         import traceback
-        print(f"错误详情: {traceback.format_exc()}")
+        safe_print(f"错误详情: {traceback.format_exc()}")
         return error_msg
 
 

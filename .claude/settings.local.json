@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp_playwright",
+      "Bash(python:*)"
+    ],
+    "deny": []
+  }
+}
