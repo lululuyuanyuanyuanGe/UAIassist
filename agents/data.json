@@ -50,7 +50,22 @@
         "文档": {}
     },
     "中讯村": {
-        "表格": {},
+        "表格": {
+            "2022年中讯村村民小组长名单": {
+                "summary": "{\n  \"2022年中讯村村民小组长名单.xlsx\": {\n    \"表格结构\": {\n      \"序号\": [],\n      \"镇街\": [],\n      \"村(社区)名称\": [],\n      \"姓名\": [],\n      \"性别\": [],\n      \"年龄\": [],\n      \"民族\": [],\n      \"籍贯\": [],\n      \"政治面貌\": [],\n      \"职务/职称\": [],\n      \"任职时间\": [],\n      \"身份证号\": [],\n      \"文化程度\": [],\n      \"现居住地\": [],\n      \"联系电话\": [],\n      \"备注\": []\n    }\n  }\n}",
+                "file_path": "D:\\asianInfo\\ExcelAssist\\conversations\\1\\user_uploaded_files\\2022年中讯村村民小组长名单.txt",
+                "original_file_path": "D:\\asianInfo\\ExcelAssist\\conversations\\1\\user_uploaded_files\\2022年中讯村村民小组长名单.xlsx",
+                "timestamp": "2025-07-23T17:23:56.661370",
+                "file_size": 7879
+            },
+            "2021年中讯村村民小组长名单": {
+                "summary": "{\n  \"2021年中讯村村民小组长名单.xlsx\": {\n    \"表格结构\": {\n      \"序号\": [],\n      \"镇街\": [],\n      \"村(社区)名称\": [],\n      \"姓名\": [],\n      \"性别\": [],\n      \"年龄\": [],\n      \"民族\": [],\n      \"籍贯\": [],\n      \"政治面貌\": [],\n      \"职务/职称\": [],\n      \"任职时间\": [],\n      \"身份证号\": [],\n      \"文化程度\": [],\n      \"现居住地\": [],\n      \"联系电话\": [],\n      \"备注\": []\n    }\n  }\n}",
+                "file_path": "D:\\asianInfo\\ExcelAssist\\conversations\\1\\user_uploaded_files\\2021年中讯村村民小组长名单.txt",
+                "original_file_path": "D:\\asianInfo\\ExcelAssist\\conversations\\1\\user_uploaded_files\\2021年中讯村村民小组长名单.xlsx",
+                "timestamp": "2025-07-23T17:23:57.257999",
+                "file_size": 9345
+            }
+        },
         "文档": {}
     },
     "郭坡村": {
