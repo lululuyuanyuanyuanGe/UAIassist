@@ -1780,7 +1780,8 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
         # Create destination directories
         processed_content_dir.mkdir(parents=True, exist_ok=True)
         original_dir.mkdir(parents=True, exist_ok=True)
-        screen_shot_dir.mkdir(parents=True, exist_ok=True)
+        if file_type == "table":
+            screen_shot_dir.mkdir(parents=True, exist_ok=True)
 
         result = {
             "processed_supplement_path": "",
@@ -1816,7 +1817,7 @@ def move_supplement_files_to_final_destination(processed_file_path: str, origina
             print(f"✅ 原始补充文件已移动到: {original_target}")
         
         # Move screen shot file
-        if screen_shot_dir and Path(screen_shot_dir).exists():
+        if file_type == "table" and screen_shot_dir and Path(screen_shot_dir).exists():
             screen_shot_source = original_source.with_suffix(".png")
 
             screen_shot_target = screen_shot_dir / screen_shot_source.name
@@ -2087,7 +2088,8 @@ def reconstruct_csv_with_headers(analysis_response: str, original_filename: str,
                 response = invoke_model(
                     model_name="Pro/deepseek-ai/DeepSeek-V3",
                     messages=[SystemMessage(content=system_prompt), HumanMessage(content=chunk_input)],
-                    temperature=0.2
+                    temperature=0.2,
+                    silent_mode=True
                 )
                 
                 print(f"📥 块 {chunk_index + 1} 处理完成")

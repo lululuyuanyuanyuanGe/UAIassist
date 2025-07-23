@@ -471,8 +471,8 @@ class FileProcessAgent:
                 print(f"📦 原文件已备份到: {backup_path}")
             data = {}
         
-        # Get available locations from existing data
-        available_locations = get_available_locations(data)
+        # Use village_name from state as the location for all supplement files
+        location = state["village_name"]
         
         table_files = state["supplement_files_path"]["表格"]
         document_files = state["supplement_files_path"]["文档"]
@@ -491,8 +491,8 @@ class FileProcessAgent:
                 print(f"🔍 正在处理表格文件: {source_path.name}")
                 
                 
-                # Determine location for this file
-                location = state["village_name"]
+                # Use village_name as the location for this table file
+                file_location = location
                 
 
                 print("📤 正在调用LLM进行表格分析...")
@@ -500,10 +500,25 @@ class FileProcessAgent:
                 try:
                     file_name = source_path.name
                     print(f"🔍 表格文件名: {file_name}")
-                    original_excel_file = Path(source_path).with_suffix(".xls")
-
-                    analysis_response = invoke_model_with_screenshot(model_name="Qwen/Qwen2.5-VL-72B-Instruct", file_path=original_excel_file)
-                    print("📥 表格分析响应接收成功")
+                    
+                    # Find the corresponding original Excel file from the uploaded files
+                    table_file_stem = Path(table_file).stem
+                    original_files = state.get("original_files_path", [])
+                    original_excel_file = None
+                    
+                    for original_file in original_files:
+                        if Path(original_file).stem == table_file_stem:
+                            original_excel_file = Path(original_file)
+                            break
+                    
+                    if original_excel_file and original_excel_file.exists():
+                        print(f"🔍 找到原始Excel文件: {original_excel_file}")
+                        analysis_response = invoke_model_with_screenshot(model_name="Qwen/Qwen2.5-VL-72B-Instruct", file_path=original_excel_file)
+                        print("📥 表格分析响应接收成功")
+                    else:
+                        print(f"⚠️ 未找到对应的原始Excel文件: {table_file_stem}")
+                        raise FileNotFoundError(f"Original Excel file not found for {table_file_stem}")
+                        
                 except Exception as llm_error:
                     print(f"❌ LLM调用失败: {llm_error}")
                     # Create fallback response  
@@ -513,28 +528,18 @@ class FileProcessAgent:
                 # Note: file_path will be updated after moving to final destination
                 result_data = {
                     "file_key": source_path.name.split(".")[0],
-                    "location": location,
+                    "location": file_location,
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(table_file),  # This will be updated after moving
-                        "original_file_path": str(original_excel_file),  # This will be updated after moving
+                        "original_file_path": str(original_excel_file) if original_excel_file else "",  # This will be updated after moving
                         "timestamp": datetime.now().isoformat(),
                         "file_size": source_path.stat().st_size
                     },
                     "analysis_response": analysis_response
                 }
                 
-                print(f"✅ 表格文件已分析: {source_path.name} (位置: {location})")
-                
-                # Find the corresponding original Excel file
-                original_excel_file = None
-                table_file_stem = Path(table_file).stem
-                original_files = state.get("original_files_path", [])
-                
-                for original_file in original_files:
-                    if Path(original_file).stem == table_file_stem:
-                        original_excel_file = original_file
-                        break
+                print(f"✅ 表格文件已分析: {source_path.name} (位置: {file_location})")
                 
                 # Reconstruct CSV with headers using the analyzed structure
                 try:
@@ -552,10 +557,9 @@ class FileProcessAgent:
                 
             except Exception as e:
                 print(f"❌ 处理表格文件出错 {table_file}: {e}")
-                default_location = available_locations[0] if available_locations else "默认位置"
                 return table_file, "table", {
                     "file_key": Path(table_file).name,
-                    "location": default_location,  # Default location on error
+                    "location": location,  # Use village_name as location on error
                     "new_entry": {
                         "summary": f"表格文件处理失败: {str(e)}",
                         "file_path": str(table_file),
@@ -576,72 +580,9 @@ class FileProcessAgent:
                 file_name = extract_filename(document_file)
                 print(f"🔍 文档文件名: {file_name}")
                 
-                # For document files, ask user to select location(s)
-                if len(available_locations) == 0:
-                    # If no locations exist, create a default one
-                    selected_locations = ["默认位置"]
-                    print(f"📍 没有可用位置，为文档文件创建默认位置: {selected_locations}")
-                elif len(available_locations) == 1:
-                    # If only one location exists, use it
-                    selected_locations = [available_locations[0]]
-                    print(f"📍 只有一个可用位置，文档文件使用: {selected_locations}")
-                else:
-                    # Multiple locations exist, ask user to choose
-                    try:
-                        locations_list = "\n".join([f"  {i+1}. {loc}" for i, loc in enumerate(available_locations)])
-                        question = f"""检测到文档文件: {source_path.name}
-
-📍 可选的存储位置：
-{locations_list}
-
-请选择要将此文档文件添加到哪个位置：
-  • 输入序号（如：1, 2, 3）选择单个位置
-  • 输入 "all" 添加到所有位置  
-  • 输入 "new [位置名]" 创建新位置（如：new 石龙村）"""
-                        
-                        user_choice = self.request_user_clarification.invoke(
-                            input = {"question": question,
-                                     "context" : "文档文件可以添加到多个位置，请选择合适的存储位置"
-                                    }
-                            )
-                
-                        print(f"👤 用户选择: {user_choice}")
-                        
-                        # Parse user choice
-                        choice = user_choice.strip().lower()
-                        selected_locations = []
-                        
-                        if choice == "all":
-                            selected_locations = available_locations.copy()
-                            print(f"📍 用户选择添加到所有位置: {selected_locations}")
-                        elif choice.startswith("new "):
-                            new_location = choice[4:].strip()
-                            if new_location:
-                                selected_locations = [new_location]
-                                print(f"📍 用户创建新位置: {new_location}")
-                            else:
-                                selected_locations = ["默认位置"]
-                                print(f"⚠️ 新位置名称无效，使用默认位置: {selected_locations[0]}")
-                        else:
-                            # Parse numbers
-                            try:
-                                indices = [int(x.strip()) - 1 for x in choice.split(',')]
-                                selected_locations = [available_locations[i] for i in indices if 0 <= i < len(available_locations)]
-                                if not selected_locations:
-                                    selected_locations = [available_locations[0]]
-                                print(f"📍 用户选择的位置: {selected_locations}")
-                            except (ValueError, IndexError):
-                                selected_locations = [available_locations[0]]
-                                print(f"⚠️ 输入格式错误，使用默认位置: {available_locations[0]}")
-                        
-                        # Handle multiple selected locations
-                        if not selected_locations:
-                            selected_locations = ["默认位置"]
-                        
-                    except Exception as e:
-                        print(f"❌ 用户选择过程出错: {e}")
-                        selected_locations = ["默认位置"]
-                        print(f"📍 使用默认位置: {selected_locations}")
+                # Use village_name as the location for this document file
+                file_location = location
+                print(f"📍 文档文件使用位置: {file_location}")
                 
                 system_prompt = """你是一位专业的文档分析专家，具备法律与政策解读能力。你的任务是阅读用户提供的 HTML 格式文件，并从中提取出最重要的 1-2 条关键信息进行总结，无需提取全部内容。
 
@@ -688,11 +629,11 @@ class FileProcessAgent:
                     # Create fallback response
                     analysis_response = f"文档文件分析失败: {str(llm_error)}，文件名: {source_path.name}"
 
-                # Create result data with multiple location information
+                # Create result data with location information
                 # Note: file_path will be updated after moving to final destination
                 result_data = {
                     "file_key": source_path.name,
-                    "selected_locations": selected_locations,  # Multiple locations
+                    "location": file_location,  # Single location
                     "new_entry": {
                         "summary": analysis_response,
                         "file_path": str(document_file),  # This will be updated after moving
@@ -703,15 +644,14 @@ class FileProcessAgent:
                     "analysis_response": analysis_response
                 }
                 
-                print(f"✅ 文档文件已分析: {source_path.name} (位置: {selected_locations})")
+                print(f"✅ 文档文件已分析: {source_path.name} (位置: {file_location})")
                 return document_file, "document", result_data
                 
             except Exception as e:
                 print(f"❌ 处理文档文件出错 {document_file}: {e}")
-                default_locations = [available_locations[0]] if available_locations else ["默认位置"]
                 return document_file, "document", {
                     "file_key": Path(document_file).name,
-                    "selected_locations": default_locations,  # Default locations on error
+                    "location": location,  # Use village_name as location on error
                     "new_entry": {
                         "summary": f"文档文件处理失败: {str(e)}",
                         "file_path": str(document_file),
@@ -758,41 +698,33 @@ class FileProcessAgent:
                     file_key = result_data["file_key"]
                     new_entry = result_data["new_entry"]
                     
+                    # Both table and document files now use single location
+                    file_location = result_data["location"]
+                    # Ensure location structure exists in data
+                    data = ensure_location_structure(data, file_location)
+                    
                     if processed_file_type == "table":
-                        # Table files have single location
-                        location = result_data["location"]
-                        # Ensure location structure exists in data
-                        data = ensure_location_structure(data, location)
-                        
-                        if file_key in data[location]["表格"]:
-                            print(f"⚠️ 表格文件 {file_key} 已存在于 {location}，将更新其内容")
+                        if file_key in data[file_location]["表格"]:
+                            print(f"⚠️ 表格文件 {file_key} 已存在于 {file_location}，将更新其内容")
                             # Preserve any additional fields that might exist
-                            existing_entry = data[location]["表格"][file_key]
+                            existing_entry = data[file_location]["表格"][file_key]
                             for key, value in existing_entry.items():
                                 if key not in new_entry:
                                     new_entry[key] = value
                         else:
-                            print(f"📝 添加新的表格文件: {file_key} 到 {location}")
-                        data[location]["表格"][file_key] = new_entry
-                    else:  # document - can have multiple locations
-                        selected_locations = result_data["selected_locations"]
-                        for location in selected_locations:
-                            # Ensure location structure exists in data
-                            data = ensure_location_structure(data, location)
-                            
-                            # Create a copy of new_entry for each location
-                            entry_copy = new_entry.copy()
-                            
-                            if file_key in data[location]["文档"]:
-                                print(f"⚠️ 文档文件 {file_key} 已存在于 {location}，将更新其内容")
-                                # Preserve any additional fields that might exist
-                                existing_entry = data[location]["文档"][file_key]
-                                for key, value in existing_entry.items():
-                                    if key not in entry_copy:
-                                        entry_copy[key] = value
-                            else:
-                                print(f"📝 添加新的文档文件: {file_key} 到 {location}")
-                            data[location]["文档"][file_key] = entry_copy
+                            print(f"📝 添加新的表格文件: {file_key} 到 {file_location}")
+                        data[file_location]["表格"][file_key] = new_entry
+                    else:  # document - now also uses single location
+                        if file_key in data[file_location]["文档"]:
+                            print(f"⚠️ 文档文件 {file_key} 已存在于 {file_location}，将更新其内容")
+                            # Preserve any additional fields that might exist
+                            existing_entry = data[file_location]["文档"][file_key]
+                            for key, value in existing_entry.items():
+                                if key not in new_entry:
+                                    new_entry[key] = value
+                        else:
+                            print(f"📝 添加新的文档文件: {file_key} 到 {file_location}")
+                        data[file_location]["文档"][file_key] = new_entry
                     
                 except Exception as e:
                     print(f"❌ 并行处理文件任务失败 {file_path}: {e}")
@@ -829,7 +761,7 @@ class FileProcessAgent:
                 moved_files_info[Path(table_file).name] = {
                     "new_processed_path": move_result["processed_supplement_path"],
                     "new_original_path": move_result["original_supplement_path"],
-                    "new_screen_shot_path": move_result["screen_shot_path"]
+                    "new_screen_shot_path": move_result.get("screen_shot_path", "")  # Use get to avoid KeyError
                 }
             except Exception as e:
                 print(f"❌ 移动表格文件失败 {table_file}: {e}")
