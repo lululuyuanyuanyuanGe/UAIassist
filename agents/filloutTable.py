@@ -575,7 +575,7 @@ class FilloutTableAgent:
                     response = invoke_model(
                         model_name="deepseek-ai/DeepSeek-V3", 
                         messages=[SystemMessage(content=system_prompt), HumanMessage(content=user_input)],
-                        temperature=0.2, silent_mode=True
+                        temperature=0.2, silent_mode=False
                     )
                     print(f"✅ Completed chunk {index + 1}")
                     return (index, response)
